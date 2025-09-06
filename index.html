@@ -114,14 +114,26 @@
 
             // AI Strategy: prioritize high-value captures, then trail lowest card
             const playAITurn = () => {
-                if (currentPlayer === 0 || !players[currentPlayer] || isAIThinking) return;
+                console.log('🤖 playAITurn called');
+                console.log('Current player:', currentPlayer);
+                console.log('Players state:', players);
+                console.log('Is AI thinking:', isAIThinking);
+                
+                if (currentPlayer === 0 || !players[currentPlayer] || isAIThinking) {
+                    console.log('❌ Early return from playAITurn');
+                    return;
+                }
                 
                 setIsAIThinking(true);
                 setMessage(`${players[currentPlayer].name} is thinking...`);
                 
                 setTimeout(() => {
                     const aiPlayer = players[currentPlayer];
+                    console.log('🎯 AI Player:', aiPlayer);
+                    console.log('AI Player hand length:', aiPlayer?.hand?.length);
+                    
                     if (!aiPlayer || aiPlayer.hand.length === 0) {
+                        console.log('⚠️ AI has no cards, skipping turn');
                         setIsAIThinking(false);
                         nextTurn();
                         return;
@@ -129,16 +141,21 @@
 
                     let bestMove = null;
                     let bestScore = -1;
+                    
+                    console.log('🎲 Board cards:', boardCards);
+                    console.log('🃏 AI hand:', aiPlayer.hand);
 
                     // Evaluate all possible moves
                     for (const handCard of aiPlayer.hand) {
                         const captures = findCaptures(handCard, boardCards);
+                        console.log(`💫 Captures for ${handCard.rank}${handCard.suit}:`, captures);
                         
                         for (const capture of captures) {
                             const totalScore = [handCard, ...capture].reduce((sum, card) => sum + card.score, 0);
                             if (totalScore > bestScore) {
                                 bestScore = totalScore;
                                 bestMove = { type: 'capture', handCard, boardCards: capture, score: totalScore };
+                                console.log('✨ New best capture move:', bestMove);
                             }
                         }
                     }
@@ -149,16 +166,22 @@
                             card.score < lowest.score ? card : lowest
                         );
                         bestMove = { type: 'trail', handCard: lowestCard };
+                        console.log('🚶 Trail move (no captures):', bestMove);
                     }
 
+                    console.log('🎯 Final AI move:', bestMove);
                     // Execute the move
                     executeAIMove(bestMove);
                 }, 1000); // 1 second thinking time
             };
 
             const executeAIMove = (move) => {
+                console.log('🎬 Executing AI move:', move);
+                
                 const newPlayers = [...players];
                 const aiPlayer = newPlayers[currentPlayer];
+                
+                console.log('📋 Player before move:', aiPlayer);
                 
                 // Remove hand card
                 aiPlayer.hand = aiPlayer.hand.filter(c => c.id !== move.handCard.id);
@@ -175,11 +198,16 @@
                     ));
                     
                     setMessage(`${aiPlayer.name} captured ${capturedCards.length} cards for ${move.score} points!`);
+                    console.log('🎉 Capture successful!');
                 } else {
                     // Trail card
                     setBoardCards([...boardCards, move.handCard]);
                     setMessage(`${aiPlayer.name} placed ${move.handCard.rank}${move.handCard.suit} on the board.`);
+                    console.log('🚶 Trail successful!');
                 }
+                
+                console.log('📋 Player after move:', aiPlayer);
+                console.log('🎯 Updated players array:', newPlayers);
                 
                 setPlayers(newPlayers);
                 setIsAIThinking(false);
@@ -187,24 +215,34 @@
                 // Check for win condition
                 if (aiPlayer.score >= 500) {
                     setMessage(`${aiPlayer.name} wins with ${aiPlayer.score} points!`);
+                    console.log('🏆 AI wins!');
                     return;
                 }
                 
                 // Move to next turn
                 setTimeout(() => {
+                    console.log('⏭️ Moving to next turn from executeAIMove');
                     nextTurn();
                 }, 1500);
             };
 
             const nextTurn = () => {
+                console.log('🔄 nextTurn called');
+                console.log('Current player before:', currentPlayer);
+                
                 const nextPlayerIndex = (currentPlayer + 1) % 3;
+                console.log('Next player index:', nextPlayerIndex);
+                
                 setCurrentPlayer(nextPlayerIndex);
                 
                 if (nextPlayerIndex === 0) {
+                    console.log('👤 Human turn');
                     setMessage('Your turn! Select a card from your hand.');
                 } else {
+                    console.log(`🤖 AI ${nextPlayerIndex} turn incoming`);
                     // Trigger AI turn after a brief delay
                     setTimeout(() => {
+                        console.log(`🤖 Triggering AI ${nextPlayerIndex} turn`);
                         playAITurn();
                     }, 500);
                 }
@@ -212,10 +250,30 @@
 
             // Trigger AI turns when it's their turn
             useEffect(() => {
-                if (gameStarted && currentPlayer > 0 && !isAIThinking) {
-                    playAITurn();
+                console.log('🔍 useEffect triggered');
+                console.log('Game started:', gameStarted);
+                console.log('Current player:', currentPlayer);
+                console.log('Is AI thinking:', isAIThinking);
+                console.log('Players length:', players.length);
+                
+                // Add a detailed check of player hands
+                if (players.length > 0) {
+                    players.forEach((player, index) => {
+                        console.log(`Player ${index} (${player.name}): ${player.hand.length} cards`);
+                    });
                 }
-            }, [currentPlayer, gameStarted]);
+                
+                if (gameStarted && currentPlayer > 0 && !isAIThinking && players.length > 0) {
+                    console.log('✅ Conditions met, calling playAITurn');
+                    playAITurn();
+                } else {
+                    console.log('❌ Conditions not met for AI turn');
+                    if (!gameStarted) console.log('  - Game not started');
+                    if (currentPlayer === 0) console.log('  - Current player is human');
+                    if (isAIThinking) console.log('  - AI is already thinking');
+                    if (players.length === 0) console.log('  - No players yet');
+                }
+            }, [currentPlayer, gameStarted, players, isAIThinking]);
 
             const selectHandCard = (card) => {
                 if (currentPlayer !== 0 || isAIThinking) return;
@@ -234,6 +292,7 @@
             };
 
             const captureCards = () => {
+                console.log('🎯 Human captureCards called');
                 if (!selectedHandCard || selectedBoardCards.length === 0 || isAIThinking) return;
                 if (!canCapture(selectedHandCard, selectedBoardCards)) {
                     setMessage('Invalid capture!');
@@ -261,12 +320,14 @@
                     return;
                 }
                 
+                console.log('👤 Human capture complete, calling nextTurn');
                 setTimeout(() => {
                     nextTurn();
                 }, 1500);
             };
 
             const placeCard = () => {
+                console.log('🏷️ Human placeCard called');
                 if (!selectedHandCard || isAIThinking) return;
                 const newPlayers = [...players];
                 const player = newPlayers[currentPlayer];
@@ -276,6 +337,7 @@
                 setMessage(`Placed ${selectedHandCard.rank}${selectedHandCard.suit} on the board.`);
                 setSelectedHandCard(null);
                 
+                console.log('👤 Human place complete, calling nextTurn');
                 setTimeout(() => {
                     nextTurn();
                 }, 1500);

@@ -230,9 +230,33 @@
                 console.log('🔄 nextTurn called');
                 console.log('Current player before:', currentPlayer);
                 
-                const nextPlayerIndex = (currentPlayer + 1) % 3;
-                console.log('Next player index:', nextPlayerIndex);
+                // Check if all players have no cards (round end)
+                const totalCardsInHands = players.reduce((sum, player) => sum + player.hand.length, 0);
+                console.log('Total cards in all hands:', totalCardsInHands);
                 
+                if (totalCardsInHands === 0) {
+                    console.log('🏁 All players out of cards - round ended!');
+                    setMessage('Round ended! All players are out of cards.');
+                    return;
+                }
+                
+                // Find next player with cards
+                let nextPlayerIndex = (currentPlayer + 1) % 3;
+                let attempts = 0;
+                
+                while (attempts < 3 && players[nextPlayerIndex]?.hand.length === 0) {
+                    console.log(`Player ${nextPlayerIndex} has no cards, skipping...`);
+                    nextPlayerIndex = (nextPlayerIndex + 1) % 3;
+                    attempts++;
+                }
+                
+                if (attempts >= 3) {
+                    console.log('🏁 No players have cards - game over!');
+                    setMessage('Game Over! No players have cards remaining.');
+                    return;
+                }
+                
+                console.log('Next player index:', nextPlayerIndex);
                 setCurrentPlayer(nextPlayerIndex);
                 
                 if (nextPlayerIndex === 0) {

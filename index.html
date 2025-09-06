@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STACKED! Card Game</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState } = React;
+
+        const StackedGame = () => {
+            const getCardScore = (rank) => {
+                if (rank === 'A') return 15;
+                if (['K', 'Q', 'J', '10'].includes(rank)) return 10;
+                return 5;
+            };
+
+            const createDeck = () => {
+                const suits = ['♠', '♥', '♦', '♣'];
+                const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+                const deck = suits.flatMap(suit => 
+                    ranks.map(rank => ({ 
+                        id: `${rank}${suit}`, 
+                        rank, 
+                        suit, 
+                        score: getCardScore(rank),
+                        numValue: rank === 'A' ? 1 : isNaN(parseInt(rank)) ? 0 : parseInt(rank)
+                    }))
+                );
+                
+                for (let i = deck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [deck[i], deck[j]] = [deck[j], deck[i]];
+                }
+                return deck;
+            };
+
+            const [players, setPlayers] = useState([]);
+            const [boardCards, setBoardCards] = useState([]);
+            const [currentPlayer, setCurrentPlayer] = useState(0);
+            const [selectedHandCard, setSelectedHandCard] = useState(null);
+            const [selectedBoardCards, setSelectedBoardCards] = useState([]);
+            const [message, setMessage] = useState('');
+            const [gameStarted, setGameStarted] = useState(false);
+
+            const startGame = () => {
+                const newDeck = createDeck();
+                const newPlayers = Array.from({ length: 3 }, (_, i) => ({
+                    id: i,
+                    name: i === 0 ? 'You' : `AI ${i}`,
+                    hand: newDeck.slice(i * 4, (i + 1) * 4),
+                    captured: [],
+                    score: 0
+                }));
+                
+                setPlayers(newPlayers);
+                setBoardCards(newDeck.slice(12, 16));
+                setCurrentPlayer(0);
+                setGameStarted(true);
+                setSelectedHandCard(null);
+                setSelectedBoardCards([]);
+                setMessage('Your turn! Select a card from your hand.');
+            };
+
+            const canCapture = (handCard, boardCards) => {
+                if (boardCards.length === 0) return false;
+                if (boardCards.every(card => card.rank === handCard.rank)) return true;
+                if (handCard.numValue > 0) {
+                    const boardSum = boardCards.reduce((sum, card) => sum + (card.numValue || 0), 0);
+                    return boardSum === handCard.numValue && boardCards.every(card => card.numValue > 0);
+                }
+                return false;
+            };
+
+            const selectHandCard = (card) => {
+                if (currentPlayer !== 0) return;
+                setSelectedHandCard(selectedHandCard?.id === card.id ? null : card);
+                setSelectedBoardCards([]);
+            };
+
+            const selectBoardCard = (card) => {
+                if (!selectedHandCard || currentPlayer !== 0) return;
+                const isSelected = selectedBoardCards.some(c => c.id === card.id);
+                if (isSelected) {
+                    setSelectedBoardCards(selectedBoardCards.filter(c => c.id !== card.id));
+                } else {
+                    setSelectedBoardCards([...selectedBoardCards, card]);
+                }
+            };
+
+            const captureCards = () => {
+                if (!selectedHandCard || selectedBoardCards.length === 0) return;
+                if (!canCapture(selectedHandCard, selectedBoardCards)) {
+                    setMessage('Invalid capture!');
+                    return;
+                }
+                
+                const newPlayers = [...players];
+                const player = newPlayers[currentPlayer];
+                player.hand = player.hand.filter(c => c.id !== selectedHandCard.id);
+                const capturedCards = [selectedHandCard, ...selectedBoardCards];
+                player.captured.push(...capturedCards);
+                player.score += capturedCards.reduce((sum, card) => sum + card.score, 0);
+                
+                setBoardCards(boardCards.filter(card => 
+                    !selectedBoardCards.some(selected => selected.id === card.id)
+                ));
+                
+                setMessage(`Captured ${capturedCards.length} cards for ${capturedCards.reduce((sum, card) => sum + card.score, 0)} points!`);
+                setPlayers(newPlayers);
+                setSelectedHandCard(null);
+                setSelectedBoardCards([]);
+                
+                if (player.score >= 500) {
+                    setMessage(`You win with ${player.score} points!`);
+                } else if (player.hand.length === 0) {
+                    setCurrentPlayer((currentPlayer + 1) % 3);
+                }
+            };
+
+            const trailCard = () => {
+                if (!selectedHandCard) return;
+                const newPlayers = [...players];
+                const player = newPlayers[currentPlayer];
+                player.hand = player.hand.filter(c => c.id !== selectedHandCard.id);
+                setBoardCards([...boardCards, selectedHandCard]);
+                setPlayers(newPlayers);
+                setMessage(`Trailed ${selectedHandCard.rank}${selectedHandCard.suit}.`);
+                setSelectedHandCard(null);
+                setCurrentPlayer((currentPlayer + 1) % 3);
+            };
+
+            const Card = ({ card, onClick, selected, size = 'normal' }) => {
+                const isRed = ['♥', '♦'].includes(card.suit);
+                const sizes = { small: 'w-10 h-14 text-xs', normal: 'w-12 h-16 text-sm', large: 'w-14 h-20 text-base' };
+                
+                return React.createElement('div', {
+                    onClick: onClick,
+                    className: `${sizes[size]} ${isRed ? 'text-red-600' : 'text-black'} ${selected ? 'bg-blue-200 border-blue-500' : 'bg-white border-gray-300'} border-2 rounded-lg flex flex-col items-center justify-between p-1 font-bold shadow-sm cursor-pointer hover:shadow-md transition-all`
+                }, [
+                    React.createElement('div', { key: 'rank', className: 'text-xs' }, card.rank),
+                    React.createElement('div', { key: 'suit', className: 'text-lg' }, card.suit),
+                    React.createElement('div', { key: 'score', className: 'text-xs' }, card.score)
+                ]);
+            };
+
+            return React.createElement('div', {
+                className: 'min-h-screen bg-gradient-to-br from-green-600 to-green-800 text-white p-4'
+            }, [
+                React.createElement('div', { key: 'container', className: 'max-w-4xl mx-auto' }, [
+                    React.createElement('h1', { key: 'title', className: 'text-4xl font-bold text-center mb-6' }, 'STACKED!'),
+                    
+                    !gameStarted ? 
+                        React.createElement('div', { key: 'start', className: 'text-center' },
+                            React.createElement('button', {
+                                onClick: startGame,
+                                className: 'bg-yellow-500 hover:bg-yellow-400 text-black px-8 py-3 rounded-lg font-bold text-lg'
+                            }, 'Start Game')
+                        ) :
+                        React.createElement('div', { key: 'game', className: 'space-y-6' }, [
+                            React.createElement('div', { key: 'message', className: 'bg-white/10 backdrop-blur rounded-lg p-4 text-center' },
+                                React.createElement('p', { className: 'font-semibold' }, message)
+                            ),
+                            
+                            React.createElement('div', { key: 'scores', className: 'grid grid-cols-3 gap-4' },
+                                players.map(player =>
+                                    React.createElement('div', {
+                                        key: player.id,
+                                        className: 'bg-white/10 backdrop-blur rounded-lg p-3 text-center'
+                                    }, [
+                                        React.createElement('div', { key: 'name', className: 'font-bold' }, player.name),
+                                        React.createElement('div', { key: 'score', className: 'text-2xl font-bold text-yellow-300' }, player.score)
+                                    ])
+                                )
+                            ),
+                            
+                            React.createElement('div', { key: 'board', className: 'bg-white/10 backdrop-blur rounded-lg p-4' }, [
+                                React.createElement('h3', { key: 'board-title', className: 'font-bold mb-3' }, 'Board Cards'),
+                                React.createElement('div', { key: 'board-cards', className: 'flex flex-wrap gap-2 min-h-20' },
+                                    boardCards.map(card =>
+                                        React.createElement(Card, {
+                                            key: card.id,
+                                            card: card,
+                                            onClick: () => selectBoardCard(card),
+                                            selected: selectedBoardCards.some(c => c.id === card.id)
+                                        })
+                                    )
+                                )
+                            ]),
+                            
+                            React.createElement('div', { key: 'hand', className: 'bg-white/10 backdrop-blur rounded-lg p-4' }, [
+                                React.createElement('h3', { key: 'hand-title', className: 'font-bold mb-3' }, 'Your Hand'),
+                                React.createElement('div', { key: 'hand-cards', className: 'flex flex-wrap gap-2 justify-center' },
+                                    players[0]?.hand.map(card =>
+                                        React.createElement(Card, {
+                                            key: card.id,
+                                            card: card,
+                                            onClick: () => selectHandCard(card),
+                                            selected: selectedHandCard?.id === card.id,
+                                            size: 'large'
+                                        })
+                                    ) || []
+                                )
+                            ]),
+                            
+                            selectedHandCard && currentPlayer === 0 ?
+                                React.createElement('div', { key: 'actions', className: 'flex gap-4 justify-center' }, [
+                                    React.createElement('button', {
+                                        key: 'capture',
+                                        onClick: captureCards,
+                                        disabled: selectedBoardCards.length === 0 || !canCapture(selectedHandCard, selectedBoardCards),
+                                        className: 'bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:opacity-50 px-6 py-3 rounded-lg font-bold'
+                                    }, `Capture (${selectedBoardCards.length})`),
+                                    React.createElement('button', {
+                                        key: 'trail',
+                                        onClick: trailCard,
+                                        className: 'bg-orange-600 hover:bg-orange-500 px-6 py-3 rounded-lg font-bold'
+                                    }, 'Trail Card')
+                                ]) : null
+                        ])
+                ])
+            ]);
+        };
+
+        ReactDOM.render(React.createElement(StackedGame), document.getElementById('root'));
+    </script>
+</body>
+</html>

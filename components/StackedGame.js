@@ -9,7 +9,7 @@ const StackedGame = () => {
     return 5; // 2-9
   };
 
-  // Create and shuffle deck
+  // Create and shuffle deck - FIXED UNICODE
   const createDeck = () => {
     const suits = ['♠', '♥', '♦', '♣'];
     const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
@@ -276,7 +276,7 @@ const StackedGame = () => {
     }
   };
 
-  // Card component
+  // Card component - FIXED UNICODE
   const Card = ({ card, onClick, selected, size = 'normal', disabled = false }) => {
     const isRed = ['♥', '♦'].includes(card.suit);
     

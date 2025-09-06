@@ -229,13 +229,11 @@
 
             const executeAction = (action) => {
                 console.log('🎬 Executing action:', action);
-// ADD THIS LINE:
 if (action.type === 'capture') {
-    console.log('🔍 CAPTURE DEBUG:', {
-        handCard: `${action.handCard.rank}${action.handCard.suit}`,
-        boardCards: action.boardCards.map(c => `${c.rank}${c.suit}`),
-        isValid: canCapture(action.handCard, action.boardCards)
-    });
+    console.log('🔍 CAPTURE DEBUG:');
+    console.log('  Hand card:', `${action.handCard.rank}${action.handCard.suit} (${action.handCard.score} pts)`);
+    console.log('  Board cards:', action.boardCards.map(c => `${c.rank}${c.suit} (${c.score} pts)`));
+    console.log('  Is valid:', canCapture(action.handCard, action.boardCards));
 }
                 
                 const newPlayers = [...players];
@@ -315,23 +313,7 @@ if (action.type === 'capture') {
                     if (!aiPlayer || aiPlayer.hand.length === 0) {
     console.log('🪑 AI has no cards - should be sitting out');
     setIsAIThinking(false);
-    
-    // Trigger game state check instead of returning
-    setTimeout(() => {
-        const newGameState = determineGameState();
-        if (newGameState === 'DEAL_NEW_HAND') {
-            dealNewHand();
-        } else if (newGameState === 'END_ROUND') {
-            endRound();
-        } else {
-            // Find next player with cards
-            const nextPlayer = findNextPlayer();
-            if (nextPlayer !== null) {
-                setCurrentPlayer(nextPlayer);
-            }
-        }
-    }, 500);
-    return;
+    return; // Just return - let useEffect handle the logic
 }
 
                     let bestMove = null;

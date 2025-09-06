@@ -563,38 +563,58 @@
             }
             
             async processGameState() {
+                console.log('🔍 processGameState called');
+                console.log('isProcessing:', this.isProcessing);
+                
                 try {
+                    const currentState = this.gameEngine.getState();
+                    console.log('📊 Current game state:');
+                    console.log('  currentPlayer:', currentState.currentPlayer);
+                    console.log('  lastAction:', currentState.lastAction);
+                    console.log('  Player hands:', currentState.players.map(p => `${p.name}: ${p.hand.length} cards`));
+                    
                     const decision = GameStateManager.determineGameState(this.gameEngine);
-                    console.log('🎯 GameController processing decision:', decision.action);
+                    console.log('🎯 GameStateManager decision:', decision.action);
+                    console.log('🎯 Decision data:', decision);
                     
                     const result = GameStateManager.executeDecision(decision, this.gameEngine);
+                    console.log('🎬 Decision execution result:', result);
                     
                     switch (decision.action) {
                         case GameStateManager.STATES.CONTINUE_TURN:
+                            console.log('📋 CONTINUE_TURN: Player keeps turn after capture');
                             this.updateUI('You captured cards and continue your turn!');
                             this.isProcessing = false;
                             break;
                             
                         case GameStateManager.STATES.NEXT_PLAYER:
+                            console.log(`📋 NEXT_PLAYER: Advancing to player ${decision.nextPlayer}`);
                             await this.handleNextPlayer(decision.nextPlayer);
                             break;
                             
                         case GameStateManager.STATES.DEAL_NEW_HAND:
+                            console.log('📋 DEAL_NEW_HAND: All hands empty, dealing new cards');
                             this.updateUI(`New hand dealt! ${result.cardsRemaining} cards remaining in deck.`);
                             setTimeout(() => this.processGameState(), 1000);
                             break;
                             
                         case GameStateManager.STATES.END_ROUND:
+                            console.log('📋 END_ROUND: Round over');
                             this.handleEndRound(result);
                             break;
                             
                         case GameStateManager.STATES.END_GAME:
+                            console.log('📋 END_GAME: Game over');
                             this.handleEndGame(result);
                             break;
+                            
+                        default:
+                            console.log('❌ Unknown decision action:', decision.action);
+                            this.isProcessing = false;
                     }
                     
                 } catch (error) {
-                    console.error('Error processing game state:', error);
+                    console.error('❌ Error processing game state:', error);
                     this.isProcessing = false;
                 }
             }

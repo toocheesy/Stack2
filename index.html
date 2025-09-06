@@ -13,7 +13,7 @@
     <div id="root"></div>
     
     <script type="text/babel">
-        const { useState } = React;
+        const { useState, useEffect } = React;
 
         const StackedGame = () => {
             const getCardScore = (rank) => {
@@ -49,6 +49,7 @@
             const [selectedBoardCards, setSelectedBoardCards] = useState([]);
             const [message, setMessage] = useState('');
             const [gameStarted, setGameStarted] = useState(false);
+            const [isAIThinking, setIsAIThinking] = useState(false);
 
             const startGame = () => {
                 const newDeck = createDeck();
@@ -67,26 +68,158 @@
                 setSelectedHandCard(null);
                 setSelectedBoardCards([]);
                 setMessage('Your turn! Select a card from your hand.');
+                setIsAIThinking(false);
             };
 
             const canCapture = (handCard, boardCards) => {
                 if (boardCards.length === 0) return false;
+                
+                // Rank matching capture
                 if (boardCards.every(card => card.rank === handCard.rank)) return true;
+                
+                // Number sum capture (only for numbered cards)
                 if (handCard.numValue > 0) {
                     const boardSum = boardCards.reduce((sum, card) => sum + (card.numValue || 0), 0);
                     return boardSum === handCard.numValue && boardCards.every(card => card.numValue > 0);
                 }
+                
                 return false;
             };
 
+            // Find all possible captures for a hand card
+            const findCaptures = (handCard, boardCards) => {
+                const captures = [];
+                
+                // Try all combinations of board cards
+                for (let i = 1; i < (1 << boardCards.length); i++) {
+                    const combination = [];
+                    for (let j = 0; j < boardCards.length; j++) {
+                        if (i & (1 << j)) {
+                            combination.push(boardCards[j]);
+                        }
+                    }
+                    
+                    if (canCapture(handCard, combination)) {
+                        captures.push(combination);
+                    }
+                }
+                
+                return captures;
+            };
+
+            // AI Strategy: prioritize high-value captures, then trail lowest card
+            const playAITurn = () => {
+                if (currentPlayer === 0 || !players[currentPlayer] || isAIThinking) return;
+                
+                setIsAIThinking(true);
+                setMessage(`${players[currentPlayer].name} is thinking...`);
+                
+                setTimeout(() => {
+                    const aiPlayer = players[currentPlayer];
+                    if (!aiPlayer || aiPlayer.hand.length === 0) {
+                        setIsAIThinking(false);
+                        nextTurn();
+                        return;
+                    }
+
+                    let bestMove = null;
+                    let bestScore = -1;
+
+                    // Evaluate all possible moves
+                    for (const handCard of aiPlayer.hand) {
+                        const captures = findCaptures(handCard, boardCards);
+                        
+                        for (const capture of captures) {
+                            const totalScore = [handCard, ...capture].reduce((sum, card) => sum + card.score, 0);
+                            if (totalScore > bestScore) {
+                                bestScore = totalScore;
+                                bestMove = { type: 'capture', handCard, boardCards: capture, score: totalScore };
+                            }
+                        }
+                    }
+
+                    // If no good capture found, trail the lowest scoring card
+                    if (!bestMove) {
+                        const lowestCard = aiPlayer.hand.reduce((lowest, card) => 
+                            card.score < lowest.score ? card : lowest
+                        );
+                        bestMove = { type: 'trail', handCard: lowestCard };
+                    }
+
+                    // Execute the move
+                    executeAIMove(bestMove);
+                }, 1000); // 1 second thinking time
+            };
+
+            const executeAIMove = (move) => {
+                const newPlayers = [...players];
+                const aiPlayer = newPlayers[currentPlayer];
+                
+                // Remove hand card
+                aiPlayer.hand = aiPlayer.hand.filter(c => c.id !== move.handCard.id);
+                
+                if (move.type === 'capture') {
+                    // Capture cards
+                    const capturedCards = [move.handCard, ...move.boardCards];
+                    aiPlayer.captured.push(...capturedCards);
+                    aiPlayer.score += capturedCards.reduce((sum, card) => sum + card.score, 0);
+                    
+                    // Remove captured cards from board
+                    setBoardCards(boardCards.filter(card => 
+                        !move.boardCards.some(captured => captured.id === card.id)
+                    ));
+                    
+                    setMessage(`${aiPlayer.name} captured ${capturedCards.length} cards for ${move.score} points!`);
+                } else {
+                    // Trail card
+                    setBoardCards([...boardCards, move.handCard]);
+                    setMessage(`${aiPlayer.name} placed ${move.handCard.rank}${move.handCard.suit} on the board.`);
+                }
+                
+                setPlayers(newPlayers);
+                setIsAIThinking(false);
+                
+                // Check for win condition
+                if (aiPlayer.score >= 500) {
+                    setMessage(`${aiPlayer.name} wins with ${aiPlayer.score} points!`);
+                    return;
+                }
+                
+                // Move to next turn
+                setTimeout(() => {
+                    nextTurn();
+                }, 1500);
+            };
+
+            const nextTurn = () => {
+                const nextPlayerIndex = (currentPlayer + 1) % 3;
+                setCurrentPlayer(nextPlayerIndex);
+                
+                if (nextPlayerIndex === 0) {
+                    setMessage('Your turn! Select a card from your hand.');
+                } else {
+                    // Trigger AI turn after a brief delay
+                    setTimeout(() => {
+                        playAITurn();
+                    }, 500);
+                }
+            };
+
+            // Trigger AI turns when it's their turn
+            useEffect(() => {
+                if (gameStarted && currentPlayer > 0 && !isAIThinking) {
+                    playAITurn();
+                }
+            }, [currentPlayer, gameStarted]);
+
             const selectHandCard = (card) => {
-                if (currentPlayer !== 0) return;
+                if (currentPlayer !== 0 || isAIThinking) return;
                 setSelectedHandCard(selectedHandCard?.id === card.id ? null : card);
                 setSelectedBoardCards([]);
             };
 
             const selectBoardCard = (card) => {
-                if (!selectedHandCard || currentPlayer !== 0) return;
+                if (!selectedHandCard || currentPlayer !== 0 || isAIThinking) return;
                 const isSelected = selectedBoardCards.some(c => c.id === card.id);
                 if (isSelected) {
                     setSelectedBoardCards(selectedBoardCards.filter(c => c.id !== card.id));
@@ -96,7 +229,7 @@
             };
 
             const captureCards = () => {
-                if (!selectedHandCard || selectedBoardCards.length === 0) return;
+                if (!selectedHandCard || selectedBoardCards.length === 0 || isAIThinking) return;
                 if (!canCapture(selectedHandCard, selectedBoardCards)) {
                     setMessage('Invalid capture!');
                     return;
@@ -120,21 +253,27 @@
                 
                 if (player.score >= 500) {
                     setMessage(`You win with ${player.score} points!`);
-                } else if (player.hand.length === 0) {
-                    setCurrentPlayer((currentPlayer + 1) % 3);
+                    return;
                 }
+                
+                setTimeout(() => {
+                    nextTurn();
+                }, 1500);
             };
 
-            const trailCard = () => {
-                if (!selectedHandCard) return;
+            const placeCard = () => {
+                if (!selectedHandCard || isAIThinking) return;
                 const newPlayers = [...players];
                 const player = newPlayers[currentPlayer];
                 player.hand = player.hand.filter(c => c.id !== selectedHandCard.id);
                 setBoardCards([...boardCards, selectedHandCard]);
                 setPlayers(newPlayers);
-                setMessage(`Trailed ${selectedHandCard.rank}${selectedHandCard.suit}.`);
+                setMessage(`Placed ${selectedHandCard.rank}${selectedHandCard.suit} on the board.`);
                 setSelectedHandCard(null);
-                setCurrentPlayer((currentPlayer + 1) % 3);
+                
+                setTimeout(() => {
+                    nextTurn();
+                }, 1500);
             };
 
             const Card = ({ card, onClick, selected, size = 'normal' }) => {
@@ -173,10 +312,11 @@
                                 players.map(player =>
                                     React.createElement('div', {
                                         key: player.id,
-                                        className: 'bg-white/10 backdrop-blur rounded-lg p-3 text-center'
+                                        className: `bg-white/10 backdrop-blur rounded-lg p-3 text-center ${currentPlayer === player.id ? 'ring-2 ring-yellow-400' : ''}`
                                     }, [
                                         React.createElement('div', { key: 'name', className: 'font-bold' }, player.name),
-                                        React.createElement('div', { key: 'score', className: 'text-2xl font-bold text-yellow-300' }, player.score)
+                                        React.createElement('div', { key: 'score', className: 'text-2xl font-bold text-yellow-300' }, player.score),
+                                        React.createElement('div', { key: 'cards', className: 'text-sm opacity-75' }, `${player.hand.length} cards`)
                                     ])
                                 )
                             ),
@@ -210,7 +350,7 @@
                                 )
                             ]),
                             
-                            selectedHandCard && currentPlayer === 0 ?
+                            selectedHandCard && currentPlayer === 0 && !isAIThinking ?
                                 React.createElement('div', { key: 'actions', className: 'flex gap-4 justify-center' }, [
                                     React.createElement('button', {
                                         key: 'capture',
@@ -219,10 +359,10 @@
                                         className: 'bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:opacity-50 px-6 py-3 rounded-lg font-bold'
                                     }, `Capture (${selectedBoardCards.length})`),
                                     React.createElement('button', {
-                                        key: 'trail',
-                                        onClick: trailCard,
+                                        key: 'place',
+                                        onClick: placeCard,
                                         className: 'bg-orange-600 hover:bg-orange-500 px-6 py-3 rounded-lg font-bold'
-                                    }, 'Trail Card')
+                                    }, 'Place Card')
                                 ]) : null
                         ])
                 ])

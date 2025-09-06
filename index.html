@@ -42,19 +42,26 @@
                 return deck;
             };
 
+            // Game State
             const [players, setPlayers] = useState([]);
             const [boardCards, setBoardCards] = useState([]);
+            const [deck, setDeck] = useState([]);
             const [currentPlayer, setCurrentPlayer] = useState(0);
             const [selectedHandCard, setSelectedHandCard] = useState(null);
             const [selectedBoardCards, setSelectedBoardCards] = useState([]);
             const [message, setMessage] = useState('');
             const [gameStarted, setGameStarted] = useState(false);
             const [isAIThinking, setIsAIThinking] = useState(false);
+            const [lastCapturer, setLastCapturer] = useState(null);
+            const [lastAction, setLastAction] = useState(null);
+            const [gameState, setGameState] = useState('PLAYING'); // PLAYING, DEAL_NEW_HAND, END_ROUND, END_GAME
 
             const startGame = () => {
                 console.log('🎮 Starting new game');
                 
                 const newDeck = createDeck();
+                
+                // Deal initial hands and board
                 const newPlayers = Array.from({ length: 3 }, (_, i) => ({
                     id: i,
                     name: i === 0 ? 'You' : `AI ${i}`,
@@ -63,17 +70,26 @@
                     score: 0
                 }));
                 
-                console.log('🃏 Initial players:', newPlayers);
-                console.log('🎲 Initial board cards:', newDeck.slice(12, 16));
+                const initialBoard = newDeck.slice(12, 16);
+                const remainingDeck = newDeck.slice(16);
+                
+                console.log('📊 Initial state:');
+                console.log('Players:', newPlayers);
+                console.log('Board:', initialBoard);
+                console.log('Deck remaining:', remainingDeck.length);
                 
                 setPlayers(newPlayers);
-                setBoardCards(newDeck.slice(12, 16));
+                setBoardCards(initialBoard);
+                setDeck(remainingDeck);
                 setCurrentPlayer(0);
                 setGameStarted(true);
                 setSelectedHandCard(null);
                 setSelectedBoardCards([]);
                 setMessage('Your turn! Select a card from your hand.');
                 setIsAIThinking(false);
+                setLastCapturer(null);
+                setLastAction(null);
+                setGameState('PLAYING');
             };
 
             const canCapture = (handCard, boardCards) => {
@@ -91,11 +107,9 @@
                 return false;
             };
 
-            // Find all possible captures for a hand card
             const findCaptures = (handCard, boardCards) => {
                 const captures = [];
                 
-                // Try all combinations of board cards
                 for (let i = 1; i < (1 << boardCards.length); i++) {
                     const combination = [];
                     for (let j = 0; j < boardCards.length; j++) {
@@ -112,201 +126,235 @@
                 return captures;
             };
 
-            // AI Strategy: prioritize high-value captures, then trail lowest card
-            const playAITurn = () => {
-                console.log('🤖 playAITurn called');
-                console.log('Current player:', currentPlayer);
-                console.log('Players state:', players);
-                console.log('Is AI thinking:', isAIThinking);
+            const determineGameState = () => {
+                console.log('🔍 Determining game state...');
                 
-                if (currentPlayer === 0 || !players[currentPlayer] || isAIThinking) {
-                    console.log('❌ Early return from playAITurn');
+                // Check if all hands are empty
+                const totalCardsInHands = players.reduce((sum, player) => sum + player.hand.length, 0);
+                console.log('Total cards in hands:', totalCardsInHands);
+                console.log('Cards in deck:', deck.length);
+                
+                if (totalCardsInHands === 0) {
+                    if (deck.length >= 12) {
+                        console.log('🃏 All hands empty, dealing new hand');
+                        return 'DEAL_NEW_HAND';
+                    } else {
+                        console.log('🏁 Round over - deck empty');
+                        return 'END_ROUND';
+                    }
+                }
+                
+                // Check win condition
+                const winner = players.find(player => player.score >= 500);
+                if (winner) {
+                    console.log('🏆 Game over - winner found');
+                    return 'END_GAME';
+                }
+                
+                return 'PLAYING';
+            };
+
+            const dealNewHand = () => {
+                console.log('🃏 Dealing new hand');
+                
+                if (deck.length < 12) {
+                    console.log('⚠️ Not enough cards for new hand');
                     return;
                 }
+                
+                const newPlayers = [...players];
+                let deckIndex = 0;
+                
+                // Deal 4 cards to each player
+                for (let i = 0; i < 3; i++) {
+                    newPlayers[i].hand = deck.slice(deckIndex, deckIndex + 4);
+                    deckIndex += 4;
+                }
+                
+                const newDeck = deck.slice(12);
+                
+                console.log('New hands dealt, deck now has:', newDeck.length, 'cards');
+                
+                setPlayers(newPlayers);
+                setDeck(newDeck);
+                setGameState('PLAYING');
+                setMessage(`New hand dealt! ${newDeck.length} cards remaining in deck.`);
+                
+                // Continue with current player or find next player with cards
+                if (currentPlayer > 0 && !isAIThinking) {
+                    setTimeout(() => playAITurn(), 1000);
+                }
+            };
+
+            const endRound = () => {
+                console.log('🏁 Ending round');
+                
+                // Apply jackpot if there are board cards and someone made a capture
+                if (boardCards.length > 0 && lastCapturer !== null) {
+                    const newPlayers = [...players];
+                    const jackpotScore = boardCards.reduce((sum, card) => sum + card.score, 0);
+                    newPlayers[lastCapturer].captured.push(...boardCards);
+                    newPlayers[lastCapturer].score += jackpotScore;
+                    
+                    setPlayers(newPlayers);
+                    setBoardCards([]);
+                    setMessage(`${newPlayers[lastCapturer].name} wins the jackpot! +${jackpotScore} points from ${boardCards.length} cards!`);
+                    
+                    console.log('💰 Jackpot awarded to player', lastCapturer, 'for', jackpotScore, 'points');
+                } else {
+                    setMessage('Round ended. No jackpot this time.');
+                }
+                
+                // Check for game winner
+                const winner = players.find(player => player.score >= 500);
+                if (winner) {
+                    setGameState('END_GAME');
+                    setMessage(`${winner.name} wins the game with ${winner.score} points!`);
+                } else {
+                    // Could add new round setup here
+                    setMessage('Round complete! Start a new game to continue.');
+                }
+            };
+
+            const findNextPlayer = () => {
+                // Find next player with cards, starting from currentPlayer + 1
+                for (let i = 1; i <= 3; i++) {
+                    const nextPlayerIndex = (currentPlayer + i) % 3;
+                    if (players[nextPlayerIndex]?.hand.length > 0) {
+                        return nextPlayerIndex;
+                    }
+                }
+                return null; // No player has cards
+            };
+
+            const executeAction = (action) => {
+                console.log('🎬 Executing action:', action);
+                
+                const newPlayers = [...players];
+                const player = newPlayers[currentPlayer];
+                
+                // Remove hand card
+                player.hand = player.hand.filter(c => c.id !== action.handCard.id);
+                
+                if (action.type === 'capture') {
+                    // Capture cards
+                    const capturedCards = [action.handCard, ...action.boardCards];
+                    player.captured.push(...capturedCards);
+                    player.score += capturedCards.reduce((sum, card) => sum + card.score, 0);
+                    
+                    // Remove captured cards from board
+                    setBoardCards(boardCards.filter(card => 
+                        !action.boardCards.some(captured => captured.id === card.id)
+                    ));
+                    
+                    setLastCapturer(currentPlayer);
+                    setLastAction('capture');
+                    
+                    setMessage(`${player.name} captured ${capturedCards.length} cards for ${action.score} points!`);
+                    console.log('🎉 Capture successful!');
+                    
+                    // Capture continues turn if player has cards left
+                    if (player.hand.length > 0) {
+                        setMessage(`${player.name} captured cards and continues their turn!`);
+                        setPlayers(newPlayers);
+                        return; // Continue same player's turn
+                    }
+                } else {
+                    // Place card
+                    setBoardCards([...boardCards, action.handCard]);
+                    setLastAction('place');
+                    setMessage(`${player.name} placed ${action.handCard.rank}${action.handCard.suit} on the board.`);
+                    console.log('🚶 Place successful!');
+                }
+                
+                setPlayers(newPlayers);
+                
+                // Check game state after action
+                setTimeout(() => {
+                    const newGameState = determineGameState();
+                    console.log('Next game state:', newGameState);
+                    
+                    if (newGameState === 'DEAL_NEW_HAND') {
+                        dealNewHand();
+                    } else if (newGameState === 'END_ROUND') {
+                        endRound();
+                    } else {
+                        // Continue to next player
+                        const nextPlayer = findNextPlayer();
+                        if (nextPlayer !== null) {
+                            setCurrentPlayer(nextPlayer);
+                            if (nextPlayer === 0) {
+                                setMessage('Your turn! Select a card from your hand.');
+                            } else {
+                                setTimeout(() => playAITurn(), 1000);
+                            }
+                        }
+                    }
+                }, 1500);
+            };
+
+            const playAITurn = () => {
+                console.log('🤖 AI turn for player', currentPlayer);
+                
+                if (currentPlayer === 0 || !players[currentPlayer] || isAIThinking) return;
                 
                 setIsAIThinking(true);
                 setMessage(`${players[currentPlayer].name} is thinking...`);
                 
                 setTimeout(() => {
                     const aiPlayer = players[currentPlayer];
-                    console.log('🎯 AI Player:', aiPlayer);
-                    console.log('AI Player hand length:', aiPlayer?.hand?.length);
                     
                     if (!aiPlayer || aiPlayer.hand.length === 0) {
-                        console.log('⚠️ AI has no cards, skipping turn');
+                        console.log('⚠️ AI has no cards');
                         setIsAIThinking(false);
-                        nextTurn();
                         return;
                     }
 
                     let bestMove = null;
                     let bestScore = -1;
-                    
-                    console.log('🎲 Board cards:', boardCards);
-                    console.log('🃏 AI hand:', aiPlayer.hand);
 
-                    // Evaluate all possible moves
+                    // Evaluate all possible captures
                     for (const handCard of aiPlayer.hand) {
                         const captures = findCaptures(handCard, boardCards);
-                        console.log(`💫 Captures for ${handCard.rank}${handCard.suit}:`, captures);
                         
                         for (const capture of captures) {
                             const totalScore = [handCard, ...capture].reduce((sum, card) => sum + card.score, 0);
                             if (totalScore > bestScore) {
                                 bestScore = totalScore;
                                 bestMove = { type: 'capture', handCard, boardCards: capture, score: totalScore };
-                                console.log('✨ New best capture move:', bestMove);
                             }
                         }
                     }
 
-                    // If no good capture found, trail the lowest scoring card
+                    // If no capture found, place lowest scoring card
                     if (!bestMove) {
                         const lowestCard = aiPlayer.hand.reduce((lowest, card) => 
                             card.score < lowest.score ? card : lowest
                         );
-                        bestMove = { type: 'trail', handCard: lowestCard };
-                        console.log('🚶 Trail move (no captures):', bestMove);
+                        bestMove = { type: 'place', handCard: lowestCard };
                     }
 
-                    console.log('🎯 Final AI move:', bestMove);
-                    // Execute the move
-                    executeAIMove(bestMove);
-                }, 1000); // 1 second thinking time
+                    console.log('🎯 AI chose:', bestMove);
+                    setIsAIThinking(false);
+                    executeAction(bestMove);
+                }, 1000);
             };
 
-            const executeAIMove = (move) => {
-                console.log('🎬 Executing AI move:', move);
-                
-                const newPlayers = [...players];
-                const aiPlayer = newPlayers[currentPlayer];
-                
-                console.log('📋 Player before move:', aiPlayer);
-                
-                // Remove hand card
-                aiPlayer.hand = aiPlayer.hand.filter(c => c.id !== move.handCard.id);
-                
-                if (move.type === 'capture') {
-                    // Capture cards
-                    const capturedCards = [move.handCard, ...move.boardCards];
-                    aiPlayer.captured.push(...capturedCards);
-                    aiPlayer.score += capturedCards.reduce((sum, card) => sum + card.score, 0);
-                    
-                    // Remove captured cards from board
-                    setBoardCards(boardCards.filter(card => 
-                        !move.boardCards.some(captured => captured.id === card.id)
-                    ));
-                    
-                    setMessage(`${aiPlayer.name} captured ${capturedCards.length} cards for ${move.score} points!`);
-                    console.log('🎉 Capture successful!');
-                } else {
-                    // Trail card
-                    setBoardCards([...boardCards, move.handCard]);
-                    setMessage(`${aiPlayer.name} placed ${move.handCard.rank}${move.handCard.suit} on the board.`);
-                    console.log('🚶 Trail successful!');
-                }
-                
-                console.log('📋 Player after move:', aiPlayer);
-                console.log('🎯 Updated players array:', newPlayers);
-                
-                setPlayers(newPlayers);
-                setIsAIThinking(false);
-                
-                // Check for win condition
-                if (aiPlayer.score >= 500) {
-                    setMessage(`${aiPlayer.name} wins with ${aiPlayer.score} points!`);
-                    console.log('🏆 AI wins!');
-                    return;
-                }
-                
-                // Move to next turn
-                setTimeout(() => {
-                    console.log('⏭️ Moving to next turn from executeAIMove');
-                    nextTurn();
-                }, 1500);
-            };
-
-            const nextTurn = () => {
-                console.log('🔄 nextTurn called');
-                console.log('Current player before:', currentPlayer);
-                
-                // Check if all players have no cards (round end)
-                const totalCardsInHands = players.reduce((sum, player) => sum + player.hand.length, 0);
-                console.log('Total cards in all hands:', totalCardsInHands);
-                
-                if (totalCardsInHands === 0) {
-                    console.log('🏁 All players out of cards - round ended!');
-                    setMessage('Round ended! All players are out of cards.');
-                    return;
-                }
-                
-                // Find next player with cards
-                let nextPlayerIndex = (currentPlayer + 1) % 3;
-                let attempts = 0;
-                
-                while (attempts < 3 && players[nextPlayerIndex]?.hand.length === 0) {
-                    console.log(`Player ${nextPlayerIndex} has no cards, skipping...`);
-                    nextPlayerIndex = (nextPlayerIndex + 1) % 3;
-                    attempts++;
-                }
-                
-                if (attempts >= 3) {
-                    console.log('🏁 No players have cards - game over!');
-                    setMessage('Game Over! No players have cards remaining.');
-                    return;
-                }
-                
-                console.log('Next player index:', nextPlayerIndex);
-                setCurrentPlayer(nextPlayerIndex);
-                
-                if (nextPlayerIndex === 0) {
-                    console.log('👤 Human turn');
-                    setMessage('Your turn! Select a card from your hand.');
-                } else {
-                    console.log(`🤖 AI ${nextPlayerIndex} turn incoming`);
-                    // Trigger AI turn after a brief delay
-                    setTimeout(() => {
-                        console.log(`🤖 Triggering AI ${nextPlayerIndex} turn`);
-                        playAITurn();
-                    }, 500);
-                }
-            };
-
-            // Trigger AI turns when it's their turn
+            // Trigger AI turns
             useEffect(() => {
-                console.log('🔍 useEffect triggered');
-                console.log('Game started:', gameStarted);
-                console.log('Current player:', currentPlayer);
-                console.log('Is AI thinking:', isAIThinking);
-                console.log('Players length:', players.length);
-                
-                // Add a detailed check of player hands
-                if (players.length > 0) {
-                    players.forEach((player, index) => {
-                        console.log(`Player ${index} (${player.name}): ${player.hand.length} cards`);
-                    });
-                }
-                
-                if (gameStarted && currentPlayer > 0 && !isAIThinking && players.length > 0) {
-                    console.log('✅ Conditions met, calling playAITurn');
+                if (gameStarted && gameState === 'PLAYING' && currentPlayer > 0 && !isAIThinking && players.length > 0) {
                     playAITurn();
-                } else {
-                    console.log('❌ Conditions not met for AI turn');
-                    if (!gameStarted) console.log('  - Game not started');
-                    if (currentPlayer === 0) console.log('  - Current player is human');
-                    if (isAIThinking) console.log('  - AI is already thinking');
-                    if (players.length === 0) console.log('  - No players yet');
                 }
-            }, [currentPlayer, gameStarted, players, isAIThinking]);
+            }, [currentPlayer, gameStarted, gameState, players, isAIThinking]);
 
             const selectHandCard = (card) => {
-                if (currentPlayer !== 0 || isAIThinking) return;
+                if (currentPlayer !== 0 || isAIThinking || gameState !== 'PLAYING') return;
                 setSelectedHandCard(selectedHandCard?.id === card.id ? null : card);
                 setSelectedBoardCards([]);
             };
 
             const selectBoardCard = (card) => {
-                if (!selectedHandCard || currentPlayer !== 0 || isAIThinking) return;
+                if (!selectedHandCard || currentPlayer !== 0 || isAIThinking || gameState !== 'PLAYING') return;
                 const isSelected = selectedBoardCards.some(c => c.id === card.id);
                 if (isSelected) {
                     setSelectedBoardCards(selectedBoardCards.filter(c => c.id !== card.id));
@@ -316,55 +364,34 @@
             };
 
             const captureCards = () => {
-                console.log('🎯 Human captureCards called');
                 if (!selectedHandCard || selectedBoardCards.length === 0 || isAIThinking) return;
                 if (!canCapture(selectedHandCard, selectedBoardCards)) {
                     setMessage('Invalid capture!');
                     return;
                 }
                 
-                const newPlayers = [...players];
-                const player = newPlayers[currentPlayer];
-                player.hand = player.hand.filter(c => c.id !== selectedHandCard.id);
-                const capturedCards = [selectedHandCard, ...selectedBoardCards];
-                player.captured.push(...capturedCards);
-                player.score += capturedCards.reduce((sum, card) => sum + card.score, 0);
+                const action = {
+                    type: 'capture',
+                    handCard: selectedHandCard,
+                    boardCards: selectedBoardCards,
+                    score: [selectedHandCard, ...selectedBoardCards].reduce((sum, card) => sum + card.score, 0)
+                };
                 
-                setBoardCards(boardCards.filter(card => 
-                    !selectedBoardCards.some(selected => selected.id === card.id)
-                ));
-                
-                setMessage(`Captured ${capturedCards.length} cards for ${capturedCards.reduce((sum, card) => sum + card.score, 0)} points!`);
-                setPlayers(newPlayers);
                 setSelectedHandCard(null);
                 setSelectedBoardCards([]);
-                
-                if (player.score >= 500) {
-                    setMessage(`You win with ${player.score} points!`);
-                    return;
-                }
-                
-                console.log('👤 Human capture complete, calling nextTurn');
-                setTimeout(() => {
-                    nextTurn();
-                }, 1500);
+                executeAction(action);
             };
 
             const placeCard = () => {
-                console.log('🏷️ Human placeCard called');
                 if (!selectedHandCard || isAIThinking) return;
-                const newPlayers = [...players];
-                const player = newPlayers[currentPlayer];
-                player.hand = player.hand.filter(c => c.id !== selectedHandCard.id);
-                setBoardCards([...boardCards, selectedHandCard]);
-                setPlayers(newPlayers);
-                setMessage(`Placed ${selectedHandCard.rank}${selectedHandCard.suit} on the board.`);
-                setSelectedHandCard(null);
                 
-                console.log('👤 Human place complete, calling nextTurn');
-                setTimeout(() => {
-                    nextTurn();
-                }, 1500);
+                const action = {
+                    type: 'place',
+                    handCard: selectedHandCard
+                };
+                
+                setSelectedHandCard(null);
+                executeAction(action);
             };
 
             const Card = ({ card, onClick, selected, size = 'normal' }) => {
@@ -397,6 +424,10 @@
                         React.createElement('div', { key: 'game', className: 'space-y-6' }, [
                             React.createElement('div', { key: 'message', className: 'bg-white/10 backdrop-blur rounded-lg p-4 text-center' },
                                 React.createElement('p', { className: 'font-semibold' }, message)
+                            ),
+                            
+                            React.createElement('div', { key: 'deck-info', className: 'bg-white/10 backdrop-blur rounded-lg p-3 text-center' },
+                                React.createElement('p', { className: 'font-bold' }, `Deck: ${deck.length} cards remaining`)
                             ),
                             
                             React.createElement('div', { key: 'scores', className: 'grid grid-cols-3 gap-4' },
@@ -441,7 +472,7 @@
                                 )
                             ]),
                             
-                            selectedHandCard && currentPlayer === 0 && !isAIThinking ?
+                            selectedHandCard && currentPlayer === 0 && !isAIThinking && gameState === 'PLAYING' ?
                                 React.createElement('div', { key: 'actions', className: 'flex gap-4 justify-center' }, [
                                     React.createElement('button', {
                                         key: 'capture',

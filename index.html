@@ -217,15 +217,15 @@
             };
 
             const findNextPlayer = () => {
-                // Find next player with cards, starting from currentPlayer + 1
-                for (let i = 1; i <= 3; i++) {
-                    const nextPlayerIndex = (currentPlayer + i) % 3;
-                    if (players[nextPlayerIndex]?.hand.length > 0) {
-                        return nextPlayerIndex;
-                    }
-                }
-                return null; // No player has cards
-            };
+    // Find next player with cards, starting from currentPlayer + 1
+    for (let i = 1; i <= 3; i++) {
+        const nextPlayerIndex = (currentPlayer + i) % 3;
+        if (players[nextPlayerIndex]?.hand.length > 0) {
+            return nextPlayerIndex;
+        }
+    }
+    return null; // No player has cards
+};
 
             const executeAction = (action) => {
                 console.log('🎬 Executing action:', action);
@@ -342,10 +342,32 @@
 
             // Trigger AI turns
             useEffect(() => {
-                if (gameStarted && gameState === 'PLAYING' && currentPlayer > 0 && !isAIThinking && players.length > 0) {
-                    playAITurn();
+    if (gameStarted && gameState === 'PLAYING' && currentPlayer > 0 && !isAIThinking && players.length > 0) {
+        const currentPlayerData = players[currentPlayer];
+        
+        // Only trigger AI turn if current player has cards
+        if (currentPlayerData && currentPlayerData.hand.length > 0) {
+            playAITurn();
+        } else {
+            console.log(`🪑 Player ${currentPlayer} sitting out - no cards`);
+            
+            // Find next player with cards or trigger new hand deal
+            const nextPlayerWithCards = findNextPlayer();
+            if (nextPlayerWithCards !== null) {
+                console.log(`➡️ Advancing to player ${nextPlayerWithCards}`);
+                setCurrentPlayer(nextPlayerWithCards);
+            } else {
+                console.log(`🃏 All players out of cards - checking for new hand`);
+                const newGameState = determineGameState();
+                if (newGameState === 'DEAL_NEW_HAND') {
+                    dealNewHand();
+                } else if (newGameState === 'END_ROUND') {
+                    endRound();
                 }
-            }, [currentPlayer, gameStarted, gameState, players, isAIThinking]);
+            }
+        }
+    }
+}, [currentPlayer, gameStarted, gameState, players, isAIThinking]);
 
             const selectHandCard = (card) => {
                 if (currentPlayer !== 0 || isAIThinking || gameState !== 'PLAYING') return;

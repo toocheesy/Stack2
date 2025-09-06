@@ -275,28 +275,8 @@ if (action.type === 'capture') {
                 
                 setPlayers(newPlayers);
                 
-                // Check game state after action
-                setTimeout(() => {
-                    const newGameState = determineGameState();
-                    console.log('Next game state:', newGameState);
-                    
-                    if (newGameState === 'DEAL_NEW_HAND') {
-                        dealNewHand();
-                    } else if (newGameState === 'END_ROUND') {
-                        endRound();
-                    } else {
-                        // Continue to next player
-                        const nextPlayer = findNextPlayer();
-                        if (nextPlayer !== null) {
-                            setCurrentPlayer(nextPlayer);
-                            if (nextPlayer === 0) {
-                                setMessage('Your turn! Select a card from your hand.');
-                            } else {
-                                setTimeout(() => playAITurn(), 1000);
-                            }
-                        }
-                    }
-                }, 1500);
+                // Let useEffect handle ALL turn management - just update players
+setPlayers(newPlayers);
             };
 
             const playAITurn = () => {
@@ -348,30 +328,42 @@ if (action.type === 'capture') {
 
             // Trigger AI turns
             useEffect(() => {
-    if (gameStarted && gameState === 'PLAYING' && currentPlayer > 0 && !isAIThinking && players.length > 0) {
-        const currentPlayerData = players[currentPlayer];
+    if (!gameStarted || gameState !== 'PLAYING' || players.length === 0) return;
+    
+    console.log(`🎮 Turn Management: Player ${currentPlayer}, Cards: ${players[currentPlayer]?.hand.length || 0}`);
+    
+    // Check if we need to deal new hand or end round first
+    const newGameState = determineGameState();
+    if (newGameState === 'DEAL_NEW_HAND') {
+        dealNewHand();
+        return;
+    } else if (newGameState === 'END_ROUND') {
+        endRound();
+        return;
+    }
+    
+    const currentPlayerData = players[currentPlayer];
+    
+    if (!currentPlayerData || currentPlayerData.hand.length === 0) {
+        console.log(`🪑 Player ${currentPlayer} sitting out - no cards`);
         
-        // Only trigger AI turn if current player has cards
-        if (currentPlayerData && currentPlayerData.hand.length > 0) {
-            playAITurn();
+        // Find next player with cards
+        const nextPlayerWithCards = findNextPlayer();
+        if (nextPlayerWithCards !== null) {
+            console.log(`➡️ Advancing to player ${nextPlayerWithCards}`);
+            setCurrentPlayer(nextPlayerWithCards);
         } else {
-            console.log(`🪑 Player ${currentPlayer} sitting out - no cards`);
-            
-            // Find next player with cards or trigger new hand deal
-            const nextPlayerWithCards = findNextPlayer();
-            if (nextPlayerWithCards !== null) {
-                console.log(`➡️ Advancing to player ${nextPlayerWithCards}`);
-                setCurrentPlayer(nextPlayerWithCards);
-            } else {
-                console.log(`🃏 All players out of cards - checking for new hand`);
-                const newGameState = determineGameState();
-                if (newGameState === 'DEAL_NEW_HAND') {
-                    dealNewHand();
-                } else if (newGameState === 'END_ROUND') {
-                    endRound();
-                }
-            }
+            console.log(`🃏 All players out of cards - should deal new hand`);
+            // This should be caught by determineGameState above, but safety check
         }
+        return;
+    }
+    
+    // Current player has cards - handle their turn
+    if (currentPlayer === 0) {
+        setMessage('Your turn! Select a card from your hand.');
+    } else if (!isAIThinking) {
+        setTimeout(() => playAITurn(), 1000);
     }
 }, [currentPlayer, gameStarted, gameState, players, isAIThinking]);
 

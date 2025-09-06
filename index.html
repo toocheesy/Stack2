@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STACKED! Card Game</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+    
+    <script type="text/babel">
+        const { useState } = React;
+
+        const StackedGame = () => {
+            // Card scoring system
+            const getCardScore = (rank) => {
+                if (rank === 'A') return 15;
+                if (['K', 'Q', 'J', '10'].includes(rank)) return 10;
+                return 5; // 2-9
+            };
+
+            // Create and shuffle deck
+            const createDeck = () => {
+                const suits = ['♠', '♥', '♦', '♣'];
+                const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+                const deck = suits.flatMap(suit => 
+                    ranks.map(rank => ({ 
+                        id: `${rank}${suit}`, 
+                        rank, 
+                        suit, 
+                        score: getCardScore(rank),
+                        numValue: rank === 'A' ? 1 : isNaN(parseInt(rank)) ? 0 : parseInt(rank)
+                    }))
+                );
+                
+                // Shuffle
+                for (let i = deck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [deck[i], deck[j]] = [deck[j], deck[i]];
+                }
+                return deck;
+            };
+
+            // Game state
+            const [deck, setDeck] = useState([]);
+            const [players, setPlayers] = useState([]);
+            const [boardCards, setBoardCards] = useState([]);
+            const [currentPlayer, setCurrentPlayer] = useState(0);
+            const [selectedHandCard, setSelectedHandCard] = useState(null);
+            const [selectedBoardCards, setSelectedBoardCards] = useState([]);
+            const [gamePhase, setGamePhase] = useState('setup');
+            const [message, setMessage] = useState('');
+            const [gameStarted, setGameStarted] = useState(false);
+
+            // Initialize new game
+            const startGame = () => {
+                const newDeck = createDeck();
+                
+                // Create 3 players
+                const newPlayers = Array.from({ length: 3 }, (_, i) => ({
+                    id: i,
+                    name: i === 0 ? 'You' : `AI ${i}`,
+                    hand: newDeck.slice(i * 4, (i + 1) * 4),
+                    captured: [],
+                    score: 0,
+                    isHuman: i === 0
+                }));
+                
+                // 4 cards on board
+                const initialBoard = newDeck.slice(12, 16);
+                const remainingDeck = newDeck.slice(16);
+                
+                setPlayers(newPlayers);
+                setBoardCards(initialBoard);
+                setDeck(remainingDeck);
+                setCurrentPlayer(0);
+                setGamePhase('playing');
+                setGameStarted(true);
+                setSelectedHandCard(null);
+                setSelectedBoardCards([]);
+                setMessage('Your turn! Select a card from your hand, then select board cards to capture or trail.');
+            };
+
+            // Check if cards can be captured together
+            const canCapture = (handCard, boardCards) => {
+                if (boardCards.length === 0) return false;
+                
+                // Simple pair capture
+                const pairCapture = boardCards.some(card => card.rank === handCard.rank);
+                if (pairCapture && boardCards.every(card => card.rank === handCard.rank)) {
+                    return true;
+                }
+                
+                // Sum capture
+                if (handCard.numValue > 0) {
+                    const boardSum = boardCards.reduce((sum, card) => sum + (card.numValue || 0), 0);
+                    if (boardSum === handCard.numValue && boardCards.every(card => card.numValue > 0)) {
+                        return true;
+                    }
+                }
+                
+                return false;
+            };
+
+            // Handle card selection from hand
+            const selectHandCard = (card) => {
+                if (currentPlayer !== 0 || gamePhase !== 'playing') return;
+                
+                setSelectedHandCard(selectedHandCard?.id === card.id ? null : card);
+                setSelectedBoardCards([]);
+                setMessage(selectedHandCard?.id === card.id ? 
+                    'Select a card from your hand to play.' : 
+                    `Selected ${card.rank}${card.suit}. Now select board cards to capture, or click Trail.`
+                );
+            };
+
+            // Handle board card selection
+            const selectBoardCard = (card) => {
+                if (!selectedHandCard || currentPlayer !== 0) return;
+                
+                const isSelected = selectedBoardCards.some(c => c.id === card.id);
+                let newSelection;
+                
+                if (isSelected) {
+                    newSelection = selectedBoardCards.filter(c => c.id !== card.id);
+                } else {
+                    newSelection = [...selectedBoardCards, card];
+                }
+                
+                setSelectedBoardCards(newSelection);
+            };
+
+            // Execute capture move
+            const captureCards = () => {
+                if (!selectedHandCard || selectedBoardCards.length === 0) return;
+                
+                if (!canCapture(selectedHandCard, selectedBoardCards)) {
+                    setMessage('Invalid capture! Cards must match rank or sum to your hand card value.');
+                    return;
+                }
+                
+                const newPlayers = [...players];
+                const player = newPlayers[currentPlayer];
+                
+                // Remove hand card and add all captured cards
+                player.hand = player.hand.filter(c => c.id !== selectedHandCard.id);
+                const capturedCards = [selectedHandCard, ...selectedBoardCards];
+                player.captured.push(...capturedCards);
+                player.score += capturedCards.reduce((sum, card) => sum + card.score, 0);
+                
+                // Remove captured cards from board
+                setBoardCards(boardCards.filter(card => 
+                    !selectedBoardCards.some(selected => selected.id === card.id)
+                ));
+                
+                setMessage(`Captured ${capturedCards.length} cards for ${capturedCards.reduce((sum, card) => sum + card.score, 0)} points!`);
+                setPlayers(newPlayers);
+                
+                // Continue turn
+                setSelectedHandCard(null);
+                setSelectedBoardCards([]);
+                
+                // Check if player is out of cards
+                if (player.hand.length === 0) {
+                    nextPlayer();
+                }
+            };
+
+            // Trail a card to the board
+            const trailCard = () => {
+                if (!selectedHandCard) return;
+                
+                const newPlayers = [...players];
+                const player = newPlayers[currentPlayer];
+                
+                // Remove card from hand and add to board
+                player.hand = player.hand.filter(c => c.id !== selectedHandCard.id);
+                setBoardCards([...boardCards, selectedHandCard]);
+                setPlayers(newPlayers);
+                
+                setMessage(`Trailed ${selectedHandCard.rank}${selectedHandCard.suit} to the board.`);
+                setSelectedHandCard(null);
+                setSelectedBoardCards([]);
+                
+                nextPlayer();
+            };
+
+            // Move to next player
+            const nextPlayer = () => {
+                const nextPlayerIndex = (currentPlayer + 1) % 3;
+                setCurrentPlayer(nextPlayerIndex);
+                
+                // Check win condition
+                const currentPlayerData = players[currentPlayer];
+                if (currentPlayerData && currentPlayerData.score >= 500) {
+                    setGamePhase('gameOver');
+                    setMessage(`${currentPlayerData.name} wins with ${currentPlayerData.score} points!`);
+                    return;
+                }
+                
+                // AI turn
+                if (nextPlayerIndex !== 0) {
+                    setTimeout(() => playAITurn(nextPlayerIndex), 1000);
+                } else {
+                    setMessage('Your turn! Select a card to play.');
+                }
+            };
+
+            // Simple AI logic
+            const playAITurn = (playerIndex) => {
+                const player = players[playerIndex];
+                if (!player || player.hand.length === 0) {
+                    nextPlayer();
+                    return;
+                }
+                
+                // Try to find a capture
+                let bestCapture = null;
+                let bestScore = 0;
+                
+                for (const handCard of player.hand) {
+                    // Try pair captures
+                    const pairCards = boardCards.filter(card => card.rank === handCard.rank);
+                    if (pairCards.length > 0) {
+                        const score = (handCard.score + pairCards.reduce((sum, card) => sum + card.score, 0));
+                        if (score > bestScore) {
+                            bestCapture = { handCard, boardCards: pairCards };
+                            bestScore = score;
+                        }
+                    }
+                    
+                    // Try sum captures
+                    if (handCard.numValue > 0) {
+                        for (let i = 1; i < (1 << boardCards.length); i++) {
+                            const subset = boardCards.filter((_, index) => (i >> index) & 1);
+                            if (subset.every(card => card.numValue > 0)) {
+                                const sum = subset.reduce((total, card) => total + card.numValue, 0);
+                                if (sum === handCard.numValue) {
+                                    const score = handCard.score + subset.reduce((total, card) => total + card.score, 0);
+                                    if (score > bestScore) {
+                                        bestCapture = { handCard, boardCards: subset };
+                                        bestScore = score;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                const newPlayers = [...players];
+                const aiPlayer = newPlayers[playerIndex];
+                
+                if (bestCapture) {
+                    // Execute capture
+                    aiPlayer.hand = aiPlayer.hand.filter(c => c.id !== bestCapture.handCard.id);
+                    const capturedCards = [bestCapture.handCard, ...bestCapture.boardCards];
+                    aiPlayer.captured.push(...capturedCards);
+                    aiPlayer.score += capturedCards.reduce((sum, card) => sum + card.score, 0);
+                    
+                    setBoardCards(boardCards.filter(card => 
+                        !bestCapture.boardCards.some(selected => selected.id === card.id)
+                    ));
+                    
+                    setMessage(`${aiPlayer.name} captured ${capturedCards.length} cards for ${capturedCards.reduce((sum, card) => sum + card.score, 0)} points!`);
+                    setPlayers(newPlayers);
+                    
+                    // AI continues turn if they still have cards
+                    if (aiPlayer.hand.length > 0) {
+                        setTimeout(() => playAITurn(playerIndex), 800);
+                    } else {
+                        setTimeout(() => nextPlayer(), 1000);
+                    }
+                } else {
+                    // Trail lowest card
+                    const lowestCard = aiPlayer.hand.reduce((lowest, card) => 
+                        card.score < lowest.score ? card : lowest
+                    );
+                    
+                    aiPlayer.hand = aiPlayer.hand.filter(c => c.id !== lowestCard.id);
+                    setBoardCards([...boardCards, lowestCard]);
+                    setPlayers(newPlayers);
+                    
+                    setMessage(`${aiPlayer.name} trailed ${lowestCard.rank}${lowestCard.suit}.`);
+                    
+                    setTimeout(() => nextPlayer(), 1000);
+                }
+            };
+
+            // Shuffle icon component
+            const Shuffle = () => (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="16,3 21,3 21,8"></polyline>
+                    <line x1="4" y1="20" x2="21" y2="3"></line>
+                    <polyline points="21,16 21,21 16,21"></polyline>
+                    <line x1="15" y1="15" x2="21" y2="21"></line>
+                    <line x1="4" y1="4" x2="9" y2="9"></line>
+                </svg>
+            );
+
+            // Play icon component
+            const Play = () => (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="5,3 19,12 5,21"></polygon>
+                </svg>
+            );
+
+            // RotateCcw icon component
+            const RotateCcw = () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="1,4 1,10 7,10"></polyline>
+                    <path d="M3.51,15a9,9,0,0,0,2.13,3.09,9,9,0,0,0,13.29,0,9,9,0,0,0,.55-11.76A9,9,0,0,0,3.51,9"></path>
+                </svg>
+            );
+
+            // Card component
+            const Card = ({ card, onClick, selected, size = 'normal', disabled = false }) => {
+                const isRed = ['♥', '♦'].includes(card.suit);
+                
+                const sizeClasses = {
+                    small: 'w-10 h-14 text-xs',
+                    normal: 'w-12 h-16 text-sm',
+                    large: 'w-14 h-20 text-base'
+                };
+                
+                return React.createElement('div', {
+                    onClick: disabled ? undefined : onClick,
+                    className: `
+                        ${sizeClasses[size]} 
+                        ${isRed ? 'text-red-600' : 'text-black'}
+                        ${selected ? 'bg-blue-200 border-blue-500' : 'bg-white border-gray-300'}
+                        ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:shadow-md'}
+                        border-2 rounded-lg flex flex-col items-center justify-between p-1 font-bold shadow-sm transition-all
+                    `
+                }, [
+                    React.createElement('div', { key: 'rank', className: 'text-xs' }, card.rank),
+                    React.createElement('div', { key: 'suit', className: 'text-lg' }, card.suit),
+                    React.createElement('div', { key: 'score', className: 'text-xs' }, card.score)
+                ]);
+            };
+
+            return React.createElement('div', {
+                className: 'min-h-screen bg-gradient-to-br from-green-600 to-green-800 text-white'
+            }, 
+                React.createElement('div', {
+                    className: 'container mx-auto p-4 max-w-6xl'
+                }, [
+                    // Header
+                    React.createElement('header', {
+                        key: 'header',
+                        className: 'text-center mb-6'
+                    }, [
+                        React.createElement('h1', { key: 'title', className: 'text-4xl font-bold mb-2' }, 'STACKED!'),
+                        React.createElement('p', { key: 'subtitle', className: 'text-green-200' }, 'First to 500 points wins')
+                    ]),
+
+                    // Game content
+                    !gameStarted ? 
+                        React.createElement('div', {
+                            key: 'start-screen',
+                            className: 'text-center'
+                        },
+                            React.createElement('div', {
+                                className: 'bg-white/10 backdrop-blur rounded-xl p-8 max-w-md mx-auto'
+                            }, [
+                                React.createElement('h2', { key: 'ready', className: 'text-2xl font-bold mb-4' }, 'Ready to Play?'),
+                                React.createElement('p', { key: 'desc', className: 'mb-6 text-green-100' }, '3 players • Capture cards by matching ranks or summing values'),
+                                React.createElement('button', {
+                                    key: 'start-btn',
+                                    onClick: startGame,
+                                    className: 'bg-yellow-500 hover:bg-yellow-400 text-black px-8 py-3 rounded-lg font-bold text-lg flex items-center gap-2 mx-auto transition-colors'
+                                }, [
+                                    React.createElement(Shuffle, { key: 'icon' }),
+                                    'Start Game'
+                                ])
+                            ])
+                        ) :
+                        React.createElement('div', {
+                            key: 'game-screen',
+                            className: 'space-y-6'
+                        }, [
+                            // Game Message
+                            React.createElement('div', {
+                                key: 'message',
+                                className: 'bg-white/10 backdrop-blur rounded-lg p-4 text-center'
+                            },
+                                React.createElement('p', { className: 'font-semibold' }, message)
+                            ),
+
+                            // Scores
+                            React.createElement('div', {
+                                key: 'scores',
+                                className: 'grid grid-cols-3 gap-4'
+                            },
+                                players.map((player, index) =>
+                                    React.createElement('div', {
+                                        key: player.id,
+                                        className: `
+                                            bg-white/10 backdrop-blur rounded-lg p-3 text-center
+                                            ${index === currentPlayer ? 'ring-2 ring-yellow-400' : ''}
+                                        `
+                                    }, [
+                                        React.createElement('div', { key: 'name', className: 'font-bold' }, player.name),
+                                        React.createElement('div', { key: 'score', className: 'text-2xl font-bold text-yellow-300' }, player.score),
+                                        React.createElement('div', { key: 'cards', className: 'text-xs opacity-75' }, `Cards: ${player.hand.length}`)
+                                    ])
+                                )
+                            ),
+
+                            // Board Cards
+                            React.createElement('div', {
+                                key: 'board',
+                                className: 'bg-white/10 backdrop-blur rounded-lg p-4'
+                            }, [
+                                React.createElement('h3', { key: 'board-title', className: 'font-bold mb-3' }, 'Board Cards'),
+                                React.createElement('div', {
+                                    key: 'board-cards',
+                                    className: 'flex flex-wrap gap-2 min-h-20'
+                                },
+                                    boardCards.map(card =>
+                                        React.createElement(Card, {
+                                            key: card.id,
+                                            card: card,
+                                            onClick: () => selectBoardCard(card),
+                                            selected: selectedBoardCards.some(c => c.id === card.id),
+                                            disabled: currentPlayer !== 0
+                                        })
+                                    )
+                                )
+                            ]),
+
+                            // Human Player Hand
+                            React.createElement('div', {
+                                key: 'hand',
+                                className: 'bg-white/10 backdrop-blur rounded-lg p-4'
+                            }, [
+                                React.createElement('h3', { key: 'hand-title', className: 'font-bold mb-3' }, 'Your Hand'),
+                                React.createElement('div', {
+                                    key: 'hand-cards',
+                                    className: 'flex flex-wrap gap-2 justify-center'
+                                },
+                                    players[0]?.hand.map(card =>
+                                        React.createElement(Card, {
+                                            key: card.id,
+                                            card: card,
+                                            onClick: () => selectHandCard(card),
+                                            selected: selectedHandCard?.id === card.id,
+                                            size: 'large'
+                                        })
+                                    )
+                                )
+                            ]),
+
+                            // Action Buttons
+                            currentPlayer === 0 && selectedHandCard && gamePhase === 'playing' ?
+                                React.createElement('div', {
+                                    key: 'actions',
+                                    className: 'flex gap-4 justify-center'
+                                }, [
+                                    React.createElement('button', {
+                                        key: 'capture',
+                                        onClick: captureCards,
+                                        disabled: selectedBoardCards.length === 0 || !canCapture(selectedHandCard, selectedBoardCards),
+                                        className: 'bg-blue-600 hover:bg-blue-500 disabled:bg-gray-600 disabled:opacity-50 px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition-colors'
+                                    }, [
+                                        React.createElement(Play, { key: 'play-icon' }),
+                                        `Capture (${selectedBoardCards.length})`
+                                    ]),
+                                    React.createElement('button', {
+                                        key: 'trail',
+                                        onClick: trailCard,
+                                        className: 'bg-orange-600 hover:bg-orange-500 px-6 py-3 rounded-lg font-bold transition-colors'
+                                    }, 'Trail Card')
+                                ]) : null,
+
+                            // New Game Button
+                            React.createElement('div', {
+                                key: 'new-game',
+                                className: 'text-center'
+                            },
+                                React.createElement('button', {
+                                    onClick: startGame,
+                                    className: 'bg-green-600 hover:bg-green-500 px-6 py-2 rounded-lg font-bold flex items-center gap-2 mx-auto transition-colors'
+                                }, [
+                                    React.createElement(RotateCcw, { key: 'rotate-icon' }),
+                                    'New Game'
+                                ])
+                            )
+                        ])
+                ])
+            );
+        };
+
+        ReactDOM.render(React.createElement(StackedGame), document.getElementById('root'));
+    </script>
+</body>
+</html>

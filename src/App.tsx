@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import { GameView } from './components/GameView';
 import { useGameController } from './game/useGameController';
 import type { GameSettings } from './engine/types';
@@ -32,6 +33,14 @@ function App() {
     );
   }
 
+  return <TitleScreen onStart={startGame} />;
+}
+
+// ─── Title Screen ───────────────────────────────────
+
+function TitleScreen({ onStart }: { onStart: () => void }) {
+  const [showRules, setShowRules] = useState(false);
+
   return (
     <div
       style={{
@@ -42,36 +51,70 @@ function App() {
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 20,
+        gap: 12,
+        position: 'relative',
+        overflow: 'hidden',
       }}
     >
+      {/* Wordmark */}
       <h1
         style={{
+          fontFamily: 'Inter, sans-serif',
           fontWeight: 700,
-          fontSize: 42,
+          fontSize: 48,
           color: '#F1F1F3',
           letterSpacing: -1,
+          lineHeight: 1,
         }}
       >
         STACKED<span style={{ color: '#4F46E5' }}>!</span>
       </h1>
-      <p style={{ fontSize: 16, color: '#8B8BA3' }}>Strategic Card Combat</p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12, width: 260 }}>
-        <RuleRow icon="🃏" text="Capture cards by matching pairs or sums" />
-        <RuleRow icon="🎯" text="Build combos in the 4 capture slots" />
-        <RuleRow icon="👆" text="Drag cards from your hand to slots" />
-        <RuleRow icon="🏆" text="First to 300 points wins" />
-      </div>
-
-      <button
-        onClick={startGame}
+      {/* Tagline */}
+      <p
         style={{
-          marginTop: 16,
+          fontFamily: 'Inter, sans-serif',
+          fontWeight: 500,
+          fontSize: 14,
+          color: '#8B8BA3',
+          letterSpacing: 2,
+          textTransform: 'uppercase',
+          marginTop: -4,
+        }}
+      >
+        CAPTURE · COMBO · WIN
+      </p>
+
+      {/* How to Play link */}
+      <button
+        onClick={() => setShowRules(true)}
+        style={{
+          marginTop: 8,
+          fontFamily: 'Inter, sans-serif',
+          fontSize: 13,
+          color: '#8B8BA3',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          textDecoration: 'none',
+          padding: '4px 8px',
+        }}
+      >
+        How to Play
+      </button>
+
+      {/* Start button */}
+      <motion.button
+        onClick={onStart}
+        whileTap={{ scale: 0.97 }}
+        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        style={{
+          marginTop: 8,
           width: 220,
           height: 52,
           background: '#4F46E5',
           color: '#FFF',
+          fontFamily: 'Inter, sans-serif',
           fontWeight: 600,
           fontSize: 18,
           border: 'none',
@@ -80,14 +123,212 @@ function App() {
         }}
       >
         START GAME
-      </button>
+      </motion.button>
 
-      <p style={{ fontSize: 12, color: '#5A5A70', marginTop: 8 }}>
+      {/* Footer */}
+      <p
+        style={{
+          fontFamily: 'Inter, sans-serif',
+          fontSize: 12,
+          color: '#5A5A70',
+          marginTop: 16,
+        }}
+      >
         Built by TC with AI collaboration
       </p>
+
+      {/* Card peek — bottom right */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: -20,
+          right: -16,
+          transform: 'rotate(10deg)',
+          pointerEvents: 'none',
+        }}
+      >
+        <PeekCard />
+      </div>
+
+      {/* Rules modal */}
+      <AnimatePresence>
+        {showRules && <RulesModal onClose={() => setShowRules(false)} />}
+      </AnimatePresence>
     </div>
   );
 }
+
+// ─── Card Peek (Queen of Hearts) ────────────────────
+
+function PeekCard() {
+  const w = 120;
+  const h = Math.round(w * (3.5 / 2.5));
+  return (
+    <div
+      style={{
+        width: w,
+        height: h,
+        borderRadius: 12,
+        background: '#FFFFFF',
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+      }}
+    >
+      {/* Indigo stripe */}
+      <div
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          width: 6,
+          background: '#4F46E5',
+          borderRadius: '12px 0 0 12px',
+        }}
+      />
+      <div
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100%',
+          gap: 2,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: 700,
+            fontSize: 48,
+            lineHeight: 1,
+            color: '#DC2626',
+          }}
+        >
+          Q
+        </span>
+        <span style={{ fontSize: 28, lineHeight: 1, color: '#DC2626' }}>♥</span>
+      </div>
+    </div>
+  );
+}
+
+// ─── Rules Modal ────────────────────────────────────
+
+function RulesModal({ onClose }: { onClose: () => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(30,30,46,0.95)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 300,
+        padding: 20,
+      }}
+    >
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.15 }}
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: '#252538',
+          borderRadius: 12,
+          maxWidth: 360,
+          width: '100%',
+          padding: 24,
+          position: 'relative',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Left stripe — carries the motif */}
+        <div
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: 4,
+            background: '#4F46E5',
+            borderRadius: '12px 0 0 12px',
+          }}
+        />
+
+        <h2
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: 700,
+            fontSize: 18,
+            color: '#F1F1F3',
+            marginBottom: 16,
+          }}
+        >
+          How to Play
+        </h2>
+
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: 12,
+          }}
+        >
+          {[
+            'Drag cards into combo slots to build captures',
+            'Match the BASE card with pairs or sums',
+            'Capture = go again. Place = turn ends.',
+            'First to reach the target score wins!',
+          ].map((rule, i) => (
+            <p
+              key={i}
+              style={{
+                fontFamily: 'Inter, sans-serif',
+                fontSize: 14,
+                color: '#C0C0D0',
+                lineHeight: 1.5,
+              }}
+            >
+              {rule}
+            </p>
+          ))}
+        </div>
+
+        <motion.button
+          onClick={onClose}
+          whileTap={{ scale: 0.97 }}
+          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          style={{
+            marginTop: 20,
+            width: '100%',
+            height: 44,
+            background: '#4F46E5',
+            color: '#FFF',
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: 600,
+            fontSize: 15,
+            border: 'none',
+            borderRadius: 8,
+            cursor: 'pointer',
+          }}
+        >
+          GOT IT
+        </motion.button>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+// ─── Game Wrapper ───────────────────────────────────
 
 function GameWrapper({
   seed,
@@ -114,15 +355,6 @@ function GameWrapper({
       onHome={onHome}
       onPlayAgain={onPlayAgain}
     />
-  );
-}
-
-function RuleRow({ icon, text }: { icon: string; text: string }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{ fontSize: 18 }}>{icon}</span>
-      <span style={{ fontSize: 14, color: '#8B8BA3' }}>{text}</span>
-    </div>
   );
 }
 

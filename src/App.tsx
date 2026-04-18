@@ -5,6 +5,7 @@ import { useGameController } from './game/useGameController';
 import type { GameSettings } from './engine/types';
 import { C, SHADOWS } from './config/colors';
 import { getTransition, tween } from './config/motion';
+import { loadGame, clearSavedGame } from './game/persistence';
 
 type Screen = 'home' | 'game';
 
@@ -19,9 +20,24 @@ function App() {
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1_000_000));
   const [settings] = useState(DEFAULT_SETTINGS);
 
-  const startGame = useCallback(() => {
+  const startNewGame = useCallback(() => {
+    clearSavedGame();
     setSeed(Math.floor(Math.random() * 1_000_000));
     setScreen('game');
+  }, []);
+
+  const continueGame = useCallback(() => {
+    setScreen('game');
+  }, []);
+
+  const goHome = useCallback(() => {
+    clearSavedGame();
+    setScreen('home');
+  }, []);
+
+  const playAgain = useCallback(() => {
+    clearSavedGame();
+    setSeed(Math.floor(Math.random() * 1_000_000));
   }, []);
 
   if (screen === 'game') {
@@ -29,18 +45,24 @@ function App() {
       <GameWrapper
         seed={seed}
         settings={settings}
-        onHome={() => setScreen('home')}
-        onPlayAgain={() => setSeed(Math.floor(Math.random() * 1_000_000))}
+        onHome={goHome}
+        onPlayAgain={playAgain}
       />
     );
   }
 
-  return <TitleScreen onStart={startGame} />;
+  const hasSave = !!loadGame();
+  return (
+    <TitleScreen
+      onNewGame={startNewGame}
+      onContinue={hasSave ? continueGame : undefined}
+    />
+  );
 }
 
 // ─── Title Screen ───────────────────────────────────
 
-function TitleScreen({ onStart }: { onStart: () => void }) {
+function TitleScreen({ onNewGame, onContinue }: { onNewGame: () => void; onContinue?: () => void }) {
   const [showRules, setShowRules] = useState(false);
 
   return (
@@ -105,27 +127,40 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
         How to Play
       </button>
 
-      {/* Start button */}
-      <motion.button
-        onClick={onStart}
-        whileTap={{ scale: 0.97 }}
-        transition={getTransition('snappy')}
-        style={{
-          marginTop: 8,
-          width: 220,
-          height: 52,
-          background: C.indigo,
-          color: '#FFF',
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 600,
-          fontSize: 18,
-          border: 'none',
-          borderRadius: 12,
-          cursor: 'pointer',
-        }}
-      >
-        START GAME
-      </motion.button>
+      {/* Action buttons */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center', marginTop: 8 }}>
+        {onContinue && (
+          <motion.button
+            onClick={onContinue}
+            whileTap={{ scale: 0.97 }}
+            transition={getTransition('snappy')}
+            style={{
+              width: 220, height: 52, background: C.indigo,
+              color: '#FFF', fontFamily: 'Inter, sans-serif',
+              fontWeight: 600, fontSize: 18,
+              border: 'none', borderRadius: 12, cursor: 'pointer',
+            }}
+          >
+            CONTINUE
+          </motion.button>
+        )}
+        <motion.button
+          onClick={onNewGame}
+          whileTap={{ scale: 0.97 }}
+          transition={getTransition('snappy')}
+          style={{
+            width: 220, height: onContinue ? 44 : 52,
+            background: onContinue ? 'transparent' : C.indigo,
+            color: onContinue ? C.textSecondary : '#FFF',
+            fontFamily: 'Inter, sans-serif',
+            fontWeight: 600, fontSize: onContinue ? 15 : 18,
+            border: onContinue ? `1px solid ${C.divider}` : 'none',
+            borderRadius: 12, cursor: 'pointer',
+          }}
+        >
+          {onContinue ? 'NEW GAME' : 'START GAME'}
+        </motion.button>
+      </div>
 
       {/* Footer */}
       <p

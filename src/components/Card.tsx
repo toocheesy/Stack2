@@ -10,7 +10,7 @@ const CARD_H = Math.round(CARD_W * (3.5 / 2.5));
 const SMALL_W = 40;
 const SMALL_H = Math.round(SMALL_W * (3.5 / 2.5));
 
-const STRIPE_W = 14;
+const STRIPE_PCT = 0.22; // ~22% of card width
 const STRIPE_H_PCT = 0.75;
 const MAX_TILT_DEG = 18;
 
@@ -36,7 +36,7 @@ const suitColor = (suit: string) =>
 // ─── Card Back ────────────────────────────────────────
 
 function CardBack({ w, h }: { w: number; h: number }) {
-  const stripeW = Math.round(w * (STRIPE_W / CARD_W));
+  const stripeW = Math.round(w * STRIPE_PCT);
   const stripeH = Math.round(h * STRIPE_H_PCT);
   return (
     <div style={{
@@ -77,7 +77,7 @@ function CardFace({ card, w, h, lifted }: {
   const suitSize = w < 50 ? 10 : 16;
   const shadow = lifted ? SHADOWS.cardLifted : SHADOWS.cardRest;
   const color = suitColor(card.suit);
-  const stripeW = Math.round(w * (STRIPE_W / CARD_W));
+  const stripeW = Math.round(w * STRIPE_PCT);
   const stripeH = Math.round(h * STRIPE_H_PCT);
   const contentShift = Math.round(stripeW / 2);
 

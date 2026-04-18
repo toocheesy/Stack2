@@ -27,6 +27,7 @@ import {
 } from '../engine/ai/cardTracker';
 import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../engine/ai/botDecision';
 import { evaluateAllActions } from '../engine/ai/evaluator';
+import { saveGame, loadGame, clearSavedGame } from './persistence';
 
 type CardSource = 'hand' | 'board';
 
@@ -72,7 +73,6 @@ export function useGameController(seed: number, settings: GameSettings) {
   const botBusyRef = useRef(false);
   const mountedRef = useRef(true);
 
-  // Initialize refs once
   if (prngRef.current === null) {
     prngRef.current = createPRNG(seed);
     idGenRef.current = createIdGenerator(createPRNG(seed + 1000));
@@ -80,13 +80,20 @@ export function useGameController(seed: number, settings: GameSettings) {
   }
 
   const [state, setState] = useState<GameState>(() => {
+    const saved = loadGame();
+    if (saved) return saved;
     const initial = createInitialState(settings, prngRef.current, idGenRef.current);
-    // Seed tracker with initial board cards so AI has context from turn 1
     for (const card of initial.board) {
       trackerRef.current = recordPlacement(trackerRef.current, card);
     }
     return initial;
   });
+
+  const setAndPersist = useCallback((s: GameState) => {
+    setState(s);
+    stateRef.current = s;
+    saveGame(s);
+  }, []);
   const [botViz, setBotViz] = useState<BotVizStep | null>(null);
   const [gameOver, setGameOver] = useState<{
     winner: PlayerIndex;
@@ -110,8 +117,7 @@ export function useGameController(seed: number, settings: GameSettings) {
     switch (result.type) {
       case 'CONTINUE_TURN': {
         const next = { ...current, currentPlayer: result.nextPlayer };
-        setState(next);
-        stateRef.current = next;
+        setAndPersist(next);
         if (result.nextPlayer !== 0) {
           await runBotTurn(next);
         }
@@ -120,8 +126,7 @@ export function useGameController(seed: number, settings: GameSettings) {
       case 'DEAL_NEW_HAND': {
         let next = dealNewHand(current);
         next = { ...next, currentPlayer: result.startingPlayer };
-        setState(next);
-        stateRef.current = next;
+        setAndPersist(next);
         if (result.startingPlayer !== 0) {
           await runBotTurn(next);
         }
@@ -137,8 +142,7 @@ export function useGameController(seed: number, settings: GameSettings) {
             boardBefore,
           );
         }
-        setState(afterJackpot);
-        stateRef.current = afterJackpot;
+        setAndPersist(afterJackpot);
         await wait(1500);
         if (!mountedRef.current) return;
         const next = startNewRound(
@@ -146,8 +150,7 @@ export function useGameController(seed: number, settings: GameSettings) {
           prngRef.current,
           idGenRef.current,
         );
-        setState(next);
-        stateRef.current = next;
+        setAndPersist(next);
         if (next.currentPlayer !== 0) {
           await runBotTurn(next);
         }
@@ -163,8 +166,8 @@ export function useGameController(seed: number, settings: GameSettings) {
             boardBefore,
           );
         }
-        setState(afterJackpot);
-        stateRef.current = afterJackpot;
+        setAndPersist(afterJackpot);
+        clearSavedGame();
         setGameOver({
           winner: result.winner,
           winnerName: result.winnerName,
@@ -244,7 +247,7 @@ export function useGameController(seed: number, settings: GameSettings) {
         (c) => c.id !== botBase.id,
       );
       setBotCombo({ playerIndex: player, baseCard: botBase, comboCards: botComboCards });
-      await wait(1200);
+      await wait(2000);
       if (!mountedRef.current) return;
       setBotCombo(null);
 
@@ -275,12 +278,11 @@ export function useGameController(seed: number, settings: GameSettings) {
       );
     }
 
-    setState(next);
-    stateRef.current = next;
+    setAndPersist(next);
     setBotViz(null);
     botBusyRef.current = false;
 
-    await wait(400);
+    await wait(500);
     if (!mountedRef.current) return;
     await advanceRef.current(next);
   }
@@ -340,10 +342,9 @@ export function useGameController(seed: number, settings: GameSettings) {
       }
 
       const next = { ...s, combination: combo };
-      setState(next);
-      stateRef.current = next;
+      setAndPersist(next);
     },
-    [],
+    [setAndPersist],
   );
 
   const submitCombo = useCallback((): string | null => {
@@ -375,11 +376,10 @@ export function useGameController(seed: number, settings: GameSettings) {
       points: validation.totalPoints,
       timestamp: Date.now(),
     });
-    setState(next);
-    stateRef.current = next;
+    setAndPersist(next);
     void advanceRef.current(next);
     return null;
-  }, []);
+  }, [setAndPersist]);
 
   const doPlaceCard = useCallback((cardId: string) => {
     if (botBusyRef.current) return;
@@ -391,10 +391,9 @@ export function useGameController(seed: number, settings: GameSettings) {
     let next = resetCombination(s);
     next = placeCard(next, cardId);
     trackerRef.current = recordPlacement(trackerRef.current, card);
-    setState(next);
-    stateRef.current = next;
+    setAndPersist(next);
     void advanceRef.current(next);
-  }, []);
+  }, [setAndPersist]);
 
   const doRemoveFromCombo = useCallback((cardId: string) => {
     const s = stateRef.current;
@@ -406,17 +405,15 @@ export function useGameController(seed: number, settings: GameSettings) {
       combo3: s.combination.combo3.filter((g) => g.card.id !== cardId),
     };
     const next = { ...s, combination: combo };
-    setState(next);
-    stateRef.current = next;
-  }, []);
+    setAndPersist(next);
+  }, [setAndPersist]);
 
   const doResetCombo = useCallback(() => {
     const s = stateRef.current;
     if (s.currentPlayer !== 0) return;
     const next = resetCombination(s);
-    setState(next);
-    stateRef.current = next;
-  }, []);
+    setAndPersist(next);
+  }, [setAndPersist]);
 
   const isPlayerTurn =
     state.currentPlayer === 0 && !botBusyRef.current && !gameOver;

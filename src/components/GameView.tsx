@@ -209,7 +209,7 @@ export function GameView({
         border: hoveredBoard ? `1px solid ${C.success}` : `1px solid ${C.divider}`,
         boxShadow: hoveredBoard ? `0 0 12px rgba(16,185,129,0.15)` : 'none',
         transition: 'border 150ms, box-shadow 150ms, background 150ms',
-        minHeight: 0,
+        minHeight: 0, overflow: 'hidden', position: 'relative' as const, zIndex: 1,
       }}>
         {visibleBoard.length === 0 && !botCombo && (
           <span style={{ fontSize: 11, color: C.disabledText, fontFamily: 'Inter, sans-serif' }}>Board empty</span>
@@ -234,7 +234,7 @@ export function GameView({
       <div style={{
         gridArea: 'combo', display: 'flex', flexDirection: 'column',
         alignItems: 'center', gap: 6, padding: '6px 8px',
-        background: '#222236', position: 'relative',
+        background: '#222236', position: 'relative' as const, zIndex: 10,
       }}>
         {/* Thinking bubble between board and combo */}
         <ThinkingBubble
@@ -292,7 +292,7 @@ export function GameView({
       <div style={{
         gridArea: 'hand', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', gap: 4,
-        background: '#1A1A28', borderTop: `1px solid ${C.divider}`,
+        background: '#1A1A28', borderTop: `1px solid ${C.divider}`, position: 'relative' as const, zIndex: 20,
       }}>
         <span style={{ fontSize: 9, color: C.textSecondary, letterSpacing: 1, fontWeight: 500, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' }}>YOUR HAND</span>
         <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>

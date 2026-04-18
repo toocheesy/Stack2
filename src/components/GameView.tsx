@@ -187,9 +187,9 @@ export function GameView({
 
       {/* ═══ SCORE BAR ═══ */}
       <div style={{ gridArea: 'score', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: C.slateBg, borderBottom: `1px solid ${C.divider}` }}>
-        <ScoreBlock label="YOU" labelColor={C.textSecondary} score={state.scores.player} target={target} active={state.currentPlayer === 0} amber />
-        <ScoreBlock label={bot1Info.name} labelColor={bot1Info.fill} score={state.scores.bot1} target={target} active={state.currentPlayer === 1} />
-        <ScoreBlock label={bot2Info.name} labelColor={bot2Info.fill} score={state.scores.bot2} target={target} active={state.currentPlayer === 2} />
+        <ScoreBlock label="YOU" labelColor={C.textSecondary} score={state.overallScores.player} target={target} active={state.currentPlayer === 0} amber />
+        <ScoreBlock label={bot1Info.name} labelColor={bot1Info.fill} score={state.overallScores.bot1} target={target} active={state.currentPlayer === 1} />
+        <ScoreBlock label={bot2Info.name} labelColor={bot2Info.fill} score={state.overallScores.bot2} target={target} active={state.currentPlayer === 2} />
         <span style={{ color: C.textSecondary, fontSize: 11, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>R{state.currentRound}</span>
       </div>
 

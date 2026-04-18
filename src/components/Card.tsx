@@ -10,8 +10,14 @@ const CARD_H = Math.round(CARD_W * (3.5 / 2.5));
 const SMALL_W = 40;
 const SMALL_H = Math.round(SMALL_W * (3.5 / 2.5));
 
-const STRIPE_PCT = 0.22; // ~22% of card width
-const STRIPE_H_PCT = 0.75;
+// Banner/pennant proportions (percentage of card)
+const BANNER_W_PCT = 0.20;
+const BANNER_H_PCT = 0.65;
+const BANNER_LEFT_PCT = 0.08;
+const BANNER_TOP_PCT = 0.08;
+
+const BANNER_CLIP = 'polygon(0 0, 100% 0, 100% 85%, 50% 100%, 0 85%)';
+
 const MAX_TILT_DEG = 18;
 
 export interface CardProps {
@@ -33,24 +39,40 @@ const suitSymbols: Record<string, string> = {
 const suitColor = (suit: string) =>
   suit === 'hearts' || suit === 'diamonds' ? C.suitRed : C.suitBlack;
 
+// ─── Banner shape (shared between face and back) ─────
+
+function Banner({ w, h, lifted, back }: { w: number; h: number; lifted?: boolean; back?: boolean }) {
+  const bw = Math.round(w * BANNER_W_PCT);
+  const bh = Math.round(h * BANNER_H_PCT);
+  const left = Math.round(w * BANNER_LEFT_PCT);
+  const top = Math.round(h * BANNER_TOP_PCT);
+
+  const bg = back
+    ? 'rgba(255,255,255,0.3)'
+    : lifted
+    ? `linear-gradient(to bottom, ${C.indigoHover}, #818CF8)`
+    : `linear-gradient(to bottom, ${C.indigo}, ${C.indigoHover})`;
+
+  return (
+    <div style={{
+      position: 'absolute', left, top, width: bw, height: bh,
+      background: bg,
+      clipPath: BANNER_CLIP,
+      filter: back ? 'none' : 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))',
+    }} />
+  );
+}
+
 // ─── Card Back ────────────────────────────────────────
 
 function CardBack({ w, h }: { w: number; h: number }) {
-  const stripeW = Math.round(w * STRIPE_PCT);
-  const stripeH = Math.round(h * STRIPE_H_PCT);
   return (
     <div style={{
       width: w, height: h, borderRadius: 8, background: C.indigo,
       position: 'relative', overflow: 'hidden',
       boxShadow: SHADOWS.cardRest, flexShrink: 0,
     }}>
-      {/* White 75% stripe */}
-      <div style={{
-        position: 'absolute', left: 0, top: 0,
-        width: stripeW, height: stripeH,
-        background: 'rgba(255,255,255,0.4)',
-        borderRadius: '8px 0 0 0',
-      }} />
+      <Banner w={w} h={h} back />
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage:
@@ -77,9 +99,6 @@ function CardFace({ card, w, h, lifted }: {
   const suitSize = w < 50 ? 10 : 16;
   const shadow = lifted ? SHADOWS.cardLifted : SHADOWS.cardRest;
   const color = suitColor(card.suit);
-  const stripeW = Math.round(w * STRIPE_PCT);
-  const stripeH = Math.round(h * STRIPE_H_PCT);
-  const contentShift = Math.round(stripeW / 2);
 
   return (
     <div style={{
@@ -87,22 +106,17 @@ function CardFace({ card, w, h, lifted }: {
       position: 'relative', overflow: 'hidden', boxShadow: shadow,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', gap: 1, flexShrink: 0,
-      paddingLeft: contentShift,
     }}>
-      {/* 75% indigo stripe — brand mark */}
-      <div style={{
-        position: 'absolute', left: 0, top: 0,
-        width: stripeW, height: stripeH,
-        background: lifted
-          ? `linear-gradient(to bottom, ${C.indigoHover}, ${C.indigo})`
-          : `linear-gradient(to bottom, ${C.indigo}, ${C.indigoHover})`,
-        borderRadius: '8px 0 0 0',
-      }} />
+      <Banner w={w} h={h} lifted={lifted} />
       <span style={{
         fontFamily: 'Inter, sans-serif', fontWeight: 700,
         fontSize: rankSize, lineHeight: 1, color,
+        position: 'relative', zIndex: 2,
       }}>{card.rank}</span>
-      <span style={{ fontSize: suitSize, lineHeight: 1, color }}>
+      <span style={{
+        fontSize: suitSize, lineHeight: 1, color,
+        position: 'relative', zIndex: 2,
+      }}>
         {suitSymbols[card.suit] ?? '?'}
       </span>
     </div>

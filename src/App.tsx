@@ -200,8 +200,10 @@ function TitleScreen({ onNewGame, onContinue }: { onNewGame: () => void; onConti
 function PeekCard() {
   const w = 120;
   const h = Math.round(w * (3.5 / 2.5));
-  const stripeW = Math.round(w * 0.22);
-  const stripeH = Math.round(h * 0.75);
+  const bw = Math.round(w * 0.20);
+  const bh = Math.round(h * 0.65);
+  const bl = Math.round(w * 0.08);
+  const bt = Math.round(h * 0.08);
   return (
     <div
       style={{
@@ -214,16 +216,17 @@ function PeekCard() {
         boxShadow: SHADOWS.cardPeek,
       }}
     >
-      {/* 75% indigo stripe */}
+      {/* Banner/pennant */}
       <div
         style={{
           position: 'absolute',
-          left: 0,
-          top: 0,
-          width: stripeW,
-          height: stripeH,
+          left: bl,
+          top: bt,
+          width: bw,
+          height: bh,
           background: `linear-gradient(to bottom, ${C.indigo}, ${C.indigoHover})`,
-          borderRadius: '12px 0 0 0',
+          clipPath: 'polygon(0 0, 100% 0, 100% 85%, 50% 100%, 0 85%)',
+          filter: 'drop-shadow(0 1px 3px rgba(0,0,0,0.15))',
         }}
       />
       <div

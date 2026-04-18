@@ -14,7 +14,7 @@ const SMALL_H = Math.round(SMALL_W * (3.5 / 2.5));
 const BANNER_W_PCT = 0.20;
 const BANNER_H_PCT = 0.65;
 const BANNER_LEFT_PCT = 0.08;
-const BANNER_TOP_PCT = 0.08;
+const BANNER_TOP_PCT = 0;
 
 const BANNER_CLIP = 'polygon(0 0, 100% 0, 100% 85%, 50% 100%, 0 85%)';
 

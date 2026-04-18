@@ -165,28 +165,30 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
 function PeekCard() {
   const w = 120;
   const h = Math.round(w * (3.5 / 2.5));
+  const stripeW = Math.round(w * 0.22);
+  const stripeH = Math.round(h * 0.75);
   return (
     <div
       style={{
         width: w,
         height: h,
         borderRadius: 12,
-        background: '#FFFFFF',
+        background: C.card,
         position: 'relative',
         overflow: 'hidden',
         boxShadow: SHADOWS.cardPeek,
       }}
     >
-      {/* Indigo stripe */}
+      {/* 75% indigo stripe */}
       <div
         style={{
           position: 'absolute',
           left: 0,
           top: 0,
-          bottom: 0,
-          width: 6,
-          background: C.indigo,
-          borderRadius: '12px 0 0 12px',
+          width: stripeW,
+          height: stripeH,
+          background: `linear-gradient(to bottom, ${C.indigo}, ${C.indigoHover})`,
+          borderRadius: '12px 0 0 0',
         }}
       />
       <div

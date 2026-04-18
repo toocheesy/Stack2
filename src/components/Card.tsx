@@ -10,7 +10,8 @@ const CARD_H = Math.round(CARD_W * (3.5 / 2.5));
 const SMALL_W = 40;
 const SMALL_H = Math.round(SMALL_W * (3.5 / 2.5));
 
-const STRIPE_W = 6;
+const STRIPE_W = 14;
+const STRIPE_H_PCT = 0.75;
 const MAX_TILT_DEG = 18;
 
 export interface CardProps {
@@ -35,12 +36,21 @@ const suitColor = (suit: string) =>
 // ─── Card Back ────────────────────────────────────────
 
 function CardBack({ w, h }: { w: number; h: number }) {
+  const stripeW = Math.round(w * (STRIPE_W / CARD_W));
+  const stripeH = Math.round(h * STRIPE_H_PCT);
   return (
     <div style={{
       width: w, height: h, borderRadius: 8, background: C.indigo,
       position: 'relative', overflow: 'hidden',
       boxShadow: SHADOWS.cardRest, flexShrink: 0,
     }}>
+      {/* White 75% stripe */}
+      <div style={{
+        position: 'absolute', left: 0, top: 0,
+        width: stripeW, height: stripeH,
+        background: 'rgba(255,255,255,0.4)',
+        borderRadius: '8px 0 0 0',
+      }} />
       <div style={{
         position: 'absolute', inset: 0,
         backgroundImage:
@@ -67,6 +77,9 @@ function CardFace({ card, w, h, lifted }: {
   const suitSize = w < 50 ? 10 : 16;
   const shadow = lifted ? SHADOWS.cardLifted : SHADOWS.cardRest;
   const color = suitColor(card.suit);
+  const stripeW = Math.round(w * (STRIPE_W / CARD_W));
+  const stripeH = Math.round(h * STRIPE_H_PCT);
+  const contentShift = Math.round(stripeW / 2);
 
   return (
     <div style={{
@@ -74,14 +87,16 @@ function CardFace({ card, w, h, lifted }: {
       position: 'relative', overflow: 'hidden', boxShadow: shadow,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', gap: 1, flexShrink: 0,
+      paddingLeft: contentShift,
     }}>
+      {/* 75% indigo stripe — brand mark */}
       <div style={{
-        position: 'absolute', left: 0, top: 0, bottom: 0,
-        width: STRIPE_W,
+        position: 'absolute', left: 0, top: 0,
+        width: stripeW, height: stripeH,
         background: lifted
           ? `linear-gradient(to bottom, ${C.indigoHover}, ${C.indigo})`
           : `linear-gradient(to bottom, ${C.indigo}, ${C.indigoHover})`,
-        borderRadius: '8px 0 0 8px',
+        borderRadius: '8px 0 0 0',
       }} />
       <span style={{
         fontFamily: 'Inter, sans-serif', fontWeight: 700,

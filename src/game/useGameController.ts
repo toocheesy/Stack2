@@ -32,6 +32,7 @@ type CardSource = 'hand' | 'board';
 
 export interface GameActions {
   addToCombo: (cardId: string, source: CardSource, slot: ComboSlot) => void;
+  removeFromCombo: (cardId: string) => void;
   submitCombo: () => string | null;
   placeCard: (cardId: string) => void;
   resetCombo: () => void;
@@ -45,9 +46,17 @@ export interface BotVizStep {
 export interface LastCaptureInfo {
   playerIndex: PlayerIndex;
   playerName: string;
-  cards: import('../engine/types').Card[];
+  baseCard: import('../engine/types').Card | null;
+  comboCards: import('../engine/types').Card[];
+  allCards: import('../engine/types').Card[];
   points: number;
   timestamp: number;
+}
+
+export interface BotComboDisplay {
+  playerIndex: PlayerIndex;
+  baseCard: import('../engine/types').Card;
+  comboCards: import('../engine/types').Card[];
 }
 
 const PLAYER_DISPLAY_NAMES: Record<number, string> = { 0: 'You', 1: 'Bot 1', 2: 'Bot 2' };
@@ -84,6 +93,7 @@ export function useGameController(seed: number, settings: GameSettings) {
     winnerName: string;
   } | null>(null);
   const [lastCapture, setLastCapture] = useState<LastCaptureInfo | null>(null);
+  const [botCombo, setBotCombo] = useState<BotComboDisplay | null>(null);
 
   // Always-fresh ref to current state (avoids stale closures)
   const stateRef = useRef(state);
@@ -228,6 +238,16 @@ export function useGameController(seed: number, settings: GameSettings) {
 
     let next: GameState;
     if (decision.action === 'capture' && decision.captureDetails) {
+      // Show bot's combo in the slots for the player to read
+      const botBase = decision.handCard;
+      const botComboCards = decision.captureDetails.capturedCards.filter(
+        (c) => c.id !== botBase.id,
+      );
+      setBotCombo({ playerIndex: player, baseCard: botBase, comboCards: botComboCards });
+      await wait(1200);
+      if (!mountedRef.current) return;
+      setBotCombo(null);
+
       const vc: ValidatedCapture = {
         allCapturedCards: decision.captureDetails.capturedCards,
         totalPoints: decision.captureDetails.totalPoints,
@@ -241,7 +261,9 @@ export function useGameController(seed: number, settings: GameSettings) {
       setLastCapture({
         playerIndex: player,
         playerName: PLAYER_DISPLAY_NAMES[player] ?? `Bot ${player}`,
-        cards: decision.captureDetails.capturedCards,
+        baseCard: botBase,
+        comboCards: botComboCards,
+        allCards: decision.captureDetails.capturedCards,
         points: decision.captureDetails.totalPoints,
         timestamp: Date.now(),
       });
@@ -345,7 +367,11 @@ export function useGameController(seed: number, settings: GameSettings) {
     setLastCapture({
       playerIndex: 0,
       playerName: 'You',
-      cards: validation.allCapturedCards,
+      baseCard: s.combination.base,
+      comboCards: validation.allCapturedCards.filter(
+        (c) => c.id !== s.combination.base?.id,
+      ),
+      allCards: validation.allCapturedCards,
       points: validation.totalPoints,
       timestamp: Date.now(),
     });
@@ -370,6 +396,20 @@ export function useGameController(seed: number, settings: GameSettings) {
     void advanceRef.current(next);
   }, []);
 
+  const doRemoveFromCombo = useCallback((cardId: string) => {
+    const s = stateRef.current;
+    if (s.currentPlayer !== 0) return;
+    const combo = {
+      base: s.combination.base?.id === cardId ? null : s.combination.base,
+      combo1: s.combination.combo1.filter((g) => g.card.id !== cardId),
+      combo2: s.combination.combo2.filter((g) => g.card.id !== cardId),
+      combo3: s.combination.combo3.filter((g) => g.card.id !== cardId),
+    };
+    const next = { ...s, combination: combo };
+    setState(next);
+    stateRef.current = next;
+  }, []);
+
   const doResetCombo = useCallback(() => {
     const s = stateRef.current;
     if (s.currentPlayer !== 0) return;
@@ -385,10 +425,12 @@ export function useGameController(seed: number, settings: GameSettings) {
     state,
     isPlayerTurn,
     botViz,
+    botCombo,
     lastCapture,
     gameOver,
     actions: {
       addToCombo,
+      removeFromCombo: doRemoveFromCombo,
       submitCombo,
       placeCard: doPlaceCard,
       resetCombo: doResetCombo,

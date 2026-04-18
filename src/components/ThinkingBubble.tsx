@@ -9,7 +9,6 @@ const BOT_COLORS: Record<Difficulty, { fill: string; name: string }> = {
 
 interface Props {
   visible: boolean;
-  botIndex: 1 | 2;
   difficulty: Difficulty;
 }
 

@@ -10,7 +10,7 @@ const CARD_H = Math.round(CARD_W * (3.5 / 2.5));
 const SMALL_W = 40;
 const SMALL_H = Math.round(SMALL_W * (3.5 / 2.5));
 
-const STRIPE_W = 4;
+const STRIPE_W = 6;
 const MAX_TILT_DEG = 18;
 
 export interface CardProps {
@@ -77,7 +77,10 @@ function CardFace({ card, w, h, lifted }: {
     }}>
       <div style={{
         position: 'absolute', left: 0, top: 0, bottom: 0,
-        width: STRIPE_W, background: lifted ? C.indigoHover : C.indigo,
+        width: STRIPE_W,
+        background: lifted
+          ? `linear-gradient(to bottom, ${C.indigoHover}, ${C.indigo})`
+          : `linear-gradient(to bottom, ${C.indigo}, ${C.indigoHover})`,
         borderRadius: '8px 0 0 8px',
       }} />
       <span style={{

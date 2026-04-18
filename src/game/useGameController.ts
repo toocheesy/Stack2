@@ -25,7 +25,8 @@ import {
   recordPlacement,
   type CardTrackerState,
 } from '../engine/ai/cardTracker';
-import { decideBotAction, getBotThinkingDelay } from '../engine/ai/botDecision';
+import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../engine/ai/botDecision';
+import { evaluateAllActions } from '../engine/ai/evaluator';
 
 type CardSource = 'hand' | 'board';
 
@@ -59,9 +60,14 @@ export function useGameController(seed: number, settings: GameSettings) {
     trackerRef.current = createCardTracker();
   }
 
-  const [state, setState] = useState<GameState>(() =>
-    createInitialState(settings, prngRef.current, idGenRef.current),
-  );
+  const [state, setState] = useState<GameState>(() => {
+    const initial = createInitialState(settings, prngRef.current, idGenRef.current);
+    // Seed tracker with initial board cards so AI has context from turn 1
+    for (const card of initial.board) {
+      trackerRef.current = recordPlacement(trackerRef.current, card);
+    }
+    return initial;
+  });
   const [botViz, setBotViz] = useState<BotVizStep | null>(null);
   const [gameOver, setGameOver] = useState<{
     winner: PlayerIndex;
@@ -171,12 +177,42 @@ export function useGameController(seed: number, settings: GameSettings) {
     await wait(delay);
     if (!mountedRef.current) return;
 
+    // ── AI diagnostic logging ──
+    const profile = getPersonalityProfile(difficulty);
+    const allActions = evaluateAllActions(
+      current,
+      player,
+      trackerRef.current,
+      profile.weights,
+      { allowMultiSlot: profile.allowMultiSlot },
+    );
+    const top3 = allActions.slice(0, 3);
+    console.log(
+      `[BOT ${player}] ${profile.name} (${difficulty}) | ` +
+      `hand: ${current.hands[player].length} cards | ` +
+      `board: ${current.board.length} cards | ` +
+      `${allActions.length} actions evaluated`,
+    );
+    top3.forEach((a, i) => {
+      console.log(
+        `  #${i + 1}: ${a.action} ${a.handCard.rank}${a.handCard.suit[0]} ` +
+        `total=${a.score.total.toFixed(1)} raw=${a.score.rawPoints} ` +
+        `chain=${a.score.chainPotential} deny=${a.score.opponentDenial.toFixed(1)} ` +
+        `| ${a.reasoning}`,
+      );
+    });
+
     const decision = decideBotAction(
       current,
       player,
       difficulty,
       trackerRef.current,
       prngRef.current,
+    );
+
+    console.log(
+      `  → CHOSEN: ${decision.action} ${decision.handCard.rank}${decision.handCard.suit[0]} ` +
+      `score=${decision.score.total.toFixed(1)} | ${decision.reasoning}`,
     );
 
     let next: GameState;

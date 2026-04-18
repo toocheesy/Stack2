@@ -100,7 +100,7 @@ function GameWrapper({
   onHome: () => void;
   onPlayAgain: () => void;
 }) {
-  const { state, isPlayerTurn, botViz, gameOver, actions } =
+  const { state, isPlayerTurn, botViz, lastCapture, gameOver, actions } =
     useGameController(seed, settings);
 
   return (
@@ -108,6 +108,7 @@ function GameWrapper({
       state={state}
       isPlayerTurn={isPlayerTurn}
       botViz={botViz}
+      lastCapture={lastCapture}
       gameOver={gameOver}
       actions={actions}
       onHome={onHome}

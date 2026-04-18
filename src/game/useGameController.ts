@@ -42,6 +42,16 @@ export interface BotVizStep {
   playerIndex: PlayerIndex;
 }
 
+export interface LastCaptureInfo {
+  playerIndex: PlayerIndex;
+  playerName: string;
+  cards: import('../engine/types').Card[];
+  points: number;
+  timestamp: number;
+}
+
+const PLAYER_DISPLAY_NAMES: Record<number, string> = { 0: 'You', 1: 'Bot 1', 2: 'Bot 2' };
+
 function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
@@ -73,6 +83,7 @@ export function useGameController(seed: number, settings: GameSettings) {
     winner: PlayerIndex;
     winnerName: string;
   } | null>(null);
+  const [lastCapture, setLastCapture] = useState<LastCaptureInfo | null>(null);
 
   // Always-fresh ref to current state (avoids stale closures)
   const stateRef = useRef(state);
@@ -227,6 +238,13 @@ export function useGameController(seed: number, settings: GameSettings) {
         player,
         decision.captureDetails.capturedCards,
       );
+      setLastCapture({
+        playerIndex: player,
+        playerName: PLAYER_DISPLAY_NAMES[player] ?? `Bot ${player}`,
+        cards: decision.captureDetails.capturedCards,
+        points: decision.captureDetails.totalPoints,
+        timestamp: Date.now(),
+      });
     } else {
       next = placeCard(current, decision.handCard.id);
       trackerRef.current = recordPlacement(
@@ -324,6 +342,13 @@ export function useGameController(seed: number, settings: GameSettings) {
       0,
       validation.allCapturedCards,
     );
+    setLastCapture({
+      playerIndex: 0,
+      playerName: 'You',
+      cards: validation.allCapturedCards,
+      points: validation.totalPoints,
+      timestamp: Date.now(),
+    });
     setState(next);
     stateRef.current = next;
     void advanceRef.current(next);
@@ -360,6 +385,7 @@ export function useGameController(seed: number, settings: GameSettings) {
     state,
     isPlayerTurn,
     botViz,
+    lastCapture,
     gameOver,
     actions: {
       addToCombo,

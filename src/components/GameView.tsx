@@ -1,8 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ComboSlot, Difficulty, GameState } from '../engine/types';
 import { SCORE_KEYS } from '../engine/types';
-import type { GameActions, BotVizStep } from '../game/useGameController';
+import type { GameActions, BotVizStep, LastCaptureInfo } from '../game/useGameController';
 import { CardComponent } from './Card';
+import { LastCaptureCallout } from './LastCapture';
+import { ThinkingBubble } from './ThinkingBubble';
 import { validateFullCombo } from '../engine/core/captureValidator';
 
 type CardSource = 'hand' | 'board';
@@ -11,6 +13,7 @@ interface Props {
   state: GameState;
   isPlayerTurn: boolean;
   botViz: BotVizStep | null;
+  lastCapture: LastCaptureInfo | null;
   gameOver: { winner: number; winnerName: string } | null;
   actions: GameActions;
   onHome: () => void;
@@ -35,6 +38,7 @@ export function GameView({
   state,
   isPlayerTurn,
   botViz,
+  lastCapture,
   gameOver,
   actions,
   onHome,
@@ -210,8 +214,22 @@ export function GameView({
           gridArea: 'board', display: 'flex', flexDirection: 'column',
           alignItems: 'center', gap: 8, padding: '6px 4px',
           background: '#252538', borderRadius: 8, overflow: 'hidden',
+          position: 'relative',
         }}
       >
+        {/* Thinking bubble */}
+        <ThinkingBubble
+          visible={!!botViz && botViz.type === 'thinking'}
+          botIndex={(botViz?.playerIndex ?? 1) as 1 | 2}
+          difficulty={
+            (botViz?.playerIndex ?? 1) === 1
+              ? state.settings.bot1Personality
+              : state.settings.bot2Personality
+          }
+        />
+
+        {/* Last capture callout */}
+        <LastCaptureCallout info={lastCapture} />
         {/* Combo slots */}
         <div style={{ display: 'flex', gap: 6, flexShrink: 0, width: '100%', justifyContent: 'center' }}>
           {SLOT_KEYS.map((key, i) => {

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
+import { motion } from 'motion/react';
 import type { ComboSlot, Difficulty, GameState } from '../engine/types';
 import { SCORE_KEYS } from '../engine/types';
 import type { GameActions, BotVizStep, LastCaptureInfo } from '../game/useGameController';
@@ -48,6 +49,9 @@ export function GameView({
   const boardRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedHandCard, setSelectedHandCard] = useState<string | null>(null);
+  const [hoveredSlot, setHoveredSlot] = useState<ComboSlot | '__board__' | null>(null);
+  const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
+  const lastHitRef = useRef<number>(0);
 
   const stagedIds = useMemo(() => {
     const ids = new Set<string>();
@@ -106,8 +110,27 @@ export function GameView({
     [],
   );
 
+  const handleDragMove = useCallback(
+    (point: { x: number; y: number }) => {
+      const now = Date.now();
+      if (now - lastHitRef.current < 50) return; // throttle 50ms
+      lastHitRef.current = now;
+      const t = findDropTarget(point);
+      const key = t ? (t.type === 'slot' ? t.slot : '__board__') : null;
+      setHoveredSlot(key);
+    },
+    [findDropTarget],
+  );
+
+  const handleDragStart = useCallback((cardId: string) => {
+    setDraggingCardId(cardId);
+    setSelectedHandCard(null);
+  }, []);
+
   const handleDragEnd = useCallback(
     (cardId: string, source: CardSource, point: { x: number; y: number }) => {
+      setHoveredSlot(null);
+      setDraggingCardId(null);
       if (!isPlayerTurn) return;
       const t = findDropTarget(point);
       if (!t) return;
@@ -215,6 +238,8 @@ export function GameView({
           alignItems: 'center', gap: 8, padding: '6px 4px',
           background: '#252538', borderRadius: 8, overflow: 'hidden',
           position: 'relative',
+          boxShadow: hoveredSlot === '__board__' && draggingCardId ? '0 0 12px rgba(16,185,129,0.3)' : 'none',
+          transition: 'box-shadow 150ms',
         }}
       >
         {/* Thinking bubble */}
@@ -238,6 +263,7 @@ export function GameView({
               : state.combination[key].map((g) => g.card);
             const filled = staged.length > 0;
             const isBase = key === 'base';
+            const isHovered = hoveredSlot === key && draggingCardId !== null;
             return (
               <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: '1 1 0', maxWidth: 72 }}>
                 <span style={{ fontSize: 8, color: '#8B8BA3', fontWeight: 500, letterSpacing: 1, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' as const }}>
@@ -249,13 +275,20 @@ export function GameView({
                   style={{
                     width: '100%', aspectRatio: '2.5/3.5',
                     borderRadius: 6,
-                    border: isBase
+                    border: isHovered
+                      ? '2px solid #4F46E5'
+                      : isBase
                       ? (filled ? '2px solid #4F46E5' : '1px solid #4F46E5')
                       : (filled ? '2px solid #4F46E5' : '1px dashed #4A4A5A'),
+                    boxShadow: isHovered ? '0 0 8px rgba(79,70,229,0.4)' : 'none',
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center', gap: 2,
-                    background: filled ? 'rgba(79,70,229,0.08)' : 'transparent',
-                    transition: 'border 150ms, box-shadow 150ms',
+                    background: isHovered
+                      ? 'rgba(79,70,229,0.15)'
+                      : filled
+                      ? 'rgba(79,70,229,0.08)'
+                      : 'transparent',
+                    transition: 'border 150ms, box-shadow 150ms, background 150ms',
                   }}
                 >
                   {filled ? (
@@ -290,7 +323,9 @@ export function GameView({
           {visibleBoard.map((card) => (
             <CardComponent key={card.id} card={card}
               draggable={isPlayerTurn}
+              isDragging={draggingCardId === card.id}
               onTap={() => handleBoardTap(card.id)}
+              onDragMove={(pt) => { handleDragStart(card.id); handleDragMove(pt); }}
               onDragEnd={(pt) => handleDragEnd(card.id, 'board', pt)}
             />
           ))}
@@ -320,7 +355,9 @@ export function GameView({
             <CardComponent key={card.id} card={card}
               selected={selectedHandCard === card.id}
               draggable={isPlayerTurn}
+              isDragging={draggingCardId === card.id}
               onTap={() => handleHandTap(card.id)}
+              onDragMove={(pt) => { handleDragStart(card.id); handleDragMove(pt); }}
               onDragEnd={(pt) => handleDragEnd(card.id, 'hand', pt)}
             />
           ))}
@@ -426,16 +463,22 @@ function Btn({ label, primary, disabled, big, onClick }: {
   label: string; primary?: boolean; disabled?: boolean; big?: boolean; onClick: () => void;
 }) {
   return (
-    <button onClick={onClick} disabled={disabled} style={{
-      padding: big ? '10px 24px' : '5px 14px', borderRadius: 6,
-      border: primary ? 'none' : '1px solid #8B8BA3',
-      background: primary ? (disabled ? '#2A2A3D' : '#4F46E5') : 'transparent',
-      color: primary ? (disabled ? '#5A5A70' : '#FFF') : '#8B8BA3',
-      fontSize: big ? 15 : 12, fontWeight: 600, fontFamily: 'Inter, sans-serif',
-      cursor: disabled ? 'default' : 'pointer',
-    }}>
+    <motion.button
+      onClick={onClick}
+      disabled={disabled}
+      whileTap={disabled ? undefined : { scale: 0.97 }}
+      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+      style={{
+        padding: big ? '10px 24px' : '5px 14px', borderRadius: 6,
+        border: primary ? 'none' : '1px solid #8B8BA3',
+        background: primary ? (disabled ? '#2A2A3D' : '#4F46E5') : 'transparent',
+        color: primary ? (disabled ? '#5A5A70' : '#FFF') : '#8B8BA3',
+        fontSize: big ? 15 : 12, fontWeight: 600, fontFamily: 'Inter, sans-serif',
+        cursor: disabled ? 'default' : 'pointer',
+      }}
+    >
       {label}
-    </button>
+    </motion.button>
   );
 }
 

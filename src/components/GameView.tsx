@@ -2,6 +2,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import type { ComboSlot, Difficulty, GameState } from '../engine/types';
 import { SCORE_KEYS } from '../engine/types';
+import { C } from '../config/colors';
+import { getTransition } from '../config/motion';
 import type { GameActions, BotVizStep, LastCaptureInfo } from '../game/useGameController';
 import { CardComponent } from './Card';
 import { LastCaptureCallout } from './LastCapture';
@@ -30,9 +32,9 @@ const SLOT_LABELS: Record<ComboSlot, string> = {
 };
 
 const BOT_COLORS: Record<Difficulty, { fill: string; border: string; name: string }> = {
-  beginner:     { fill: '#60A5FA', border: '#93C5FD', name: 'Calvin' },
-  intermediate: { fill: '#A78BFA', border: '#C4B5FD', name: 'Nina' },
-  advanced:     { fill: '#EF4444', border: '#FCA5A5', name: 'Rex' },
+  beginner:     { fill: C.botCalvin, border: '#93C5FD', name: 'Calvin' },
+  intermediate: { fill: C.botNina, border: '#C4B5FD', name: 'Nina' },
+  advanced:     { fill: C.botRex, border: '#FCA5A5', name: 'Rex' },
 };
 
 export function GameView({
@@ -186,7 +188,7 @@ export function GameView({
 
   return (
     <div style={{
-      width: '100vw', height: '100dvh', background: '#1E1E2E',
+      width: '100vw', height: '100dvh', background: C.slateBg,
       display: 'grid',
       gridTemplateColumns: '80px 1fr 80px',
       gridTemplateRows: '40px 1fr 110px',
@@ -198,7 +200,7 @@ export function GameView({
       <div style={{
         gridArea: 'score', display: 'flex', alignItems: 'center',
         justifyContent: 'space-between', padding: '0 16px',
-        background: '#1E1E2E', borderBottom: '1px solid #3A3A50',
+        background: C.slateBg, borderBottom: '1px solid ${C.divider}',
       }}>
         <ScoreBlock
           label="YOU" labelColor="#8B8BA3"
@@ -215,7 +217,7 @@ export function GameView({
           score={state.scores.bot2} target={target}
           active={state.currentPlayer === 2}
         />
-        <span style={{ color: '#8B8BA3', fontSize: 11, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
+        <span style={{ color: C.textSecondary, fontSize: 11, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
           R{state.currentRound}
         </span>
       </div>
@@ -236,7 +238,7 @@ export function GameView({
         style={{
           gridArea: 'board', display: 'flex', flexDirection: 'column',
           alignItems: 'center', gap: 8, padding: '6px 4px',
-          background: '#252538', borderRadius: 8, overflow: 'hidden',
+          background: C.board, borderRadius: 8, overflow: 'hidden',
           position: 'relative',
           boxShadow: hoveredSlot === '__board__' && draggingCardId ? '0 0 12px rgba(16,185,129,0.3)' : 'none',
           transition: 'box-shadow 150ms',
@@ -266,7 +268,7 @@ export function GameView({
             const isHovered = hoveredSlot === key && draggingCardId !== null;
             return (
               <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: '1 1 0', maxWidth: 72 }}>
-                <span style={{ fontSize: 8, color: '#8B8BA3', fontWeight: 500, letterSpacing: 1, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' as const }}>
+                <span style={{ fontSize: 8, color: C.textSecondary, fontWeight: 500, letterSpacing: 1, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' as const }}>
                   {SLOT_LABELS[key]}
                 </span>
                 <div
@@ -278,8 +280,8 @@ export function GameView({
                     border: isHovered
                       ? '2px solid #4F46E5'
                       : isBase
-                      ? (filled ? '2px solid #4F46E5' : '1px solid #4F46E5')
-                      : (filled ? '2px solid #4F46E5' : '1px dashed #4A4A5A'),
+                      ? (filled ? `2px solid ${C.indigo}` : `1px solid ${C.indigo}`)
+                      : (filled ? `2px solid ${C.indigo}` : `1px dashed ${C.slotEmpty}`),
                     boxShadow: isHovered ? '0 0 8px rgba(79,70,229,0.4)' : 'none',
                     display: 'flex', flexDirection: 'column',
                     alignItems: 'center', justifyContent: 'center', gap: 2,
@@ -294,7 +296,7 @@ export function GameView({
                   {filled ? (
                     staged.map((c) => <CardComponent key={c.id} card={c} small />)
                   ) : (
-                    <span style={{ fontSize: 9, color: '#5A5A70', fontFamily: 'Inter, sans-serif' }}>EMPTY</span>
+                    <span style={{ fontSize: 9, color: C.disabledText, fontFamily: 'Inter, sans-serif' }}>EMPTY</span>
                   )}
                 </div>
               </div>
@@ -313,7 +315,7 @@ export function GameView({
             )}
           </div>
         )}
-        {error && <span style={{ fontSize: 11, color: '#EF4444' }}>{error}</span>}
+        {error && <span style={{ fontSize: 11, color: C.error }}>{error}</span>}
 
         {/* Board cards */}
         <div style={{
@@ -345,9 +347,9 @@ export function GameView({
       <div style={{
         gridArea: 'hand', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center', gap: 4,
-        background: '#1A1A28', borderTop: '1px solid #3A3A50',
+        background: '#1A1A28' /* hand-bg */, borderTop: '1px solid ${C.divider}',
       }}>
-        <span style={{ fontSize: 9, color: '#8B8BA3', letterSpacing: 1, fontWeight: 500, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' as const }}>
+        <span style={{ fontSize: 9, color: C.textSecondary, letterSpacing: 1, fontWeight: 500, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' as const }}>
           YOUR HAND
         </span>
         <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
@@ -371,10 +373,10 @@ export function GameView({
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', gap: 16, zIndex: 200,
         }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, fontFamily: 'Inter, sans-serif', color: gameOver.winner === 0 ? '#F59E0B' : '#F1F1F3' }}>
+          <h1 style={{ fontSize: 28, fontWeight: 700, fontFamily: 'Inter, sans-serif', color: gameOver.winner === 0 ? C.amber : C.textPrimary }}>
             {gameOver.winner === 0 ? 'YOU WIN!' : 'GAME OVER'}
           </h1>
-          <p style={{ fontSize: 16, color: '#8B8BA3', fontFamily: 'Inter, sans-serif' }}>
+          <p style={{ fontSize: 16, color: C.textSecondary, fontFamily: 'Inter, sans-serif' }}>
             {gameOver.winnerName} — {state.overallScores[SCORE_KEYS[gameOver.winner as 0|1|2]]}
           </p>
           <div style={{ display: 'flex', gap: 12 }}>
@@ -402,10 +404,10 @@ function ScoreBlock({ label, labelColor, score, target, active, amber }: {
         {label}
       </span>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-        <span style={{ color: amber ? '#F59E0B' : '#F1F1F3', fontWeight: 700, fontSize: 20, fontFamily: "'JetBrains Mono', monospace" }}>
+        <span style={{ color: amber ? C.amber : C.textPrimary, fontWeight: 700, fontSize: 20, fontFamily: "'JetBrains Mono', monospace" }}>
           {score}
         </span>
-        <span style={{ color: '#8B8BA3', fontSize: 12, fontFamily: "'JetBrains Mono', monospace", opacity: 0.6 }}>
+        <span style={{ color: C.textSecondary, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", opacity: 0.6 }}>
           /{target}
         </span>
       </div>
@@ -430,14 +432,14 @@ function BotBadge({ area, info, handCount, hand, thinking }: {
         width: 36, height: 36, borderRadius: 18,
         background: info.fill, border: `2px solid ${info.border}`,
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: '#FFF', fontWeight: 700, fontSize: 16, fontFamily: 'Inter, sans-serif',
+        color: C.card, fontWeight: 700, fontSize: 16, fontFamily: 'Inter, sans-serif',
       }}>
         {info.name[0]}
       </div>
       <span style={{ fontSize: 12, fontWeight: 600, color: info.fill, fontFamily: 'Inter, sans-serif' }}>
         {info.name}
       </span>
-      <span style={{ fontSize: 10, color: '#8B8BA3', fontFamily: 'Inter, sans-serif' }}>
+      <span style={{ fontSize: 10, color: C.textSecondary, fontFamily: 'Inter, sans-serif' }}>
         {handCount} cards
       </span>
       {/* Mini card stack */}
@@ -446,7 +448,7 @@ function BotBadge({ area, info, handCount, hand, thinking }: {
           <div key={c.id} style={{
             position: 'absolute', top: i * 6, left: 0,
             width: 32, height: 20, borderRadius: 3,
-            background: '#4F46E5', border: '1px solid #6366F1',
+            background: C.indigo, border: '1px solid #6366F1',
           }} />
         ))}
       </div>
@@ -467,12 +469,12 @@ function Btn({ label, primary, disabled, big, onClick }: {
       onClick={onClick}
       disabled={disabled}
       whileTap={disabled ? undefined : { scale: 0.97 }}
-      transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+      transition={getTransition('snappy')}
       style={{
         padding: big ? '10px 24px' : '5px 14px', borderRadius: 6,
         border: primary ? 'none' : '1px solid #8B8BA3',
-        background: primary ? (disabled ? '#2A2A3D' : '#4F46E5') : 'transparent',
-        color: primary ? (disabled ? '#5A5A70' : '#FFF') : '#8B8BA3',
+        background: primary ? (disabled ? C.disabled : C.indigo) : 'transparent',
+        color: primary ? (disabled ? C.disabledText : C.card) : C.textSecondary,
         fontSize: big ? 15 : 12, fontWeight: 600, fontFamily: 'Inter, sans-serif',
         cursor: disabled ? 'default' : 'pointer',
       }}

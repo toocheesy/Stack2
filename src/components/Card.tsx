@@ -1,6 +1,8 @@
 import { motion, useMotionValue, useTransform } from 'motion/react';
 import type { Card as CardData } from '../engine/types';
 import type { CSSProperties } from 'react';
+import { C, SHADOWS } from '../config/colors';
+import { getTransition } from '../config/motion';
 
 // Poker standard 2.5:3.5
 const CARD_W = 62;
@@ -21,25 +23,23 @@ export interface CardProps {
   onTap?: () => void;
   onDragEnd?: (point: { x: number; y: number }) => void;
   onDragMove?: (point: { x: number; y: number }) => void;
-  /** True when this card is currently being dragged (set by parent) */
   isDragging?: boolean;
 }
 
 const suitSymbols: Record<string, string> = {
   hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠',
 };
-const suitColors: Record<string, string> = {
-  hearts: '#DC2626', diamonds: '#DC2626', clubs: '#0F0F1A', spades: '#0F0F1A',
-};
+const suitColor = (suit: string) =>
+  suit === 'hearts' || suit === 'diamonds' ? C.suitRed : C.suitBlack;
 
 // ─── Card Back ────────────────────────────────────────
 
 function CardBack({ w, h }: { w: number; h: number }) {
   return (
     <div style={{
-      width: w, height: h, borderRadius: 8, background: '#4F46E5',
+      width: w, height: h, borderRadius: 8, background: C.indigo,
       position: 'relative', overflow: 'hidden',
-      boxShadow: '0 2px 12px rgba(0,0,0,0.3)', flexShrink: 0,
+      boxShadow: SHADOWS.cardRest, flexShrink: 0,
     }}>
       <div style={{
         position: 'absolute', inset: 0,
@@ -65,31 +65,28 @@ function CardFace({ card, w, h, lifted }: {
 }) {
   const rankSize = w < 50 ? 16 : 28;
   const suitSize = w < 50 ? 10 : 16;
-  const shadow = lifted
-    ? '0 8px 24px rgba(0,0,0,0.4), inset 1px 1px 0 rgba(255,255,255,0.06)'
-    : '0 2px 12px rgba(0,0,0,0.3), inset 1px 1px 0 rgba(255,255,255,0.06)';
+  const shadow = lifted ? SHADOWS.cardLifted : SHADOWS.cardRest;
+  const color = suitColor(card.suit);
 
   return (
     <div style={{
-      width: w, height: h, borderRadius: 8, background: '#FFFFFF',
+      width: w, height: h, borderRadius: 8, background: C.card,
       position: 'relative', overflow: 'hidden', boxShadow: shadow,
       display: 'flex', flexDirection: 'column',
       alignItems: 'center', justifyContent: 'center', gap: 1, flexShrink: 0,
     }}>
       <div style={{
         position: 'absolute', left: 0, top: 0, bottom: 0,
-        width: STRIPE_W, background: lifted ? '#6366F1' : '#4F46E5',
+        width: STRIPE_W, background: lifted ? C.indigoHover : C.indigo,
         borderRadius: '8px 0 0 8px',
       }} />
       <span style={{
         fontFamily: 'Inter, sans-serif', fontWeight: 700,
-        fontSize: rankSize, lineHeight: 1,
-        color: suitColors[card.suit] ?? '#0F0F1A',
+        fontSize: rankSize, lineHeight: 1, color,
       }}>{card.rank}</span>
-      <span style={{
-        fontSize: suitSize, lineHeight: 1,
-        color: suitColors[card.suit] ?? '#0F0F1A',
-      }}>{suitSymbols[card.suit] ?? '?'}</span>
+      <span style={{ fontSize: suitSize, lineHeight: 1, color }}>
+        {suitSymbols[card.suit] ?? '?'}
+      </span>
     </div>
   );
 }
@@ -133,7 +130,7 @@ export function CardComponent({
   return (
     <motion.div
       animate={{ y: selected ? -8 : 0 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      transition={getTransition('snappy')}
       onTap={onTap}
       style={wrapStyle}
     >
@@ -153,7 +150,6 @@ function DraggableWrapper({
   style: CSSProperties;
 }) {
   const dragX = useMotionValue(0);
-  // Tilt toward movement direction, clamped to ±MAX_TILT_DEG
   const rotate = useTransform(dragX, [-200, 0, 200], [-MAX_TILT_DEG, 0, MAX_TILT_DEG]);
 
   return (
@@ -163,7 +159,7 @@ function DraggableWrapper({
       style={{ ...style, x: dragX, rotate }}
       animate={{ y: selected ? -8 : 0, scale: 1 }}
       whileDrag={{ scale: 1.05, y: -8, zIndex: 100 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+      transition={getTransition('snappy')}
       onTap={onTap}
       onDrag={(_e, info) => onDragMove?.(info.point)}
       onDragEnd={(_e, info) => onDragEnd?.(info.point)}

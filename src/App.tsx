@@ -3,6 +3,8 @@ import { AnimatePresence, motion } from 'motion/react';
 import { GameView } from './components/GameView';
 import { useGameController } from './game/useGameController';
 import type { GameSettings } from './engine/types';
+import { C, SHADOWS } from './config/colors';
+import { getTransition, tween } from './config/motion';
 
 type Screen = 'home' | 'game';
 
@@ -46,7 +48,7 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
       style={{
         width: '100vw',
         height: '100dvh',
-        background: '#1E1E2E',
+        background: C.slateBg,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -62,12 +64,12 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
           fontFamily: 'Inter, sans-serif',
           fontWeight: 700,
           fontSize: 48,
-          color: '#F1F1F3',
+          color: C.textPrimary,
           letterSpacing: -1,
           lineHeight: 1,
         }}
       >
-        STACKED<span style={{ color: '#4F46E5' }}>!</span>
+        STACKED<span style={{ color: C.indigo }}>!</span>
       </h1>
 
       {/* Tagline */}
@@ -76,7 +78,7 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
           fontFamily: 'Inter, sans-serif',
           fontWeight: 500,
           fontSize: 14,
-          color: '#8B8BA3',
+          color: C.textSecondary,
           letterSpacing: 2,
           textTransform: 'uppercase',
           marginTop: -4,
@@ -92,7 +94,7 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
           marginTop: 8,
           fontFamily: 'Inter, sans-serif',
           fontSize: 13,
-          color: '#8B8BA3',
+          color: C.textSecondary,
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
@@ -107,12 +109,12 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
       <motion.button
         onClick={onStart}
         whileTap={{ scale: 0.97 }}
-        transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+        transition={getTransition('snappy')}
         style={{
           marginTop: 8,
           width: 220,
           height: 52,
-          background: '#4F46E5',
+          background: C.indigo,
           color: '#FFF',
           fontFamily: 'Inter, sans-serif',
           fontWeight: 600,
@@ -130,7 +132,7 @@ function TitleScreen({ onStart }: { onStart: () => void }) {
         style={{
           fontFamily: 'Inter, sans-serif',
           fontSize: 12,
-          color: '#5A5A70',
+          color: C.disabledText,
           marginTop: 16,
         }}
       >
@@ -172,7 +174,7 @@ function PeekCard() {
         background: '#FFFFFF',
         position: 'relative',
         overflow: 'hidden',
-        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+        boxShadow: SHADOWS.cardPeek,
       }}
     >
       {/* Indigo stripe */}
@@ -183,7 +185,7 @@ function PeekCard() {
           top: 0,
           bottom: 0,
           width: 6,
-          background: '#4F46E5',
+          background: C.indigo,
           borderRadius: '12px 0 0 12px',
         }}
       />
@@ -203,7 +205,7 @@ function PeekCard() {
             fontWeight: 700,
             fontSize: 48,
             lineHeight: 1,
-            color: '#DC2626',
+            color: C.suitRed,
           }}
         >
           Q
@@ -222,12 +224,12 @@ function RulesModal({ onClose }: { onClose: () => void }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2 }}
+      transition={tween.default}
       onClick={onClose}
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(30,30,46,0.95)',
+        background: 'rgba(30, 30, 46, 0.95)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -239,10 +241,10 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         initial={{ opacity: 0, scale: 0.96 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.96 }}
-        transition={{ duration: 0.15 }}
+        transition={tween.micro}
         onClick={(e) => e.stopPropagation()}
         style={{
-          background: '#252538',
+          background: C.board,
           borderRadius: 12,
           maxWidth: 360,
           width: '100%',
@@ -259,7 +261,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
             top: 0,
             bottom: 0,
             width: 4,
-            background: '#4F46E5',
+            background: C.indigo,
             borderRadius: '12px 0 0 12px',
           }}
         />
@@ -269,7 +271,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
             fontFamily: 'Inter, sans-serif',
             fontWeight: 700,
             fontSize: 18,
-            color: '#F1F1F3',
+            color: C.textPrimary,
             marginBottom: 16,
           }}
         >
@@ -294,7 +296,7 @@ function RulesModal({ onClose }: { onClose: () => void }) {
               style={{
                 fontFamily: 'Inter, sans-serif',
                 fontSize: 14,
-                color: '#C0C0D0',
+                color: C.ruleText,
                 lineHeight: 1.5,
               }}
             >
@@ -306,12 +308,12 @@ function RulesModal({ onClose }: { onClose: () => void }) {
         <motion.button
           onClick={onClose}
           whileTap={{ scale: 0.97 }}
-          transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+          transition={getTransition('snappy')}
           style={{
             marginTop: 20,
             width: '100%',
             height: 44,
-            background: '#4F46E5',
+            background: C.indigo,
             color: '#FFF',
             fontFamily: 'Inter, sans-serif',
             fontWeight: 600,

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
-  Card,
   ComboSlot,
   GameSettings,
   GameState,
@@ -27,7 +26,6 @@ import {
   type CardTrackerState,
 } from '../engine/ai/cardTracker';
 import { decideBotAction, getBotThinkingDelay } from '../engine/ai/botDecision';
-import type { BotDecision } from '../engine/ai/botDecision';
 
 type CardSource = 'hand' | 'board';
 
@@ -39,175 +37,202 @@ export interface GameActions {
 }
 
 export interface BotVizStep {
-  type: 'thinking' | 'card-to-slot' | 'hold' | 'done';
+  type: 'thinking' | 'done';
   playerIndex: PlayerIndex;
-  card?: Card;
-  slot?: ComboSlot;
+}
+
+function wait(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 export function useGameController(seed: number, settings: GameSettings) {
-  const prngRef = useRef<PRNG>(createPRNG(seed));
-  const idGenRef = useRef<IdGenerator>(createIdGenerator(createPRNG(seed + 1000)));
-  const trackerRef = useRef<CardTrackerState>(createCardTracker());
-  const runningRef = useRef(true);
+  const prngRef = useRef<PRNG>(null!);
+  const idGenRef = useRef<IdGenerator>(null!);
+  const trackerRef = useRef<CardTrackerState>(null!);
+  const botBusyRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  // Initialize refs once
+  if (prngRef.current === null) {
+    prngRef.current = createPRNG(seed);
+    idGenRef.current = createIdGenerator(createPRNG(seed + 1000));
+    trackerRef.current = createCardTracker();
+  }
 
   const [state, setState] = useState<GameState>(() =>
     createInitialState(settings, prngRef.current, idGenRef.current),
   );
-  const [botBusy, setBotBusy] = useState(false);
   const [botViz, setBotViz] = useState<BotVizStep | null>(null);
   const [gameOver, setGameOver] = useState<{
     winner: PlayerIndex;
     winnerName: string;
   } | null>(null);
 
+  // Always-fresh ref to current state (avoids stale closures)
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const wait = useCallback(
-    (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
-    [],
-  );
+  // ─── Core flow: advance after any action ──────────
 
-  const advance = useCallback(
-    async (current: GameState) => {
-      if (!runningRef.current) return;
-      const result = determineTurnResult(current);
-      switch (result.type) {
-        case 'CONTINUE_TURN': {
-          const next = { ...current, currentPlayer: result.nextPlayer };
-          setState(next);
-          if (result.nextPlayer !== 0) {
-            await runBot(next);
-          }
-          break;
+  const advanceRef = useRef<(s: GameState) => Promise<void>>(null!);
+
+  advanceRef.current = async (current: GameState) => {
+    if (!mountedRef.current) return;
+    const result = determineTurnResult(current);
+
+    switch (result.type) {
+      case 'CONTINUE_TURN': {
+        const next = { ...current, currentPlayer: result.nextPlayer };
+        setState(next);
+        stateRef.current = next;
+        if (result.nextPlayer !== 0) {
+          await runBotTurn(next);
         }
-        case 'DEAL_NEW_HAND': {
-          let next = dealNewHand(current);
-          next = { ...next, currentPlayer: result.startingPlayer };
-          setState(next);
-          if (result.startingPlayer !== 0) {
-            await runBot(next);
-          }
-          break;
-        }
-        case 'END_ROUND': {
-          const boardBefore = current.board.slice();
-          const { state: afterJackpot, jackpotResult } = applyJackpot(current);
-          let s = afterJackpot;
-          if (jackpotResult) {
-            trackerRef.current = recordCapture(
-              trackerRef.current,
-              jackpotResult.player,
-              boardBefore,
-            );
-          }
-          setState(s);
-          await wait(1500);
-          if (!runningRef.current) return;
-          s = startNewRound(s, prngRef.current, idGenRef.current);
-          setState(s);
-          if (s.currentPlayer !== 0) {
-            await runBot(s);
-          }
-          break;
-        }
-        case 'END_GAME': {
-          const boardBefore = current.board.slice();
-          const { state: afterJackpot, jackpotResult } = applyJackpot(current);
-          if (jackpotResult) {
-            trackerRef.current = recordCapture(
-              trackerRef.current,
-              jackpotResult.player,
-              boardBefore,
-            );
-          }
-          setState(afterJackpot);
-          setGameOver({ winner: result.winner, winnerName: result.winnerName });
-          break;
-        }
+        break;
       }
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+      case 'DEAL_NEW_HAND': {
+        let next = dealNewHand(current);
+        next = { ...next, currentPlayer: result.startingPlayer };
+        setState(next);
+        stateRef.current = next;
+        if (result.startingPlayer !== 0) {
+          await runBotTurn(next);
+        }
+        break;
+      }
+      case 'END_ROUND': {
+        const boardBefore = current.board.slice();
+        const { state: afterJackpot, jackpotResult } = applyJackpot(current);
+        if (jackpotResult) {
+          trackerRef.current = recordCapture(
+            trackerRef.current,
+            jackpotResult.player,
+            boardBefore,
+          );
+        }
+        setState(afterJackpot);
+        stateRef.current = afterJackpot;
+        await wait(1500);
+        if (!mountedRef.current) return;
+        const next = startNewRound(
+          afterJackpot,
+          prngRef.current,
+          idGenRef.current,
+        );
+        setState(next);
+        stateRef.current = next;
+        if (next.currentPlayer !== 0) {
+          await runBotTurn(next);
+        }
+        break;
+      }
+      case 'END_GAME': {
+        const boardBefore = current.board.slice();
+        const { state: afterJackpot, jackpotResult } = applyJackpot(current);
+        if (jackpotResult) {
+          trackerRef.current = recordCapture(
+            trackerRef.current,
+            jackpotResult.player,
+            boardBefore,
+          );
+        }
+        setState(afterJackpot);
+        stateRef.current = afterJackpot;
+        setGameOver({
+          winner: result.winner,
+          winnerName: result.winnerName,
+        });
+        break;
+      }
+    }
+  };
 
-  const runBot = useCallback(
-    async (current: GameState) => {
-      if (!runningRef.current) return;
-      const player = current.currentPlayer;
-      if (player === 0) return;
-      setBotBusy(true);
+  // ─── Bot turn execution ───────────────────────────
 
-      const difficulty =
-        player === 1
-          ? current.settings.bot1Personality
-          : current.settings.bot2Personality;
+  async function runBotTurn(current: GameState): Promise<void> {
+    if (!mountedRef.current || botBusyRef.current) return;
+    const player = current.currentPlayer;
+    if (player === 0) return;
+    if (current.hands[player].length === 0) {
+      // Bot has no cards — advance immediately
+      await advanceRef.current(current);
+      return;
+    }
 
-      setBotViz({ type: 'thinking', playerIndex: player });
-      const delay = getBotThinkingDelay(difficulty, prngRef.current);
-      await wait(delay);
-      if (!runningRef.current) return;
+    botBusyRef.current = true;
+    setBotViz({ type: 'thinking', playerIndex: player });
 
-      const decision: BotDecision = decideBotAction(
-        current,
-        player,
-        difficulty,
+    const difficulty =
+      player === 1
+        ? current.settings.bot1Personality
+        : current.settings.bot2Personality;
+
+    const delay = getBotThinkingDelay(difficulty, prngRef.current);
+    await wait(delay);
+    if (!mountedRef.current) return;
+
+    const decision = decideBotAction(
+      current,
+      player,
+      difficulty,
+      trackerRef.current,
+      prngRef.current,
+    );
+
+    let next: GameState;
+    if (decision.action === 'capture' && decision.captureDetails) {
+      const vc: ValidatedCapture = {
+        allCapturedCards: decision.captureDetails.capturedCards,
+        totalPoints: decision.captureDetails.totalPoints,
+      };
+      next = executeCapture(current, vc);
+      trackerRef.current = recordCapture(
         trackerRef.current,
-        prngRef.current,
+        player,
+        decision.captureDetails.capturedCards,
       );
+    } else {
+      next = placeCard(current, decision.handCard.id);
+      trackerRef.current = recordPlacement(
+        trackerRef.current,
+        decision.handCard,
+      );
+    }
 
-      setBotViz({ type: 'done', playerIndex: player });
+    setState(next);
+    stateRef.current = next;
+    setBotViz(null);
+    botBusyRef.current = false;
 
-      let next: GameState;
-      if (decision.action === 'capture' && decision.captureDetails) {
-        const vc: ValidatedCapture = {
-          allCapturedCards: decision.captureDetails.capturedCards,
-          totalPoints: decision.captureDetails.totalPoints,
-        };
-        next = executeCapture(current, vc);
-        trackerRef.current = recordCapture(
-          trackerRef.current,
-          player,
-          decision.captureDetails.capturedCards,
-        );
-      } else {
-        next = placeCard(current, decision.handCard.id);
-        trackerRef.current = recordPlacement(
-          trackerRef.current,
-          decision.handCard,
-        );
-      }
+    await wait(400);
+    if (!mountedRef.current) return;
+    await advanceRef.current(next);
+  }
 
-      setState(next);
-      setBotViz(null);
-      setBotBusy(false);
-      await wait(300);
-      if (!runningRef.current) return;
-      await advance(next);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
-  );
+  // ─── Initial bot turn on mount ────────────────────
 
-  // Kick off bot on initial load if it's not player's turn
   useEffect(() => {
-    if (state.currentPlayer !== 0 && !botBusy && !gameOver) {
-      void runBot(state);
+    mountedRef.current = true;
+    if (state.currentPlayer !== 0 && !botBusyRef.current && !gameOver) {
+      void runBotTurn(state);
     }
     return () => {
-      runningRef.current = false;
+      mountedRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ─── Player actions ───────────────────────────────
+
   const addToCombo = useCallback(
     (cardId: string, source: CardSource, slot: ComboSlot) => {
+      if (botBusyRef.current) return;
       const s = stateRef.current;
-      if (s.currentPlayer !== 0 || botBusy) return;
+      if (s.currentPlayer !== 0) return;
+
       const card =
         source === 'hand'
-          ? s.hands[s.currentPlayer].find((c) => c.id === cardId)
+          ? s.hands[0].find((c) => c.id === cardId)
           : s.board.find((c) => c.id === cardId);
       if (!card) return;
 
@@ -217,35 +242,42 @@ export function useGameController(seed: number, settings: GameSettings) {
         combo2: s.combination.combo2.slice(),
         combo3: s.combination.combo3.slice(),
       };
+
       if (slot === 'base') {
         if (combo.base) return;
         combo.base = card;
       } else {
         if (!combo.base) return;
-        const idx =
-          source === 'hand'
-            ? s.hands[s.currentPlayer].findIndex((c) => c.id === cardId)
-            : s.board.findIndex((c) => c.id === cardId);
         const already =
           combo.base?.id === cardId ||
           [...combo.combo1, ...combo.combo2, ...combo.combo3].some(
             (g) => g.card.id === cardId,
           );
         if (already) return;
+        const idx =
+          source === 'hand'
+            ? s.hands[0].findIndex((c) => c.id === cardId)
+            : s.board.findIndex((c) => c.id === cardId);
         combo[slot] = combo[slot].concat([
           { card, source, originalIndex: idx },
         ]);
       }
-      setState({ ...s, combination: combo });
+
+      const next = { ...s, combination: combo };
+      setState(next);
+      stateRef.current = next;
     },
-    [botBusy],
+    [],
   );
 
   const submitCombo = useCallback((): string | null => {
+    if (botBusyRef.current) return 'Not your turn';
     const s = stateRef.current;
-    if (s.currentPlayer !== 0 || botBusy) return 'Not your turn';
+    if (s.currentPlayer !== 0) return 'Not your turn';
+
     const validation = validateFullCombo(s);
     if (!validation.isValid) return validation.errors[0] ?? 'Invalid combo';
+
     const vc: ValidatedCapture = {
       allCapturedCards: validation.allCapturedCards,
       totalPoints: validation.totalPoints,
@@ -257,39 +289,47 @@ export function useGameController(seed: number, settings: GameSettings) {
       validation.allCapturedCards,
     );
     setState(next);
-    void advance(next);
+    stateRef.current = next;
+    void advanceRef.current(next);
     return null;
-  }, [botBusy, advance]);
+  }, []);
 
-  const doPlaceCard = useCallback(
-    (cardId: string) => {
-      const s = stateRef.current;
-      if (s.currentPlayer !== 0 || botBusy) return;
-      const card = s.hands[0].find((c) => c.id === cardId);
-      if (!card) return;
-      let next = resetCombination(s);
-      next = placeCard(next, cardId);
-      trackerRef.current = recordPlacement(trackerRef.current, card);
-      setState(next);
-      void advance(next);
-    },
-    [botBusy, advance],
-  );
+  const doPlaceCard = useCallback((cardId: string) => {
+    if (botBusyRef.current) return;
+    const s = stateRef.current;
+    if (s.currentPlayer !== 0) return;
+    const card = s.hands[0].find((c) => c.id === cardId);
+    if (!card) return;
+
+    let next = resetCombination(s);
+    next = placeCard(next, cardId);
+    trackerRef.current = recordPlacement(trackerRef.current, card);
+    setState(next);
+    stateRef.current = next;
+    void advanceRef.current(next);
+  }, []);
 
   const doResetCombo = useCallback(() => {
     const s = stateRef.current;
     if (s.currentPlayer !== 0) return;
-    setState(resetCombination(s));
+    const next = resetCombination(s);
+    setState(next);
+    stateRef.current = next;
   }, []);
 
-  const actions: GameActions = {
-    addToCombo,
-    submitCombo,
-    placeCard: doPlaceCard,
-    resetCombo: doResetCombo,
+  const isPlayerTurn =
+    state.currentPlayer === 0 && !botBusyRef.current && !gameOver;
+
+  return {
+    state,
+    isPlayerTurn,
+    botViz,
+    gameOver,
+    actions: {
+      addToCombo,
+      submitCombo,
+      placeCard: doPlaceCard,
+      resetCombo: doResetCombo,
+    } as GameActions,
   };
-
-  const isPlayerTurn = state.currentPlayer === 0 && !botBusy && !gameOver;
-
-  return { state, isPlayerTurn, botBusy, botViz, gameOver, actions };
 }

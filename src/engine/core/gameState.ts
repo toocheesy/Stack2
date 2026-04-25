@@ -1,9 +1,12 @@
 import type {
   Card,
+  CaptureRecord,
+  GamePlayerStats,
   GameSettings,
   GameState,
   JackpotResult,
   PlayerIndex,
+  RoundStats,
   Scores,
   ValidatedCapture,
 } from '../types';
@@ -22,6 +25,32 @@ function emptyScores(): Scores {
 
 function emptyCombination(): GameState['combination'] {
   return { base: null, combo1: [], combo2: [], combo3: [] };
+}
+
+function emptyRoundStats(): RoundStats {
+  return { roundScore: 0, highestCapture: null };
+}
+
+function emptyGameStats(): GamePlayerStats {
+  return { totalScore: 0, highestCapture: null };
+}
+
+function maybeUpdateHighest(
+  state: GameState,
+  playerIndex: PlayerIndex,
+  capture: CaptureRecord,
+): GameState {
+  const roundStats = [...state.roundStats] as [RoundStats, RoundStats, RoundStats];
+  const gameStats = [...state.gameStats] as [GamePlayerStats, GamePlayerStats, GamePlayerStats];
+
+  if (!roundStats[playerIndex].highestCapture || capture.points > roundStats[playerIndex].highestCapture.points) {
+    roundStats[playerIndex] = { ...roundStats[playerIndex], highestCapture: capture };
+  }
+  if (!gameStats[playerIndex].highestCapture || capture.points > gameStats[playerIndex].highestCapture.points) {
+    gameStats[playerIndex] = { ...gameStats[playerIndex], highestCapture: capture };
+  }
+
+  return { ...state, roundStats, gameStats };
 }
 
 function deal(deck: Card[], count: number): { taken: Card[]; remaining: Card[] } {
@@ -64,6 +93,10 @@ export function createInitialState(
     settings,
     currentRound: 1,
     currentDealer,
+    handNumber: 1,
+    gamePhase: 'playing',
+    roundStats: [emptyRoundStats(), emptyRoundStats(), emptyRoundStats()],
+    gameStats: [emptyGameStats(), emptyGameStats(), emptyGameStats()],
   };
 }
 
@@ -79,7 +112,7 @@ export function dealNewHand(state: GameState): GameState {
     hands[p] = hands[p].concat(taken);
     deck = remaining;
   }
-  return { ...state, deck, hands };
+  return { ...state, deck, hands, handNumber: state.handNumber + 1 };
 }
 
 export function nextPlayer(state: GameState): GameState {
@@ -95,6 +128,16 @@ export function addScore(
   points: number,
 ): GameState {
   const key = SCORE_KEYS[playerIndex];
+  const roundStats = [...state.roundStats] as [RoundStats, RoundStats, RoundStats];
+  roundStats[playerIndex] = {
+    ...roundStats[playerIndex],
+    roundScore: roundStats[playerIndex].roundScore + points,
+  };
+  const gameStats = [...state.gameStats] as [GamePlayerStats, GamePlayerStats, GamePlayerStats];
+  gameStats[playerIndex] = {
+    ...gameStats[playerIndex],
+    totalScore: gameStats[playerIndex].totalScore + points,
+  };
   return {
     ...state,
     scores: { ...state.scores, [key]: state.scores[key] + points },
@@ -102,6 +145,8 @@ export function addScore(
       ...state.overallScores,
       [key]: state.overallScores[key] + points,
     },
+    roundStats,
+    gameStats,
   };
 }
 
@@ -126,10 +171,19 @@ export function executeCapture(
   hands[state.currentPlayer] = removeCardsById(hands[state.currentPlayer], ids);
   const board = removeCardsById(state.board, ids);
 
-  const scored = addScore(state, state.currentPlayer, validatedCapture.totalPoints);
+  let result = addScore(state, state.currentPlayer, validatedCapture.totalPoints);
+
+  const baseCard = state.combination.base ?? validatedCapture.allCapturedCards[0];
+  if (baseCard) {
+    result = maybeUpdateHighest(result, state.currentPlayer, {
+      points: validatedCapture.totalPoints,
+      cards: validatedCapture.allCapturedCards,
+      baseCard,
+    });
+  }
 
   return {
-    ...scored,
+    ...result,
     hands,
     board,
     lastAction: 'capture',
@@ -171,7 +225,12 @@ export function applyJackpot(state: GameState): {
   const points = calculateCardsPoints(state.board);
   const cardCount = state.board.length;
   const message = `${PLAYER_NAMES[player]} sweeps ${cardCount} board cards for ${points} points`;
-  const scored = addScore(state, player, points);
+  let scored = addScore(state, player, points);
+  scored = maybeUpdateHighest(scored, player, {
+    points,
+    cards: state.board.slice(),
+    baseCard: state.board[0],
+  });
   return {
     state: { ...scored, board: [] },
     jackpotResult: { player, points, cardCount, message },
@@ -209,5 +268,8 @@ export function startNewRound(
     lastCapturer: null,
     currentRound: state.currentRound + 1,
     currentDealer: newDealer,
+    handNumber: 1,
+    gamePhase: 'playing' as const,
+    roundStats: [emptyRoundStats(), emptyRoundStats(), emptyRoundStats()],
   };
 }

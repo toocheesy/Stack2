@@ -25,7 +25,7 @@ export function ThinkingBubble({ visible, difficulty }: Props) {
           transition={{ duration: 0.15 }}
           style={{
             position: 'absolute',
-            top: 4,
+            top: 'calc(100% + 4px)',
             left: '50%',
             transform: 'translateX(-50%)',
             zIndex: 50,
@@ -34,7 +34,7 @@ export function ThinkingBubble({ visible, difficulty }: Props) {
             WebkitBackdropFilter: 'blur(4px)',
             border: '1px solid #3A3A50',
             borderRadius: 999,
-            padding: '8px 16px',
+            padding: '4px 10px',
             display: 'flex',
             alignItems: 'center',
             gap: 6,
@@ -42,7 +42,7 @@ export function ThinkingBubble({ visible, difficulty }: Props) {
           }}
         >
           <span style={{
-            fontSize: 13, color: '#F1F1F3',
+            fontSize: 11, color: '#F1F1F3',
             fontFamily: 'Inter, sans-serif',
           }}>
             {info.name} is thinking

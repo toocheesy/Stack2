@@ -4,31 +4,10 @@ import type { LastCaptureInfo } from '../game/useGameController';
 import { C } from '../config/colors';
 import { tween } from '../config/motion';
 
-const SUIT_SYMBOLS: Record<string, string> = {
-  hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠',
-};
 const PLAYER_COLORS: Record<number, string> = {
   0: C.amber, 1: C.botCalvin, 2: C.botNina,
 };
 const HOLD_MS = 3000;
-
-function cardColor(suit: string): string {
-  return suit === 'hearts' || suit === 'diamonds' ? C.suitRed : C.suitBlack;
-}
-
-function CardBadge({ rank, suit, large }: { rank: string; suit: string; large?: boolean }) {
-  return (
-    <span style={{
-      fontSize: large ? 14 : 12, fontWeight: 700,
-      color: cardColor(suit), fontFamily: 'Inter, sans-serif',
-      background: 'rgba(255,255,255,0.9)', borderRadius: 3,
-      padding: large ? '2px 5px' : '1px 4px',
-      border: large ? `1px solid ${C.indigo}44` : 'none',
-    }}>
-      {rank}{SUIT_SYMBOLS[suit] ?? ''}
-    </span>
-  );
-}
 
 export function LastCaptureCallout({ info }: { info: LastCaptureInfo | null }) {
   const [visible, setVisible] = useState(false);
@@ -43,6 +22,11 @@ export function LastCaptureCallout({ info }: { info: LastCaptureInfo | null }) {
   }, [info]);
 
   const borderColor = current ? (PLAYER_COLORS[current.playerIndex] ?? C.textSecondary) : C.textSecondary;
+  const areas = current?.areas ?? [];
+  const formulaLen = (current?.baseCard?.rank.length ?? 0)
+    + areas.reduce((sum, a) => sum + a.reduce((s, c) => s + c.rank.length + 1, -1), 0)
+    + areas.length * 3;
+  const fontSize = formulaLen > 18 ? 11 : 13;
 
   return (
     <AnimatePresence>
@@ -55,8 +39,8 @@ export function LastCaptureCallout({ info }: { info: LastCaptureInfo | null }) {
           style={{
             width: '100%', padding: '4px 12px 6px',
             borderBottom: `1px solid ${borderColor}66`,
-            display: 'flex', alignItems: 'center', gap: 8,
-            justifyContent: 'center', flexShrink: 0, flexWrap: 'wrap',
+            display: 'flex', alignItems: 'center', gap: 6,
+            justifyContent: 'center', flexShrink: 0,
           }}
         >
           <span style={{
@@ -65,24 +49,24 @@ export function LastCaptureCallout({ info }: { info: LastCaptureInfo | null }) {
             textTransform: 'uppercase', flexShrink: 0,
           }}>LAST CAPTURE</span>
 
-          {current.baseCard && (
-            <>
-              <CardBadge rank={current.baseCard.rank} suit={current.baseCard.suit} large />
-              <span style={{ fontSize: 12, color: C.textSecondary }}>=</span>
-            </>
-          )}
-          <span style={{ display: 'flex', gap: 3, alignItems: 'center', flexWrap: 'wrap' }}>
-            {current.comboCards.map((c, i) => (
-              <span key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
-                {i > 0 && <span style={{ fontSize: 11, color: C.textSecondary }}>+</span>}
-                <CardBadge rank={c.rank} suit={c.suit} />
+          <span style={{
+            fontSize, fontWeight: 600,
+            fontFamily: "'JetBrains Mono', monospace",
+            color: C.textPrimary, whiteSpace: 'nowrap',
+          }}>
+            {current.baseCard?.rank}
+            {areas.map((area, i) => (
+              <span key={i}>
+                <span style={{ color: C.textSecondary, fontWeight: 400 }}> = </span>
+                {area.map((c, j) => (
+                  <span key={c.id}>
+                    {j > 0 && <span style={{ color: C.textSecondary, fontWeight: 400 }}>+</span>}
+                    {c.rank}
+                  </span>
+                ))}
               </span>
             ))}
           </span>
-          <span style={{
-            fontSize: 13, fontWeight: 700, color: C.amber,
-            fontFamily: "'JetBrains Mono', monospace", flexShrink: 0,
-          }}>+{current.points}</span>
         </motion.div>
       )}
     </AnimatePresence>

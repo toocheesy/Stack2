@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import type { Card, ComboSlot, Difficulty, GameState } from '../engine/types';
+import type { Card, ComboSlot, Difficulty, GameState, PlayerIndex } from '../engine/types';
 import { SCORE_KEYS } from '../engine/types';
 import { C } from '../config/colors';
 import { getTransition } from '../config/motion';
@@ -8,6 +8,9 @@ import type { GameActions, BotVizStep, BotComboDisplay, LastCaptureInfo } from '
 import { CardComponent, CARD_W } from './Card';
 import { LastCaptureCallout } from './LastCapture';
 import { ThinkingBubble } from './ThinkingBubble';
+import { RoundEndOverlay } from './RoundEndOverlay';
+import { JackpotCelebration, type JackpotDisplay } from './JackpotCelebration';
+import { GameOverOverlay } from './GameOverOverlay';
 import { validateFullCombo } from '../engine/core/captureValidator';
 
 type CardSource = 'hand' | 'board';
@@ -18,6 +21,7 @@ interface Props {
   botViz: BotVizStep | null;
   botCombo: BotComboDisplay | null;
   lastCapture: LastCaptureInfo | null;
+  jackpotInfo: JackpotDisplay | null;
   gameOver: { winner: number; winnerName: string } | null;
   actions: GameActions;
   onHome: () => void;
@@ -37,7 +41,7 @@ const BOARD_GAP = 6;
 const MIN_BOARD_CARD_W = 40;
 
 export function GameView({
-  state, isPlayerTurn, botViz, botCombo, lastCapture, gameOver, actions, onHome, onPlayAgain,
+  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, actions, onHome, onPlayAgain,
 }: Props) {
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -55,8 +59,12 @@ export function GameView({
     for (const g of state.combination.combo1) ids.add(g.card.id);
     for (const g of state.combination.combo2) ids.add(g.card.id);
     for (const g of state.combination.combo3) ids.add(g.card.id);
+    if (botCombo) {
+      ids.add(botCombo.baseCard.id);
+      for (const c of botCombo.comboCards) ids.add(c.id);
+    }
     return ids;
-  }, [state.combination]);
+  }, [state.combination, botCombo]);
 
   const visibleBoard = useMemo(() => state.board.filter((c) => !stagedIds.has(c.id)), [state.board, stagedIds]);
   const visibleHand = useMemo(() => state.hands[0].filter((c) => !stagedIds.has(c.id)), [state.hands, stagedIds]);
@@ -154,6 +162,8 @@ export function GameView({
     return Math.max(MIN_BOARD_CARD_W / CARD_W, maxW / CARD_W);
   }, [visibleBoard.length]);
 
+  const deckEmpty = state.deck.length === 0 && state.gamePhase === 'playing';
+
   // ── Combo display (player combo or bot combo) ──────
 
   const displayCombo = useMemo((): { base: Card | null; slots: Card[][] } => {
@@ -173,6 +183,13 @@ export function GameView({
     };
   }, [state.combination, botCombo]);
 
+  const bot1HandVisible = botCombo?.playerIndex === 1
+    ? state.hands[1].filter(c => c.id !== botCombo.baseCard.id)
+    : state.hands[1];
+  const bot2HandVisible = botCombo?.playerIndex === 2
+    ? state.hands[2].filter(c => c.id !== botCombo.baseCard.id)
+    : state.hands[2];
+
   // ── Render ─────────────────────────────────────────
 
   return (
@@ -187,10 +204,25 @@ export function GameView({
 
       {/* ═══ SCORE BAR ═══ */}
       <div style={{ gridArea: 'score', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: C.slateBg, borderBottom: `1px solid ${C.divider}` }}>
-        <ScoreBlock label="YOU" labelColor={C.textSecondary} score={state.overallScores.player} target={target} active={state.currentPlayer === 0} amber />
-        <ScoreBlock label={bot1Info.name} labelColor={bot1Info.fill} score={state.overallScores.bot1} target={target} active={state.currentPlayer === 1} />
-        <ScoreBlock label={bot2Info.name} labelColor={bot2Info.fill} score={state.overallScores.bot2} target={target} active={state.currentPlayer === 2} />
-        <span style={{ color: C.textSecondary, fontSize: 11, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>R{state.currentRound}</span>
+        <ScoreBlock label="YOU" labelColor={C.textSecondary} score={state.overallScores.player} target={target} active={state.currentPlayer === 0} amber glowColor={C.indigo} />
+        <div style={{ position: 'relative' }}>
+          <ScoreBlock label={bot1Info.name} labelColor={bot1Info.fill} score={state.overallScores.bot1} target={target} active={state.currentPlayer === 1} glowColor={bot1Info.fill} />
+          <ThinkingBubble visible={!!botViz && botViz.playerIndex === 1 && botViz.type === 'thinking'} difficulty={state.settings.bot1Personality} />
+        </div>
+        <div style={{ position: 'relative' }}>
+          <ScoreBlock label={bot2Info.name} labelColor={bot2Info.fill} score={state.overallScores.bot2} target={target} active={state.currentPlayer === 2} glowColor={bot2Info.fill} />
+          <ThinkingBubble visible={!!botViz && botViz.playerIndex === 2 && botViz.type === 'thinking'} difficulty={state.settings.bot2Personality} />
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
+          <span style={{ color: C.textSecondary, fontSize: 10, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>R{state.currentRound}</span>
+          <span style={{
+            fontSize: 9, fontWeight: 600,
+            fontFamily: "'JetBrains Mono', monospace",
+            color: state.deck.length === 0 ? C.amber : C.textSecondary,
+          }}>
+            {state.deck.length === 0 ? 'EMPTY' : state.deck.length}
+          </span>
+        </div>
       </div>
 
       {/* ═══ LAST CAPTURE ═══ */}
@@ -199,17 +231,17 @@ export function GameView({
       </div>
 
       {/* ═══ BOT 1 ═══ */}
-      <BotBadge area="bot1" info={bot1Info} handCount={state.hands[1].length} hand={state.hands[1]} thinking={botViz?.playerIndex === 1 && botViz.type === 'thinking'} />
+      <BotBadge area="bot1" info={bot1Info} handCount={bot1HandVisible.length} hand={bot1HandVisible} thinking={botViz?.playerIndex === 1 && botViz.type === 'thinking'} />
 
       {/* ═══ BOARD ZONE ═══ */}
       <div ref={boardRef} onClick={handleBoardAreaTap} style={{
         gridArea: 'board', display: 'flex', flexWrap: 'wrap', gap: BOARD_GAP,
         justifyContent: 'center', alignItems: 'center', alignContent: 'center',
         padding: '8px 4px', background: C.board, borderRadius: 8,
-        border: hoveredBoard ? `1px solid ${C.success}` : `1px solid ${C.divider}`,
+        border: hoveredBoard ? `1px solid ${C.success}` : deckEmpty ? `1px solid ${C.amber}` : `1px solid ${C.divider}`,
         boxShadow: hoveredBoard ? `0 0 12px rgba(16,185,129,0.15)` : 'none',
         transition: 'border 150ms, box-shadow 150ms, background 150ms',
-        minHeight: 0, overflow: 'hidden', position: 'relative' as const, zIndex: 1,
+        minHeight: 0, position: 'relative' as const, zIndex: 15,
       }}>
         {visibleBoard.length === 0 && !botCombo && (
           <span style={{ fontSize: 11, color: C.disabledText, fontFamily: 'Inter, sans-serif' }}>Board empty</span>
@@ -225,23 +257,24 @@ export function GameView({
             />
           </div>
         ))}
+        {deckEmpty && (
+          <motion.div
+            style={{ position: 'absolute', inset: -1, borderRadius: 8, pointerEvents: 'none' }}
+            animate={{ boxShadow: ['0 0 8px rgba(245,158,11,0.12)', '0 0 20px rgba(245,158,11,0.28)', '0 0 8px rgba(245,158,11,0.12)'] }}
+            transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+          />
+        )}
       </div>
 
       {/* ═══ BOT 2 ═══ */}
-      <BotBadge area="bot2" info={bot2Info} handCount={state.hands[2].length} hand={state.hands[2]} thinking={botViz?.playerIndex === 2 && botViz.type === 'thinking'} />
+      <BotBadge area="bot2" info={bot2Info} handCount={bot2HandVisible.length} hand={bot2HandVisible} thinking={botViz?.playerIndex === 2 && botViz.type === 'thinking'} />
 
       {/* ═══ COMBO ZONE ═══ */}
       <div style={{
         gridArea: 'combo', display: 'flex', flexDirection: 'column',
         alignItems: 'center', gap: 6, padding: '6px 8px',
-        background: '#222236', position: 'relative' as const, zIndex: 10,
+        background: '#222236',
       }}>
-        {/* Thinking bubble between board and combo */}
-        <ThinkingBubble
-          visible={!!botViz && botViz.type === 'thinking'}
-          difficulty={(botViz?.playerIndex ?? 1) === 1 ? state.settings.bot1Personality : state.settings.bot2Personality}
-        />
-
         {/* Slots */}
         <div style={{ display: 'flex', gap: 6, width: '100%', justifyContent: 'center' }}>
           {SLOT_KEYS.map((key, i) => {
@@ -309,32 +342,44 @@ export function GameView({
         </div>
       </div>
 
+      {/* ═══ ROUND END ═══ */}
+      <RoundEndOverlay
+        visible={state.gamePhase === 'roundEnd'}
+        roundNumber={state.currentRound}
+        roundStats={state.roundStats}
+        gameStats={state.gameStats}
+        targetScore={state.settings.targetScore}
+        bot1Personality={state.settings.bot1Personality}
+        bot2Personality={state.settings.bot2Personality}
+        onContinue={actions.continueRound}
+      />
+
+      {/* ═══ JACKPOT CELEBRATION ═══ */}
+      <JackpotCelebration
+        info={jackpotInfo}
+        bot1Personality={state.settings.bot1Personality}
+        bot2Personality={state.settings.bot2Personality}
+      />
+
       {/* ═══ GAME OVER ═══ */}
-      {gameOver && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16, zIndex: 200 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 700, fontFamily: 'Inter, sans-serif', color: gameOver.winner === 0 ? C.amber : C.textPrimary }}>
-            {gameOver.winner === 0 ? 'YOU WIN!' : 'GAME OVER'}
-          </h1>
-          <p style={{ fontSize: 16, color: C.textSecondary, fontFamily: 'Inter, sans-serif' }}>
-            {gameOver.winnerName} — {state.overallScores[SCORE_KEYS[gameOver.winner as 0|1|2]]}
-          </p>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <Btn label="PLAY AGAIN" primary onClick={onPlayAgain} big />
-            <Btn label="HOME" onClick={onHome} big />
-          </div>
-        </div>
-      )}
+      <GameOverOverlay
+        winner={gameOver as { winner: PlayerIndex; winnerName: string } | null}
+        state={state}
+        onPlayAgain={onPlayAgain}
+        onHome={onHome}
+      />
     </div>
   );
 }
 
 // ─── Sub-components ──────────────────────────────────
 
-function ScoreBlock({ label, labelColor, score, target, active, amber }: {
-  label: string; labelColor: string; score: number; target: number; active: boolean; amber?: boolean;
+function ScoreBlock({ label, labelColor, score, target, active, amber, glowColor }: {
+  label: string; labelColor: string; score: number; target: number; active: boolean; amber?: boolean; glowColor?: string;
 }) {
+  const gc = glowColor ?? C.indigo;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', borderBottom: active ? `3px solid ${C.indigo}` : '3px solid transparent', paddingBottom: 1, transition: 'border-color 200ms' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', borderBottom: active ? `3px solid ${gc}` : '3px solid transparent', boxShadow: active ? `0 2px 10px ${gc}55` : 'none', paddingBottom: 1, transition: 'border-color 200ms, box-shadow 200ms' }}>
       <span style={{ fontSize: 10, fontWeight: 500, color: labelColor, letterSpacing: 1, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' }}>{label}</span>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
         <span style={{ color: amber ? C.amber : C.textPrimary, fontWeight: 700, fontSize: 20, fontFamily: "'JetBrains Mono', monospace" }}>{score}</span>

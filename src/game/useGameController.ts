@@ -37,6 +37,7 @@ export interface GameActions {
   submitCombo: () => string | null;
   placeCard: (cardId: string) => void;
   resetCombo: () => void;
+  continueRound: () => void;
 }
 
 export interface BotVizStep {
@@ -49,6 +50,7 @@ export interface LastCaptureInfo {
   playerName: string;
   baseCard: import('../engine/types').Card | null;
   comboCards: import('../engine/types').Card[];
+  areas: import('../engine/types').Card[][];
   allCards: import('../engine/types').Card[];
   points: number;
   timestamp: number;
@@ -101,6 +103,11 @@ export function useGameController(seed: number, settings: GameSettings) {
   } | null>(null);
   const [lastCapture, setLastCapture] = useState<LastCaptureInfo | null>(null);
   const [botCombo, setBotCombo] = useState<BotComboDisplay | null>(null);
+  const [jackpotInfo, setJackpotInfo] = useState<{
+    winner: PlayerIndex;
+    points: number;
+    cardCount: number;
+  } | null>(null);
 
   // Always-fresh ref to current state (avoids stale closures)
   const stateRef = useRef(state);
@@ -143,17 +150,16 @@ export function useGameController(seed: number, settings: GameSettings) {
           );
         }
         setAndPersist(afterJackpot);
-        await wait(1500);
-        if (!mountedRef.current) return;
-        const next = startNewRound(
-          afterJackpot,
-          prngRef.current,
-          idGenRef.current,
-        );
-        setAndPersist(next);
-        if (next.currentPlayer !== 0) {
-          await runBotTurn(next);
+        if (jackpotResult) {
+          setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
+          await wait(2500);
+          if (!mountedRef.current) return;
+          setJackpotInfo(null);
+        } else {
+          await wait(500);
+          if (!mountedRef.current) return;
         }
+        setAndPersist({ ...stateRef.current, gamePhase: 'roundEnd' as const });
         break;
       }
       case 'END_GAME': {
@@ -167,6 +173,14 @@ export function useGameController(seed: number, settings: GameSettings) {
           );
         }
         setAndPersist(afterJackpot);
+        if (jackpotResult) {
+          setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
+          await wait(2500);
+          if (!mountedRef.current) return;
+          setJackpotInfo(null);
+        }
+        const finalState = { ...stateRef.current, gamePhase: 'gameOver' as const };
+        setAndPersist(finalState);
         clearSavedGame();
         setGameOver({
           winner: result.winner,
@@ -266,6 +280,7 @@ export function useGameController(seed: number, settings: GameSettings) {
         playerName: PLAYER_DISPLAY_NAMES[player] ?? `Bot ${player}`,
         baseCard: botBase,
         comboCards: botComboCards,
+        areas: decision.captureDetails.slots.map(s => s.cards),
         allCards: decision.captureDetails.capturedCards,
         points: decision.captureDetails.totalPoints,
         timestamp: Date.now(),
@@ -372,6 +387,11 @@ export function useGameController(seed: number, settings: GameSettings) {
       comboCards: validation.allCapturedCards.filter(
         (c) => c.id !== s.combination.base?.id,
       ),
+      areas: [
+        s.combination.combo1.map(g => g.card),
+        s.combination.combo2.map(g => g.card),
+        s.combination.combo3.map(g => g.card),
+      ].filter(a => a.length > 0),
       allCards: validation.allCapturedCards,
       points: validation.totalPoints,
       timestamp: Date.now(),
@@ -415,6 +435,16 @@ export function useGameController(seed: number, settings: GameSettings) {
     setAndPersist(next);
   }, [setAndPersist]);
 
+  function doContinueRound() {
+    const s = stateRef.current;
+    if (s.gamePhase !== 'roundEnd') return;
+    const next = startNewRound(s, prngRef.current, idGenRef.current);
+    setAndPersist(next);
+    if (next.currentPlayer !== 0) {
+      void runBotTurn(next);
+    }
+  }
+
   const isPlayerTurn =
     state.currentPlayer === 0 && !botBusyRef.current && !gameOver;
 
@@ -424,6 +454,7 @@ export function useGameController(seed: number, settings: GameSettings) {
     botViz,
     botCombo,
     lastCapture,
+    jackpotInfo,
     gameOver,
     actions: {
       addToCombo,
@@ -431,6 +462,7 @@ export function useGameController(seed: number, settings: GameSettings) {
       submitCombo,
       placeCard: doPlaceCard,
       resetCombo: doResetCombo,
+      continueRound: doContinueRound,
     } as GameActions,
   };
 }

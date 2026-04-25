@@ -33,7 +33,23 @@ export interface Player {
   score: number;
 }
 
-export type GamePhase = 'SETUP' | 'PLAYING' | 'ROUND_END' | 'GAME_OVER';
+export type GamePhase = 'playing' | 'jackpot' | 'roundEnd' | 'gameOver';
+
+export interface CaptureRecord {
+  points: number;
+  cards: Card[];
+  baseCard: Card;
+}
+
+export interface RoundStats {
+  roundScore: number;
+  highestCapture: CaptureRecord | null;
+}
+
+export interface GamePlayerStats {
+  totalScore: number;
+  highestCapture: CaptureRecord | null;
+}
 
 export type TurnAction = 'CAPTURE' | 'PLACE';
 
@@ -88,6 +104,10 @@ export interface GameState {
   settings: GameSettings;
   currentRound: number;
   currentDealer: PlayerIndex;
+  handNumber: number;
+  gamePhase: GamePhase;
+  roundStats: [RoundStats, RoundStats, RoundStats];
+  gameStats: [GamePlayerStats, GamePlayerStats, GamePlayerStats];
 }
 
 export type CaptureType = 'pair' | 'sum';

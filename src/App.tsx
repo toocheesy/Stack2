@@ -1,13 +1,14 @@
 import { useCallback, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { GameView } from './components/GameView';
+import { ClassicSetup } from './components/ClassicSetup';
 import { useGameController } from './game/useGameController';
-import type { GameSettings } from './engine/types';
+import type { Difficulty, GameSettings } from './engine/types';
 import { C, SHADOWS } from './config/colors';
 import { getTransition, tween } from './config/motion';
 import { loadGame, clearSavedGame } from './game/persistence';
 
-type Screen = 'home' | 'game';
+type Screen = 'home' | 'setup' | 'game';
 
 const DEFAULT_SETTINGS: GameSettings = {
   targetScore: 300,
@@ -18,11 +19,16 @@ const DEFAULT_SETTINGS: GameSettings = {
 function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1_000_000));
-  const [settings] = useState(DEFAULT_SETTINGS);
+  const [settings, setSettings] = useState(DEFAULT_SETTINGS);
 
-  const startNewGame = useCallback(() => {
+  const goToSetup = useCallback(() => {
+    setScreen('setup');
+  }, []);
+
+  const startWithSettings = useCallback((targetScore: number, bot1: Difficulty, bot2: Difficulty) => {
     clearSavedGame();
     setSeed(Math.floor(Math.random() * 1_000_000));
+    setSettings({ targetScore, bot1Personality: bot1, bot2Personality: bot2 });
     setScreen('game');
   }, []);
 
@@ -40,6 +46,15 @@ function App() {
     setSeed(Math.floor(Math.random() * 1_000_000));
   }, []);
 
+  if (screen === 'setup') {
+    return (
+      <ClassicSetup
+        onStart={startWithSettings}
+        onBack={goHome}
+      />
+    );
+  }
+
   if (screen === 'game') {
     return (
       <GameWrapper
@@ -54,7 +69,7 @@ function App() {
   const hasSave = !!loadGame();
   return (
     <TitleScreen
-      onNewGame={startNewGame}
+      onNewGame={goToSetup}
       onContinue={hasSave ? continueGame : undefined}
     />
   );
@@ -75,9 +90,10 @@ function TitleScreen({ onNewGame, onContinue }: { onNewGame: () => void; onConti
         flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 12,
+        gap: 16,
         position: 'relative',
         overflow: 'hidden',
+        padding: '24px 16px',
       }}
     >
       {/* Wordmark */}
@@ -89,6 +105,7 @@ function TitleScreen({ onNewGame, onContinue }: { onNewGame: () => void; onConti
           color: C.textPrimary,
           letterSpacing: -1,
           lineHeight: 1,
+          margin: 0,
         }}
       >
         STACKED<span style={{ color: C.indigo }}>!</span>
@@ -103,72 +120,87 @@ function TitleScreen({ onNewGame, onContinue }: { onNewGame: () => void; onConti
           color: C.textSecondary,
           letterSpacing: 2,
           textTransform: 'uppercase',
-          marginTop: -4,
+          marginTop: -8,
+          marginBottom: 4,
         }}
       >
         CAPTURE · COMBO · WIN
       </p>
 
-      {/* How to Play link */}
+      {/* Mode grid */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: 10,
+        width: '100%',
+        maxWidth: 320,
+      }}>
+        <ModeCard
+          name="Classic"
+          tagline="Race to target score, 1v2 AI"
+          active
+          onClick={onNewGame}
+        />
+        <ModeCard
+          name="Adventure"
+          tagline="18 levels, 6 worlds"
+          active={false}
+        />
+        <ModeCard
+          name="Speed"
+          tagline="Faster pace, same combat"
+          active={false}
+        />
+        <ModeCard
+          name="Tournament"
+          tagline="Bracket play to crown a champion"
+          active={false}
+        />
+      </div>
+
+      {/* Continue saved game */}
+      {onContinue && (
+        <motion.button
+          onClick={onContinue}
+          whileTap={{ scale: 0.97 }}
+          transition={getTransition('snappy')}
+          style={{
+            fontFamily: 'Inter, sans-serif',
+            fontSize: 13, fontWeight: 500,
+            color: C.indigo,
+            background: 'transparent',
+            border: 'none',
+            cursor: 'pointer',
+            padding: '4px 8px',
+          }}
+        >
+          Continue saved game
+        </motion.button>
+      )}
+
+      {/* How to Play */}
       <button
         onClick={() => setShowRules(true)}
         style={{
-          marginTop: 8,
           fontFamily: 'Inter, sans-serif',
           fontSize: 13,
           color: C.textSecondary,
           background: 'transparent',
           border: 'none',
           cursor: 'pointer',
-          textDecoration: 'none',
           padding: '4px 8px',
         }}
       >
         How to Play
       </button>
 
-      {/* Action buttons */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'center', marginTop: 8 }}>
-        {onContinue && (
-          <motion.button
-            onClick={onContinue}
-            whileTap={{ scale: 0.97 }}
-            transition={getTransition('snappy')}
-            style={{
-              width: 220, height: 52, background: C.indigo,
-              color: '#FFF', fontFamily: 'Inter, sans-serif',
-              fontWeight: 600, fontSize: 18,
-              border: 'none', borderRadius: 12, cursor: 'pointer',
-            }}
-          >
-            CONTINUE
-          </motion.button>
-        )}
-        <motion.button
-          onClick={onNewGame}
-          whileTap={{ scale: 0.97 }}
-          transition={getTransition('snappy')}
-          style={{
-            width: 220, height: onContinue ? 44 : 52,
-            background: onContinue ? 'transparent' : C.indigo,
-            color: onContinue ? C.textSecondary : '#FFF',
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 600, fontSize: onContinue ? 15 : 18,
-            border: onContinue ? `1px solid ${C.divider}` : 'none',
-            borderRadius: 12, cursor: 'pointer',
-          }}
-        >
-          {onContinue ? 'NEW GAME' : 'START GAME'}
-        </motion.button>
-      </div>
-
       {/* Footer */}
       <p
         style={{
           fontFamily: 'Inter, sans-serif',
-          fontSize: 12,
+          fontSize: 11,
           color: C.disabledText,
-          marginTop: 16,
+          marginTop: 4,
         }}
       >
         Built by TC with AI collaboration
@@ -192,6 +224,68 @@ function TitleScreen({ onNewGame, onContinue }: { onNewGame: () => void; onConti
         {showRules && <RulesModal onClose={() => setShowRules(false)} />}
       </AnimatePresence>
     </div>
+  );
+}
+
+// ─── Mode Card ─────────────────────────────────────
+
+function ModeCard({ name, tagline, active, onClick }: {
+  name: string; tagline: string; active: boolean; onClick?: () => void;
+}) {
+  return (
+    <motion.button
+      onClick={active ? onClick : undefined}
+      whileTap={active ? { scale: 0.97 } : undefined}
+      transition={getTransition('snappy')}
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'flex-start',
+        gap: 4,
+        padding: '14px 14px 16px',
+        borderRadius: 10,
+        border: active ? `1px solid ${C.indigo}` : `1px solid ${C.divider}`,
+        background: active ? 'rgba(79,70,229,0.08)' : 'rgba(255,255,255,0.02)',
+        cursor: active ? 'pointer' : 'default',
+        opacity: active ? 1 : 0.5,
+        width: '100%',
+        textAlign: 'left' as const,
+        position: 'relative' as const,
+        overflow: 'hidden',
+      }}
+    >
+      <span style={{
+        fontFamily: 'Inter, sans-serif',
+        fontWeight: 700,
+        fontSize: 15,
+        color: active ? C.textPrimary : C.disabledText,
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
+      }}>
+        {name}
+      </span>
+      <span style={{
+        fontFamily: 'Inter, sans-serif',
+        fontSize: 11,
+        color: active ? C.textSecondary : C.disabledText,
+        lineHeight: 1.3,
+      }}>
+        {tagline}
+      </span>
+      {!active && (
+        <span style={{
+          fontFamily: 'Inter, sans-serif',
+          fontSize: 9,
+          fontWeight: 600,
+          color: C.disabledText,
+          letterSpacing: 1,
+          textTransform: 'uppercase',
+          marginTop: 2,
+        }}>
+          COMING SOON
+        </span>
+      )}
+    </motion.button>
   );
 }
 

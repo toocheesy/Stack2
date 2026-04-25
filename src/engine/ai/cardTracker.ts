@@ -95,6 +95,17 @@ export function recordPlacement(
   return next;
 }
 
+export function seedInitialDeal(
+  tracker: CardTrackerState,
+  unseenDealtCount: number,
+): CardTrackerState {
+  const next = cloneState(tracker);
+  next.totalSeen += unseenDealtCount;
+  next.deckRemaining = Math.max(0, DECK_SIZE - next.totalSeen);
+  next.gamePhase = updateGamePhase(next);
+  return next;
+}
+
 export function getRemainingOfRank(
   tracker: CardTrackerState,
   rank: Rank,

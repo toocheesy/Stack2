@@ -1,12 +1,13 @@
 import type {
   Card,
   ComboSlot,
+  Difficulty,
   GameState,
   MultiSlotCaptureSlot,
   PlayerIndex,
   Rank,
 } from '../types';
-import { RANKS, RANK_VALUES, SCORE_VALUES } from '../types';
+import { RANKS, RANK_VALUES, SCORE_KEYS, SCORE_VALUES } from '../types';
 import {
   findAllCaptures,
   findBestMultiSlotCapture,
@@ -407,6 +408,44 @@ export function scoreFromDimensions(
   weights: PersonalityWeights,
 ): ActionScore {
   return { ...score, total: applyWeights(score, weights) };
+}
+
+export function modifyWeightsForGameState(
+  baseWeights: PersonalityWeights,
+  difficulty: Difficulty,
+  state: GameState,
+  playerIndex: PlayerIndex,
+): PersonalityWeights {
+  if (difficulty === 'beginner') return baseWeights;
+
+  const target = state.settings.targetScore;
+  if (!target || target <= 0) return baseWeights;
+
+  const myScore = state.overallScores[SCORE_KEYS[playerIndex]];
+  const opponentIndices = ([0, 1, 2] as PlayerIndex[]).filter((i) => i !== playerIndex);
+  const maxOpponent = Math.max(...opponentIndices.map((i) => state.overallScores[SCORE_KEYS[i]]));
+
+  if (difficulty === 'advanced') {
+    // Denial takes precedence: opponent at 50%+ of target → block everything
+    if (maxOpponent >= target * 0.50) {
+      return { ...baseWeights, opponentDenial: 1.8, boardControl: 1.2 };
+    }
+    // Conservative: Rex leads by 20%+ of target → protect lead
+    if (myScore - maxOpponent >= target * 0.20) {
+      return { ...baseWeights, rawPoints: 0.5, placementDanger: 1.5, opponentDenial: 0.45 };
+    }
+    return baseWeights;
+  }
+
+  if (difficulty === 'intermediate') {
+    // Aggressive: Nina behind by 15%+ of target → take more risks
+    if (maxOpponent - myScore >= target * 0.15) {
+      return { ...baseWeights, rawPoints: 1.3, opponentDenial: 0.5, placementDanger: 0.5 };
+    }
+    return baseWeights;
+  }
+
+  return baseWeights;
 }
 
 export function calvinPlacementPick(hand: readonly Card[]): Card {

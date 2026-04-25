@@ -11,6 +11,7 @@ import {
   evaluateAllActions,
   evaluateChainCapture,
   calvinPlacementPick,
+  modifyWeightsForGameState,
 } from './evaluator';
 import type {
   ActionScore,
@@ -145,7 +146,8 @@ export function decideBotAction(
   options: DecideBotOptions = {},
 ): BotDecision {
   const profile = getPersonalityProfile(difficulty);
-  let actions = evaluateAllActions(state, playerIndex, tracker, profile.weights, {
+  const weights = modifyWeightsForGameState(profile.weights, difficulty, state, playerIndex);
+  let actions = evaluateAllActions(state, playerIndex, tracker, weights, {
     allowMultiSlot: profile.allowMultiSlot,
     restrictions: options.restrictions,
   });

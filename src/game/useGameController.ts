@@ -23,6 +23,7 @@ import {
   createCardTracker,
   recordCapture,
   recordPlacement,
+  seedInitialDeal,
   type CardTrackerState,
 } from '../engine/ai/cardTracker';
 import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../engine/ai/botDecision';
@@ -88,6 +89,7 @@ export function useGameController(seed: number, settings: GameSettings) {
     for (const card of initial.board) {
       trackerRef.current = recordPlacement(trackerRef.current, card);
     }
+    trackerRef.current = seedInitialDeal(trackerRef.current, initial.hands.length * 4);
     return initial;
   });
 
@@ -133,6 +135,7 @@ export function useGameController(seed: number, settings: GameSettings) {
       case 'DEAL_NEW_HAND': {
         let next = dealNewHand(current);
         next = { ...next, currentPlayer: result.startingPlayer };
+        trackerRef.current = seedInitialDeal(trackerRef.current, next.hands.length * 4);
         setAndPersist(next);
         if (result.startingPlayer !== 0) {
           await runBotTurn(next);

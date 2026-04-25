@@ -334,3 +334,45 @@ describe('resolveRoundEnd', () => {
     expect(types).not.toContain('new_round_started');
   });
 });
+
+// ─── Bot seat randomization ────────────────────────
+
+describe('bot seat randomization', () => {
+  const mixedSettings: GameSettings = {
+    targetScore: 300,
+    bot1Personality: 'beginner',
+    bot2Personality: 'advanced',
+  };
+
+  it('same seed produces same bot order (deterministic)', () => {
+    const a = createInitialState(mixedSettings, createPRNG(77), createIdGenerator(createPRNG(1077)));
+    const b = createInitialState(mixedSettings, createPRNG(77), createIdGenerator(createPRNG(1077)));
+    expect(a.settings.bot1Personality).toBe(b.settings.bot1Personality);
+    expect(a.settings.bot2Personality).toBe(b.settings.bot2Personality);
+  });
+
+  it('different seeds can produce different bot orders', () => {
+    const results = new Set<string>();
+    for (let seed = 0; seed < 50; seed++) {
+      const s = createInitialState(mixedSettings, createPRNG(seed), createIdGenerator(createPRNG(seed + 1000)));
+      results.add(`${s.settings.bot1Personality}-${s.settings.bot2Personality}`);
+    }
+    expect(results.size).toBe(2);
+  });
+
+  it('both selected bots are always present (no duplication or loss)', () => {
+    for (let seed = 0; seed < 20; seed++) {
+      const s = createInitialState(mixedSettings, createPRNG(seed), createIdGenerator(createPRNG(seed + 1000)));
+      const bots = new Set([s.settings.bot1Personality, s.settings.bot2Personality]);
+      expect(bots).toContain('beginner');
+      expect(bots).toContain('advanced');
+    }
+  });
+
+  it('human is always player index 0 (hands[0] has cards)', () => {
+    for (let seed = 0; seed < 10; seed++) {
+      const s = createInitialState(mixedSettings, createPRNG(seed), createIdGenerator(createPRNG(seed + 1000)));
+      expect(s.hands[0].length).toBe(4);
+    }
+  });
+});

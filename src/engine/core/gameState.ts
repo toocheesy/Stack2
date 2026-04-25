@@ -65,6 +65,12 @@ export function createInitialState(
   prng: PRNG,
   idGenerator: IdGenerator,
 ): GameState {
+  // Randomize bot seating: 50/50 coin flip swaps bot1 ↔ bot2
+  const swapBots = prng.next() < 0.5;
+  const finalSettings = swapBots
+    ? { ...settings, bot1Personality: settings.bot2Personality, bot2Personality: settings.bot1Personality }
+    : settings;
+
   const shuffled = shuffleDeck(createDeck(idGenerator), prng);
   let deck = shuffled;
 
@@ -90,7 +96,7 @@ export function createInitialState(
     currentPlayer,
     lastAction: null,
     lastCapturer: null,
-    settings,
+    settings: finalSettings,
     currentRound: 1,
     currentDealer,
     handNumber: 1,

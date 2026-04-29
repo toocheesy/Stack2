@@ -2,13 +2,17 @@ import { useCallback, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { GameView } from './components/GameView';
 import { ClassicSetup } from './components/ClassicSetup';
+import { WorldMap } from './components/WorldMap';
 import { useGameController } from './game/useGameController';
 import type { Difficulty, GameSettings } from './engine/types';
 import { C, SHADOWS } from './config/colors';
 import { getTransition, tween } from './config/motion';
 import { loadGame, clearSavedGame } from './game/persistence';
+import { getLevel } from './engine/adventure/levelConfig';
+import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked } from './engine/adventure/progressManager';
+import { LevelCompleteOverlay } from './components/LevelCompleteOverlay';
 
-type Screen = 'home' | 'setup' | 'game';
+type Screen = 'home' | 'setup' | 'worldMap' | 'game';
 
 const DEFAULT_SETTINGS: GameSettings = {
   targetScore: 300,
@@ -20,6 +24,7 @@ function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1_000_000));
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
+  const [currentLevelId, setCurrentLevelId] = useState<number | null>(null);
 
   const goToSetup = useCallback(() => {
     setScreen('setup');
@@ -27,6 +32,7 @@ function App() {
 
   const startWithSettings = useCallback((targetScore: number, bot1: Difficulty, bot2: Difficulty) => {
     clearSavedGame();
+    setCurrentLevelId(null);
     setSeed(Math.floor(Math.random() * 1_000_000));
     setSettings({ targetScore, bot1Personality: bot1, bot2Personality: bot2 });
     setScreen('game');
@@ -38,13 +44,47 @@ function App() {
 
   const goHome = useCallback(() => {
     clearSavedGame();
+    setCurrentLevelId(null);
     setScreen('home');
+  }, []);
+
+  const goToWorldMap = useCallback(() => {
+    clearSavedGame();
+    setScreen('worldMap');
   }, []);
 
   const playAgain = useCallback(() => {
     clearSavedGame();
     setSeed(Math.floor(Math.random() * 1_000_000));
   }, []);
+
+  const nextLevel = useCallback(() => {
+    if (!currentLevelId) return;
+    const nextId = currentLevelId + 1;
+    const next = getLevel(nextId);
+    if (!next) return;
+    setCurrentLevelId(nextId);
+    clearSavedGame();
+    setSeed(Math.floor(Math.random() * 1_000_000));
+    setSettings({ targetScore: next.targetScore, bot1Personality: next.bots[0], bot2Personality: next.bots[1] });
+  }, [currentLevelId]);
+
+  if (screen === 'worldMap') {
+    return (
+      <WorldMap
+        onBack={() => setScreen('home')}
+        onSelectLevel={(id) => {
+          const level = getLevel(id);
+          if (!level) return;
+          setCurrentLevelId(id);
+          clearSavedGame();
+          setSeed(Math.floor(Math.random() * 1_000_000));
+          setSettings({ targetScore: level.targetScore, bot1Personality: level.bots[0], bot2Personality: level.bots[1] });
+          setScreen('game');
+        }}
+      />
+    );
+  }
 
   if (screen === 'setup') {
     return (
@@ -58,10 +98,14 @@ function App() {
   if (screen === 'game') {
     return (
       <GameWrapper
+        key={seed}
         seed={seed}
         settings={settings}
-        onHome={goHome}
+        currentLevelId={currentLevelId}
+        onQuit={currentLevelId ? goToWorldMap : goHome}
+        onHome={currentLevelId ? goToWorldMap : goHome}
         onPlayAgain={playAgain}
+        onNextLevel={nextLevel}
       />
     );
   }
@@ -70,6 +114,7 @@ function App() {
   return (
     <TitleScreen
       onNewGame={goToSetup}
+      onAdventure={() => setScreen('worldMap')}
       onContinue={hasSave ? continueGame : undefined}
     />
   );
@@ -77,7 +122,7 @@ function App() {
 
 // ─── Title Screen ───────────────────────────────────
 
-function TitleScreen({ onNewGame, onContinue }: { onNewGame: () => void; onContinue?: () => void }) {
+function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => void; onAdventure: () => void; onContinue?: () => void }) {
   const [showRules, setShowRules] = useState(false);
 
   return (
@@ -144,7 +189,8 @@ function TitleScreen({ onNewGame, onContinue }: { onNewGame: () => void; onConti
         <ModeCard
           name="Adventure"
           tagline="18 levels, 6 worlds"
-          active={false}
+          active={true}
+          onClick={onAdventure}
         />
         <ModeCard
           name="Speed"
@@ -465,33 +511,97 @@ function RulesModal({ onClose }: { onClose: () => void }) {
 
 // ─── Game Wrapper ───────────────────────────────────
 
+const BOT_NAMES: Record<Difficulty, string> = {
+  beginner: 'Calvin',
+  intermediate: 'Nina',
+  advanced: 'Rex',
+};
+
 function GameWrapper({
   seed,
   settings,
+  currentLevelId,
+  onQuit,
   onHome,
   onPlayAgain,
+  onNextLevel,
 }: {
   seed: number;
   settings: GameSettings;
+  currentLevelId: number | null;
+  onQuit: () => void;
   onHome: () => void;
   onPlayAgain: () => void;
+  onNextLevel: () => void;
 }) {
   const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, actions } =
     useGameController(seed, settings);
 
+  // Adventure level-complete logic
+  const levelComplete = currentLevelId && gameOver ? (() => {
+    const playerScore = state.overallScores.player;
+    const bot1Score = state.overallScores.bot1;
+    const bot2Score = state.overallScores.bot2;
+    const opponentMax = Math.max(bot1Score, bot2Score);
+    const stars = calculateStars(playerScore, bot1Score, bot2Score, true);
+    const won = stars === 3;
+    const margin = playerScore - opponentMax;
+
+    // Save progress (1+ stars = game completed)
+    if (stars > 0) {
+      const progress = loadProgress();
+      const updated = recordLevelCompletion(progress, currentLevelId, stars);
+      saveProgress(updated);
+    }
+
+    const scores = [
+      { name: 'You', score: playerScore, isPlayer: true },
+      { name: BOT_NAMES[state.settings.bot1Personality], score: bot1Score, isPlayer: false },
+      { name: BOT_NAMES[state.settings.bot2Personality], score: bot2Score, isPlayer: false },
+    ].sort((a, b) => b.score - a.score);
+
+    return { won, stars, margin, scores, isLevel18: currentLevelId === 18 };
+  })() : null;
+
   return (
-    <GameView
-      state={state}
-      isPlayerTurn={isPlayerTurn}
-      botViz={botViz}
-      botCombo={botCombo}
-      lastCapture={lastCapture}
-      jackpotInfo={jackpotInfo}
-      gameOver={gameOver}
-      actions={actions}
-      onHome={onHome}
-      onPlayAgain={onPlayAgain}
-    />
+    <>
+      <GameView
+        state={state}
+        isPlayerTurn={isPlayerTurn}
+        botViz={botViz}
+        botCombo={botCombo}
+        lastCapture={lastCapture}
+        currentLevelId={currentLevelId}
+        jackpotInfo={jackpotInfo}
+        gameOver={currentLevelId ? null : gameOver}
+        actions={actions}
+        onQuit={onQuit}
+        onHome={onHome}
+        onPlayAgain={onPlayAgain}
+      />
+      {levelComplete && (
+        <LevelCompleteOverlay
+          visible
+          won={levelComplete.won}
+          levelId={currentLevelId!}
+          starsEarned={levelComplete.stars}
+          margin={levelComplete.margin}
+          scores={levelComplete.scores}
+          isLevel18={levelComplete.isLevel18}
+          onPlayAgain={onPlayAgain}
+          onNextLevel={levelComplete.stars >= 2 && currentLevelId! < 18 && (() => {
+            const nextWorld = getLevelWorld(currentLevelId! + 1);
+            const currentWorld = getLevelWorld(currentLevelId!);
+            if (nextWorld !== currentWorld) {
+              const progress = loadProgress();
+              return isWorldUnlocked(progress, nextWorld);
+            }
+            return true;
+          })() ? onNextLevel : undefined}
+          onWorldMap={onHome}
+        />
+      )}
+    </>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { motion } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import type { Card, ComboSlot, Difficulty, GameState, PlayerIndex } from '../engine/types';
 import { SCORE_KEYS } from '../engine/types';
 import { C } from '../config/colors';
@@ -22,8 +22,10 @@ interface Props {
   botCombo: BotComboDisplay | null;
   lastCapture: LastCaptureInfo | null;
   jackpotInfo: JackpotDisplay | null;
+  currentLevelId?: number | null;
   gameOver: { winner: number; winnerName: string } | null;
   actions: GameActions;
+  onQuit: () => void;
   onHome: () => void;
   onPlayAgain: () => void;
 }
@@ -41,7 +43,7 @@ const BOARD_GAP = 6;
 const MIN_BOARD_CARD_W = 40;
 
 export function GameView({
-  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, actions, onHome, onPlayAgain,
+  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain,
 }: Props) {
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -51,6 +53,7 @@ export function GameView({
   const [hoveredBoard, setHoveredBoard] = useState(false);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
   const [, setDraggingSource] = useState<CardSource | null>(null);
+  const [showQuitDialog, setShowQuitDialog] = useState(false);
   const lastHitRef = useRef(0);
 
   const stagedIds = useMemo(() => {
@@ -203,7 +206,23 @@ export function GameView({
     }}>
 
       {/* ═══ SCORE BAR ═══ */}
-      <div style={{ gridArea: 'score', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 16px', background: C.slateBg, borderBottom: `1px solid ${C.divider}` }}>
+      <div style={{ gridArea: 'score', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px 0 6px', background: C.slateBg, borderBottom: `1px solid ${C.divider}`, gap: 4 }}>
+        {!gameOver && !jackpotInfo && state.gamePhase === 'playing' && (
+          <motion.button
+            onClick={() => setShowQuitDialog(true)}
+            whileTap={{ scale: 0.9 }}
+            transition={getTransition('snappy')}
+            style={{
+              width: 28, height: 28, borderRadius: 6,
+              border: `1px solid ${C.divider}`, background: 'transparent',
+              color: C.textSecondary, fontSize: 14, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'Inter, sans-serif', flexShrink: 0,
+            }}
+          >
+            ←
+          </motion.button>
+        )}
         <ScoreBlock label="YOU" labelColor={C.textSecondary} score={state.overallScores.player} target={target} active={state.currentPlayer === 0} amber glowColor={C.indigo} />
         <div style={{ position: 'relative' }}>
           <ScoreBlock label={bot1Info.name} labelColor={bot1Info.fill} score={state.overallScores.bot1} target={target} active={state.currentPlayer === 1} glowColor={bot1Info.fill} />
@@ -214,7 +233,9 @@ export function GameView({
           <ThinkingBubble visible={!!botViz && botViz.playerIndex === 2 && botViz.type === 'thinking'} difficulty={state.settings.bot2Personality} />
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
-          <span style={{ color: C.textSecondary, fontSize: 10, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>R{state.currentRound}</span>
+          <span style={{ color: C.textSecondary, fontSize: 10, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
+            {currentLevelId ? <span style={{ color: C.indigo, marginRight: 4 }}>L{currentLevelId}</span> : null}R{state.currentRound}
+          </span>
           <span style={{
             fontSize: 9, fontWeight: 600,
             fontFamily: "'JetBrains Mono', monospace",
@@ -342,6 +363,48 @@ export function GameView({
         </div>
       </div>
 
+      {/* ═══ QUIT DIALOG ═══ */}
+      <AnimatePresence>
+        {showQuitDialog && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+            onClick={() => setShowQuitDialog(false)}
+            style={{
+              position: 'fixed', inset: 0,
+              background: 'rgba(0,0,0,0.7)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 250, padding: 20,
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: C.board, borderRadius: 12,
+                padding: 24, maxWidth: 280, width: '100%',
+                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+              }}
+            >
+              <h3 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 18, color: C.textPrimary, margin: 0 }}>
+                Quit Game?
+              </h3>
+              <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: C.textSecondary, textAlign: 'center', margin: 0 }}>
+                Your progress in this game will be lost.
+              </p>
+              <div style={{ display: 'flex', gap: 10, marginTop: 4, width: '100%' }}>
+                <Btn label="QUIT" onClick={() => { setShowQuitDialog(false); onQuit(); }} big />
+                <Btn label="RESUME" primary onClick={() => setShowQuitDialog(false)} big />
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ═══ ROUND END ═══ */}
       <RoundEndOverlay
         visible={state.gamePhase === 'roundEnd'}
@@ -365,6 +428,7 @@ export function GameView({
       <GameOverOverlay
         winner={gameOver as { winner: PlayerIndex; winnerName: string } | null}
         state={state}
+        adventureMode={!!currentLevelId}
         onPlayAgain={onPlayAgain}
         onHome={onHome}
       />

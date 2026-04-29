@@ -19,6 +19,7 @@ const BOT_DISPLAY: Record<Difficulty, { name: string; color: string }> = {
 interface Props {
   winner: { winner: PlayerIndex; winnerName: string } | null;
   state: GameState;
+  adventureMode?: boolean;
   onPlayAgain: () => void;
   onHome: () => void;
 }
@@ -37,7 +38,7 @@ function formatHighest(record: CaptureRecord | null): string | null {
   return `${record.baseCard.rank} = ${others.map((c) => c.rank).join('+')}`;
 }
 
-export function GameOverOverlay({ winner, state, onPlayAgain, onHome }: Props) {
+export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onHome }: Props) {
   if (!winner) return null;
 
   const target = state.settings.targetScore;
@@ -173,7 +174,7 @@ export function GameOverOverlay({ winner, state, onPlayAgain, onHome }: Props) {
               fontFamily: 'Inter, sans-serif', cursor: 'pointer',
             }}
           >
-            HOME
+            {adventureMode ? 'WORLD MAP' : 'HOME'}
           </motion.button>
         </div>
       </motion.div>

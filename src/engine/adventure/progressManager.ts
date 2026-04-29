@@ -1,300 +1,200 @@
-import type { PersonalityKey } from '../../shared/personalities';
-import {
-  getAllLevels,
-  getAllWorlds,
-  getLevel,
-  getPreviousLevelId,
-  getWorld,
-  type ComboRestriction,
-  type LevelConfig,
-} from './levelConfig';
+import { LEVELS } from './levelConfig';
 
-const STORAGE_KEY = 'stacked.adventure.progress.v1';
+// =============================================================================
+// TEMPORARY DEV FLAG — REVERT TO false BEFORE WAVE 3 TRACK 5 SHIPS
+// =============================================================================
+// When true, all 18 Adventure levels are unlocked for testing.
+// =============================================================================
+const DEV_UNLOCK_ALL = false;
 
-function isDevUnlockAll(): boolean {
-  if (typeof window === 'undefined') return false;
-  if ((window as unknown as Record<string, unknown>).__DEV_UNLOCK_ALL) return true;
-  try {
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('unlock') === 'all') return true;
-  } catch {
-    // ignore
-  }
-  return false;
+const STORAGE_KEY = 'stacked_v2_adventure_progress';
+const MAX_LEVEL = 18;
+const LEVELS_PER_WORLD = 3;
+const STARS_PER_WORLD = LEVELS_PER_WORLD * 3; // 9
+
+export interface AdventureProgress {
+  unlockedLevels: number[];
+  starsPerLevel: Record<number, 0 | 1 | 2 | 3>;
+  lastCompleted: number | null;
+  totalStars: number;
 }
 
-export interface CompletedLevelEntry {
-  stars: number;
-  placement: number;
+// ─── Helpers ────────────────────────────────────────
+
+export function getLevelWorld(levelId: number): number {
+  return Math.ceil(levelId / LEVELS_PER_WORLD);
 }
 
-export interface AdventureProgressState {
-  completedLevels: Record<string, CompletedLevelEntry>;
-  unlockedWorlds: number[];
-  highestCompleted: string | null;
-  introsSeen: number[];
+function firstLevelOfWorld(worldId: number): number {
+  return (worldId - 1) * LEVELS_PER_WORLD + 1;
 }
 
-export interface Unlock {
-  type: 'level' | 'world' | 'classic' | 'bot';
-  id: string;
+// ─── Star calculation (placement-based) ─────────────
+
+export function calculateStars(
+  playerScore: number,
+  bot1Score: number,
+  bot2Score: number,
+  gameCompleted: boolean,
+): 0 | 1 | 2 | 3 {
+  if (!gameCompleted) return 0;
+  const higher = [bot1Score, bot2Score].filter((s) => s > playerScore).length;
+  if (higher === 0) return 3; // 1st place
+  if (higher === 1) return 2; // 2nd place
+  return 1; // 3rd place
 }
 
-export interface CompleteLevelResult {
-  stars: number;
-  unlocks: Unlock[];
-}
+// ─── World gate logic ───────────────────────────────
 
-const memoryStore = new Map<string, string>();
-
-interface StorageAdapter {
-  get(key: string): string | null;
-  set(key: string, value: string): void;
-  remove(key: string): void;
-}
-
-function getStorage(): StorageAdapter {
-  if (typeof localStorage !== 'undefined') {
-    try {
-      return {
-        get: (k) => localStorage.getItem(k),
-        set: (k, v) => localStorage.setItem(k, v),
-        remove: (k) => localStorage.removeItem(k),
-      };
-    } catch {
-      // fall through to memory store
-    }
-  }
-  return {
-    get: (k) => (memoryStore.has(k) ? memoryStore.get(k)! : null),
-    set: (k, v) => {
-      memoryStore.set(k, v);
-    },
-    remove: (k) => {
-      memoryStore.delete(k);
-    },
-  };
-}
-
-function emptyState(): AdventureProgressState {
-  return {
-    completedLevels: {},
-    unlockedWorlds: [1],
-    highestCompleted: null,
-    introsSeen: [],
-  };
-}
-
-export function loadProgress(): AdventureProgressState {
-  const storage = getStorage();
-  const raw = storage.get(STORAGE_KEY);
-  if (!raw) return emptyState();
-  try {
-    const parsed = JSON.parse(raw) as Partial<AdventureProgressState>;
-    return {
-      completedLevels: parsed.completedLevels ?? {},
-      unlockedWorlds: parsed.unlockedWorlds ?? [1],
-      highestCompleted: parsed.highestCompleted ?? null,
-      introsSeen: parsed.introsSeen ?? [],
-    };
-  } catch {
-    return emptyState();
-  }
-}
-
-export function saveProgress(progress: AdventureProgressState): void {
-  const storage = getStorage();
-  try {
-    storage.set(STORAGE_KEY, JSON.stringify(progress));
-  } catch {
-    // ignore
-  }
-}
-
-export function resetProgress(): void {
-  const storage = getStorage();
-  storage.remove(STORAGE_KEY);
-}
-
-export function calculateStars(placement: number): number {
-  if (placement <= 1) return 3;
-  if (placement === 2) return 2;
-  return 1;
-}
-
-export function completeLevel(
-  levelId: string,
-  placement: number,
-): CompleteLevelResult {
-  const level = getLevel(levelId);
-  if (!level || level.locked) return { stars: 0, unlocks: [] };
-
-  const stars = calculateStars(placement);
-  const progress = loadProgress();
-  const prev = progress.completedLevels[levelId];
-  if (!prev || stars > prev.stars) {
-    progress.completedLevels[levelId] = { stars, placement };
-  }
-
-  const unlocks: Unlock[] = [];
-  const previousHighestIndex = progress.highestCompleted
-    ? getAllLevels().findIndex((l) => l.id === progress.highestCompleted)
-    : -1;
-  const thisIndex = getAllLevels().findIndex((l) => l.id === levelId);
-  if (thisIndex > previousHighestIndex) {
-    progress.highestCompleted = levelId;
-  }
-
-  const world = getWorld(level.worldId);
-  if (world) {
-    const lastInWorld = world.levels[world.levels.length - 1];
-    if (lastInWorld.id === levelId) {
-      const nextWorldId = level.worldId + 1;
-      const nextWorld = getWorld(nextWorldId);
-      if (
-        nextWorld &&
-        !nextWorld.levels.every((l) => l.locked) &&
-        !progress.unlockedWorlds.includes(nextWorldId)
-      ) {
-        progress.unlockedWorlds.push(nextWorldId);
-        unlocks.push({ type: 'world', id: String(nextWorldId) });
-      }
-    }
-  }
-
-  if (levelId === '2-3' && (!prev || !hasClassicBefore(progress))) {
-    unlocks.push({ type: 'classic', id: 'classic' });
-  }
-
-  saveProgress(progress);
-  return { stars, unlocks };
-}
-
-function hasClassicBefore(progress: AdventureProgressState): boolean {
-  return Boolean(progress.completedLevels['2-3']);
-}
-
-export function isLevelCompleted(levelId: string): boolean {
-  return Boolean(loadProgress().completedLevels[levelId]);
-}
-
-export function isLevelUnlocked(levelId: string): boolean {
-  if (isDevUnlockAll()) return true;
-  const level = getLevel(levelId);
-  if (!level || level.locked) return false;
-  const prev = getPreviousLevelId(levelId);
-  if (!prev) return true;
-  return isLevelCompleted(prev);
-}
-
-export function isWorldUnlocked(worldId: number): boolean {
-  if (isDevUnlockAll()) return true;
-  const world = getWorld(worldId);
-  if (!world) return false;
-  if (world.levels.every((l) => l.locked)) return false;
-  return loadProgress().unlockedWorlds.includes(worldId);
-}
-
-export function getLevelStars(levelId: string): number {
-  return loadProgress().completedLevels[levelId]?.stars ?? 0;
-}
-
-export function getTotalStars(): number {
-  const progress = loadProgress();
+export function starsInWorld(progress: AdventureProgress, worldId: number): number {
+  const first = firstLevelOfWorld(worldId);
   let total = 0;
-  for (const entry of Object.values(progress.completedLevels)) {
-    total += entry.stars;
+  for (let i = 0; i < LEVELS_PER_WORLD; i++) {
+    total += progress.starsPerLevel[first + i] ?? 0;
   }
   return total;
 }
 
-export function getMaxStars(): number {
-  return getAllLevels().filter((l) => !l.locked).length * 3;
+export function isWorldUnlocked(progress: AdventureProgress, worldId: number): boolean {
+  if (DEV_UNLOCK_ALL) return true;
+  if (worldId === 1) return true;
+  return starsInWorld(progress, worldId - 1) === STARS_PER_WORLD;
 }
 
-export function hasSeenIntro(worldId: number): boolean {
-  return loadProgress().introsSeen.includes(worldId);
+export function starsRemainingForWorld(progress: AdventureProgress, worldId: number): number {
+  if (worldId === 1) return 0;
+  return Math.max(0, STARS_PER_WORLD - starsInWorld(progress, worldId - 1));
 }
 
-export function markIntroSeen(worldId: number): void {
-  const progress = loadProgress();
-  if (!progress.introsSeen.includes(worldId)) {
-    progress.introsSeen.push(worldId);
-    saveProgress(progress);
-  }
-}
+// ─── Initial / default progress ─────────────────────
 
-export function isClassicUnlocked(): boolean {
-  if (isDevUnlockAll()) return true;
-  return Boolean(loadProgress().completedLevels['2-3']);
-}
-
-export function getUnlockedBots(): PersonalityKey[] {
-  if (isDevUnlockAll()) {
-    return ['calvin', 'talia', 'nina', 'rex', 'jett', 'mira'];
-  }
-  const progress = loadProgress();
-  const bots = new Set<PersonalityKey>(['calvin']);
-  const highestCompleted = progress.highestCompleted;
-  if (!highestCompleted) return Array.from(bots);
-
-  const worldOfHighest = getLevel(highestCompleted)?.worldId ?? 0;
-  const isWorldFullyCleared = (wid: number): boolean => {
-    const w = getWorld(wid);
-    if (!w) return false;
-    return w.levels.every((l) => progress.completedLevels[l.id]);
+export function getDefaultProgress(): AdventureProgress {
+  return {
+    unlockedLevels: [1],
+    starsPerLevel: {},
+    lastCompleted: null,
+    totalStars: 0,
   };
-
-  if (isWorldFullyCleared(1) || worldOfHighest >= 2) bots.add('calvin');
-  if (isWorldFullyCleared(2) || worldOfHighest >= 3) {
-    bots.add('calvin');
-    bots.add('talia');
-  }
-  if (isWorldFullyCleared(3) || worldOfHighest >= 4) {
-    bots.add('nina');
-  }
-  if (isWorldFullyCleared(4)) {
-    bots.add('rex');
-    bots.add('jett');
-    bots.add('mira');
-  }
-  return Array.from(bots);
 }
 
-export function getComboRestrictions(): ComboRestriction[] {
-  if (isDevUnlockAll()) return [];
-  const progress = loadProgress();
-  if (progress.completedLevels['2-3']) return [];
-  if (progress.completedLevels['2-2']) return [];
-  if (progress.completedLevels['2-1']) return ['noSum3'];
-  return ['pairsOnly'];
+export function getInitialProgress(): AdventureProgress {
+  if (DEV_UNLOCK_ALL) {
+    return {
+      unlockedLevels: Array.from({ length: MAX_LEVEL }, (_, i) => i + 1),
+      starsPerLevel: {},
+      lastCompleted: null,
+      totalStars: 0,
+    };
+  }
+  return getDefaultProgress();
 }
 
-export function getNextPlayableLevel(): LevelConfig | null {
-  const all = getAllLevels();
-  const progress = loadProgress();
-  for (const l of all) {
-    if (l.locked) continue;
-    if (!progress.completedLevels[l.id] && isLevelUnlocked(l.id)) return l;
-  }
-  for (const l of all) {
-    if (l.locked) continue;
-    if (!progress.completedLevels[l.id]) return l;
-  }
-  return all[0] ?? null;
+// ─── Level unlock check ─────────────────────────────
+
+export function isLevelUnlocked(
+  progress: AdventureProgress,
+  levelId: number,
+): boolean {
+  if (DEV_UNLOCK_ALL) return true;
+  if (!progress.unlockedLevels.includes(levelId)) return false;
+  return isWorldUnlocked(progress, getLevelWorld(levelId));
 }
 
-export function getCurrentAdventureLevel(): LevelConfig {
-  return getNextPlayableLevel() ?? getAllLevels()[0];
+export function getStarsForLevel(
+  progress: AdventureProgress,
+  levelId: number,
+): 0 | 1 | 2 | 3 {
+  return progress.starsPerLevel[levelId] ?? 0;
 }
 
-export function getUnlockedWorldsList(): number[] {
-  const progress = loadProgress();
-  const worlds = new Set<number>(progress.unlockedWorlds);
-  worlds.add(1);
-  for (const w of getAllWorlds()) {
-    if (w.levels.every((l) => l.locked)) continue;
-    if (w.id === 1) worlds.add(1);
+// ─── Record completion ──────────────────────────────
+
+export function recordLevelCompletion(
+  progress: AdventureProgress,
+  levelId: number,
+  stars: 0 | 1 | 2 | 3,
+): AdventureProgress {
+  if (stars === 0) return progress;
+
+  const starsPerLevel = { ...progress.starsPerLevel };
+  const prev = starsPerLevel[levelId] ?? 0;
+  if (stars > prev) {
+    starsPerLevel[levelId] = stars;
   }
-  return Array.from(worlds).sort((a, b) => a - b);
+
+  const unlockedLevels = progress.unlockedLevels.slice();
+
+  // Same-world unlock: 2+ stars unlocks next level in same world
+  if (stars >= 2) {
+    const nextLevel = levelId + 1;
+    const sameWorld = getLevelWorld(nextLevel) === getLevelWorld(levelId);
+    if (sameWorld && nextLevel <= MAX_LEVEL && !unlockedLevels.includes(nextLevel)) {
+      unlockedLevels.push(nextLevel);
+    }
+  }
+
+  // Rebuild progress for world-gate check
+  const tempProgress: AdventureProgress = { ...progress, starsPerLevel, unlockedLevels };
+
+  // World-gate unlock: if completing this level causes a world to fully 3-star,
+  // unlock the first level of the next world
+  const currentWorld = getLevelWorld(levelId);
+  const nextWorldId = currentWorld + 1;
+  if (nextWorldId <= 6) {
+    if (starsInWorld(tempProgress, currentWorld) === STARS_PER_WORLD) {
+      const firstOfNext = firstLevelOfWorld(nextWorldId);
+      if (!unlockedLevels.includes(firstOfNext)) {
+        unlockedLevels.push(firstOfNext);
+      }
+    }
+  }
+
+  let totalStars = 0;
+  for (const s of Object.values(starsPerLevel)) {
+    totalStars += s;
+  }
+
+  return {
+    unlockedLevels,
+    starsPerLevel,
+    lastCompleted: levelId,
+    totalStars,
+  };
+}
+
+// ─── localStorage persistence ───────────────────────
+
+export function saveProgress(progress: AdventureProgress): void {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(progress));
+  } catch {
+    // storage full or unavailable
+  }
+}
+
+export function loadProgress(): AdventureProgress {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return getInitialProgress();
+    const parsed = JSON.parse(raw) as Partial<AdventureProgress>;
+    if (!parsed.unlockedLevels || !Array.isArray(parsed.unlockedLevels)) {
+      return getInitialProgress();
+    }
+    return {
+      unlockedLevels: parsed.unlockedLevels,
+      starsPerLevel: parsed.starsPerLevel ?? {},
+      lastCompleted: parsed.lastCompleted ?? null,
+      totalStars: parsed.totalStars ?? 0,
+    };
+  } catch {
+    return getInitialProgress();
+  }
+}
+
+export function clearProgress(): void {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
 }

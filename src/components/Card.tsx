@@ -1,7 +1,7 @@
 import { motion, useMotionValue, useTransform } from 'motion/react';
 import type { Card as CardData } from '../engine/types';
 import type { CSSProperties } from 'react';
-import { C, SHADOWS } from '../config/colors';
+import { SHADOWS } from '../config/colors';
 import { getTransition } from '../config/motion';
 
 // Poker standard 2.5:3.5
@@ -10,11 +10,13 @@ const CARD_H = Math.round(CARD_W * (3.5 / 2.5));
 const SMALL_W = 40;
 const SMALL_H = Math.round(SMALL_W * (3.5 / 2.5));
 
-// Stripe panel proportions (percentage of card)
-const STRIPE_W_PCT = 0.22;
-const STRIPE_H_PCT = 0.50;
-const STRIPE_LEFT_PCT = 0.07;
-const STRIPE_TOP_PCT = 0;
+// Brand colors (locked)
+const STK = {
+  JADE:  '#065F46',
+  TAN:   '#E8C577',
+  BROWN: '#72571C',
+  WHITE: '#FFFFFF',
+};
 
 const MAX_TILT_DEG = 18;
 
@@ -34,85 +36,101 @@ export interface CardProps {
 const suitSymbols: Record<string, string> = {
   hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠',
 };
-const suitColor = (suit: string) =>
-  suit === 'hearts' || suit === 'diamonds' ? C.suitRed : C.suitBlack;
+const RED_FAMILY = new Set(['hearts', 'diamonds']);
+function inkFor(suit: string) {
+  if (RED_FAMILY.has(suit)) return { rankColor: STK.TAN, suitColor: STK.BROWN };
+  return { rankColor: STK.BROWN, suitColor: STK.TAN };
+}
 
-// ─── Stripe panel (shared between face and back) ─────
+// ─── Stripe geometry (single source of truth) ───────
 
-function Stripe({ w, h, lifted, back }: { w: number; h: number; lifted?: boolean; back?: boolean }) {
-  const sw = Math.round(w * STRIPE_W_PCT);
-  const sh = Math.round(h * STRIPE_H_PCT);
-  const left = Math.round(w * STRIPE_LEFT_PCT);
-  const top = Math.round(h * STRIPE_TOP_PCT);
+function stripeBox(w: number) {
+  const h = Math.round(w * (3.5 / 2.5));
+  const sw = w * 0.18;
+  const sh = h * 0.70;
+  const left = w * 0.10;
+  const bottomR = Math.max(4, Math.round(w * 0.03));
+  return { cardHeight: h, left, top: 0, width: sw, height: sh, radius: `0 0 ${bottomR}px ${bottomR}px` };
+}
 
-  const bg = back ? 'rgba(255,255,255,0.3)' : lifted ? C.indigoHover : C.indigo;
-
-  return (
-    <div style={{
-      position: 'absolute', left, top, width: sw, height: sh,
-      background: bg,
-      border: back ? '1px solid rgba(255,255,255,0.2)' : undefined,
-      borderRadius: '0 0 6px 6px',
-    }} />
-  );
+function cardShadow(w: number, lifted?: boolean): string {
+  if (lifted) return SHADOWS.cardLifted;
+  const ledge = Math.max(2, Math.round(w * 0.03));
+  return `0 ${ledge}px 0 rgba(0,0,0,0.25), 0 ${ledge * 3}px ${ledge * 7}px rgba(0,0,0,0.45)`;
 }
 
 // ─── Card Back ────────────────────────────────────────
 
-function CardBack({ w, h }: { w: number; h: number }) {
+function CardBack({ w }: { w: number }) {
+  const s = stripeBox(w);
+  const wordSize = Math.max(5, Math.round(s.width * 0.55));
+
   return (
     <div style={{
-      width: w, height: h, borderRadius: 8, background: C.indigo,
-      position: 'relative', overflow: 'hidden',
-      boxShadow: SHADOWS.cardRest, flexShrink: 0,
+      width: w, height: s.cardHeight, borderRadius: 12,
+      background: STK.JADE, position: 'relative', overflow: 'hidden',
+      boxShadow: cardShadow(w), flexShrink: 0,
     }}>
-      <Stripe w={w} h={h} back />
       <div style={{
-        position: 'absolute', inset: 0,
-        backgroundImage:
-          'linear-gradient(0deg, rgba(255,255,255,0.1) 1px, transparent 1px),' +
-          'linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
-        backgroundSize: '12px 12px',
-      }} />
-      <div style={{
-        position: 'absolute', inset: 0, display: 'flex',
-        alignItems: 'center', justifyContent: 'center',
-        color: 'rgba(255,255,255,0.2)', fontSize: w < 50 ? 7 : 10,
-        fontWeight: 700, fontFamily: 'Inter, sans-serif', letterSpacing: 1,
-      }}>STACKED</div>
+        position: 'absolute', left: s.left, top: s.top,
+        width: s.width, height: s.height,
+        background: STK.TAN, borderRadius: s.radius,
+        zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          transform: 'rotate(-90deg)', transformOrigin: 'center center',
+          whiteSpace: 'nowrap' as const, fontFamily: 'Inter, system-ui, sans-serif',
+          fontWeight: 900, fontSize: wordSize, lineHeight: 1,
+          letterSpacing: '0.18em', color: STK.JADE, opacity: 0.65,
+          userSelect: 'none' as const,
+        }}>STACKED!</div>
+      </div>
     </div>
   );
 }
 
 // ─── Card Face ────────────────────────────────────────
 
-function CardFace({ card, w, h, lifted }: {
-  card: CardData; w: number; h: number; lifted?: boolean;
+function CardFace({ card, w, lifted }: {
+  card: CardData; w: number; lifted?: boolean;
 }) {
-  const rankSize = w < 50 ? 16 : 28;
-  const suitSize = w < 50 ? 10 : 16;
-  const shadow = lifted ? SHADOWS.cardLifted : SHADOWS.cardRest;
-  const color = suitColor(card.suit);
+  const s = stripeBox(w);
+  const { rankColor, suitColor } = inkFor(card.suit);
+  const rankSize = w * 0.50;
+  const suitSize = w * 0.30;
 
   return (
     <div style={{
-      width: w, height: h, borderRadius: 8, background: C.card,
-      position: 'relative', overflow: 'hidden', boxShadow: shadow,
-      display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', gap: 1, flexShrink: 0,
+      width: w, height: s.cardHeight, borderRadius: 12,
+      background: STK.WHITE, position: 'relative', overflow: 'hidden',
+      boxShadow: cardShadow(w, lifted), flexShrink: 0,
     }}>
-      <Stripe w={w} h={h} lifted={lifted} />
-      <span style={{
-        fontFamily: 'Inter, sans-serif', fontWeight: 700,
-        fontSize: rankSize, lineHeight: 1, color,
-        position: 'relative', zIndex: 2,
-      }}>{card.rank}</span>
-      <span style={{
-        fontSize: suitSize, lineHeight: 1, color,
-        position: 'relative', zIndex: 2,
+      {/* Jade stripe */}
+      <div style={{
+        position: 'absolute', left: s.left, top: s.top,
+        width: s.width, height: s.height,
+        background: STK.JADE, borderRadius: s.radius, zIndex: 1,
+      }} />
+
+      {/* Rank + suit, anchored right of stripe */}
+      <div style={{
+        position: 'absolute',
+        left: w * 0.34, right: w * 0.06, top: 0, bottom: 0,
+        zIndex: 2, display: 'flex', flexDirection: 'column',
+        alignItems: 'center', justifyContent: 'center',
+        gap: w * 0.01,
       }}>
-        {suitSymbols[card.suit] ?? '?'}
-      </span>
+        <div style={{
+          fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 900,
+          fontSize: rankSize, lineHeight: 0.85, letterSpacing: '-0.05em',
+          color: rankColor,
+        }}>{card.rank}</div>
+        <div style={{
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: suitSize, lineHeight: 1, color: suitColor,
+        }}>{(suitSymbols[card.suit] ?? '?') + '\uFE0E'}</div>
+      </div>
     </div>
   );
 }
@@ -124,12 +142,11 @@ export function CardComponent({
   draggable, onTap, onDragEnd, onDragMove, isDragging,
 }: CardProps) {
   const w = small ? SMALL_W : CARD_W;
-  const h = small ? SMALL_H : CARD_H;
   const lifted = selected || isDragging;
 
   const inner = faceDown
-    ? <CardBack w={w} h={h} />
-    : <CardFace card={card} w={w} h={h} lifted={lifted} />;
+    ? <CardBack w={w} />
+    : <CardFace card={card} w={w} lifted={lifted} />;
 
   const wrapStyle: CSSProperties = {
     touchAction: 'none',

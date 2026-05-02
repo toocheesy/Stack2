@@ -1,13 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Card, ComboSlot, Difficulty, GameState, PlayerIndex } from '../engine/types';
-import { SCORE_KEYS } from '../engine/types';
-import { C } from '../config/colors';
 import { getTransition } from '../config/motion';
 import type { GameActions, BotVizStep, BotComboDisplay, LastCaptureInfo } from '../game/useGameController';
 import { CardComponent, CARD_W } from './Card';
-import { LastCaptureCallout } from './LastCapture';
-import { ThinkingBubble } from './ThinkingBubble';
 import { RoundEndOverlay } from './RoundEndOverlay';
 import { JackpotCelebration, type JackpotDisplay } from './JackpotCelebration';
 import { GameOverOverlay } from './GameOverOverlay';
@@ -34,13 +30,18 @@ const SLOT_KEYS: ComboSlot[] = ['base', 'combo1', 'combo2', 'combo3'];
 const SLOT_LABELS: Record<ComboSlot, string> = {
   base: 'BASE', combo1: 'COMBO 1', combo2: 'COMBO 2', combo3: 'COMBO 3',
 };
-const BOT_COLORS: Record<Difficulty, { fill: string; border: string; name: string }> = {
-  beginner:     { fill: C.botCalvin, border: '#93C5FD', name: 'Calvin' },
-  intermediate: { fill: C.botNina, border: '#C4B5FD', name: 'Nina' },
-  advanced:     { fill: C.botRex, border: '#FCA5A5', name: 'Rex' },
+
+const PLAYER_COLORS: Record<Difficulty, { color: string; name: string }> = {
+  beginner:     { color: '#3B82F6', name: 'Calvin' },
+  intermediate: { color: '#DBEAFE', name: 'Nina' },
+  advanced:     { color: '#DC2626', name: 'Rex' },
 };
-const BOARD_GAP = 6;
-const MIN_BOARD_CARD_W = 40;
+
+const JADE = '#065F46';
+const TAN = '#E8C577';
+const BG = '#0A0A0A';
+const BOARD_GAP = 4;
+const BOT_CARD_W = Math.round(CARD_W * 0.7);
 
 export function GameView({
   state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain,
@@ -74,8 +75,12 @@ export function GameView({
   const hasCombo = state.combination.base !== null || state.combination.combo1.length > 0 || state.combination.combo2.length > 0 || state.combination.combo3.length > 0;
   const comboValid = useMemo(() => hasCombo && validateFullCombo(state).isValid, [state, hasCombo]);
   const target = state.settings.targetScore;
-  const bot1Info = BOT_COLORS[state.settings.bot1Personality];
-  const bot2Info = BOT_COLORS[state.settings.bot2Personality];
+  const bot1 = PLAYER_COLORS[state.settings.bot1Personality];
+  const bot2 = PLAYER_COLORS[state.settings.bot2Personality];
+  const deckEmpty = state.deck.length === 0 && state.gamePhase === 'playing';
+
+  const bot1HandVisible = botCombo?.playerIndex === 1 ? state.hands[1].filter(c => c.id !== botCombo.baseCard.id) : state.hands[1];
+  const bot2HandVisible = botCombo?.playerIndex === 2 ? state.hands[2].filter(c => c.id !== botCombo.baseCard.id) : state.hands[2];
 
   // ── Hit testing ─────────────────────────────────────
 
@@ -153,119 +158,114 @@ export function GameView({
     if (err) { setError(err); setTimeout(() => setError(null), 2000); }
   }, [actions]);
 
-  // ── Dynamic board card width ───────────────────────
+  // ── Board card scaling (6 across) ─────────────────
 
   const boardCardScale = useMemo(() => {
-    if (visibleBoard.length === 0) return 1;
-    // Estimate available width (~70% of viewport minus gaps)
-    const avail = typeof window !== 'undefined' ? window.innerWidth * 0.6 : 500;
-    const idealTotal = CARD_W * visibleBoard.length + BOARD_GAP * (visibleBoard.length - 1);
-    if (idealTotal <= avail) return 1;
-    const maxW = (avail - BOARD_GAP * (visibleBoard.length - 1)) / visibleBoard.length;
-    return Math.max(MIN_BOARD_CARD_W / CARD_W, maxW / CARD_W);
+    if (visibleBoard.length === 0) return 0.85;
+    const avail = typeof window !== 'undefined' ? window.innerWidth - 24 : 350;
+    const perRow = 6;
+    const maxW = (avail - BOARD_GAP * (perRow - 1)) / perRow;
+    const scale = Math.min(0.85, maxW / CARD_W);
+    return Math.max(0.55, scale);
   }, [visibleBoard.length]);
 
-  const deckEmpty = state.deck.length === 0 && state.gamePhase === 'playing';
-
-  // ── Combo display (player combo or bot combo) ──────
+  // ── Combo display ─────────────────────────────────
 
   const displayCombo = useMemo((): { base: Card | null; slots: Card[][] } => {
     if (botCombo) {
-      return {
-        base: botCombo.baseCard,
-        slots: [botCombo.comboCards.slice(0, 3), botCombo.comboCards.slice(3, 6), botCombo.comboCards.slice(6)],
-      };
+      return { base: botCombo.baseCard, slots: [botCombo.comboCards.slice(0, 3), botCombo.comboCards.slice(3, 6), botCombo.comboCards.slice(6)] };
     }
     return {
       base: state.combination.base,
-      slots: [
-        state.combination.combo1.map((g) => g.card),
-        state.combination.combo2.map((g) => g.card),
-        state.combination.combo3.map((g) => g.card),
-      ],
+      slots: [state.combination.combo1.map(g => g.card), state.combination.combo2.map(g => g.card), state.combination.combo3.map(g => g.card)],
     };
   }, [state.combination, botCombo]);
 
-  const bot1HandVisible = botCombo?.playerIndex === 1
-    ? state.hands[1].filter(c => c.id !== botCombo.baseCard.id)
-    : state.hands[1];
-  const bot2HandVisible = botCombo?.playerIndex === 2
-    ? state.hands[2].filter(c => c.id !== botCombo.baseCard.id)
-    : state.hands[2];
+  // ── Message strip content ─────────────────────────
+
+  const messageContent = useMemo(() => {
+    if (lastCapture) {
+      const base = lastCapture.baseCard?.rank ?? '';
+      const areas = lastCapture.areas.map(a => a.map(c => c.rank).join('+')).join(' · ');
+      return { text: `LAST · ${base} = ${areas}`, color: 'rgba(255,255,255,0.6)' };
+    }
+    return { text: `R${state.currentRound} · ${state.deck.length} CARDS LEFT`, color: 'rgba(255,255,255,0.5)' };
+  }, [lastCapture, state.currentRound, state.deck.length]);
 
   // ── Render ─────────────────────────────────────────
 
   return (
     <div style={{
-      width: '100vw', height: '100dvh', background: C.slateBg,
-      display: 'grid',
-      gridTemplateColumns: '72px 1fr 72px',
-      gridTemplateRows: '40px auto 1fr auto 100px',
-      gridTemplateAreas: `"score score score" "lc lc lc" "bot1 board bot2" "combo combo combo" "hand hand hand"`,
+      width: '100vw', height: '100dvh', background: BG,
+      display: 'flex', flexDirection: 'column',
       overflow: 'hidden', touchAction: 'none',
+      fontFamily: 'Inter, system-ui, sans-serif',
     }}>
 
-      {/* ═══ SCORE BAR ═══ */}
-      <div style={{ gridArea: 'score', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 8px 0 6px', background: C.slateBg, borderBottom: `1px solid ${C.divider}`, gap: 4 }}>
-        {!gameOver && !jackpotInfo && state.gamePhase === 'playing' && (
-          <motion.button
-            onClick={() => setShowQuitDialog(true)}
-            whileTap={{ scale: 0.9 }}
-            transition={getTransition('snappy')}
-            style={{
-              width: 28, height: 28, borderRadius: 6,
-              border: `1px solid ${C.divider}`, background: 'transparent',
-              color: C.textSecondary, fontSize: 14, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'Inter, sans-serif', flexShrink: 0,
-            }}
-          >
-            ←
-          </motion.button>
-        )}
-        <ScoreBlock label="YOU" labelColor={C.textSecondary} score={state.overallScores.player} target={target} active={state.currentPlayer === 0} amber glowColor={C.indigo} />
-        <div style={{ position: 'relative' }}>
-          <ScoreBlock label={bot1Info.name} labelColor={bot1Info.fill} score={state.overallScores.bot1} target={target} active={state.currentPlayer === 1} glowColor={bot1Info.fill} />
-          <ThinkingBubble visible={!!botViz && botViz.playerIndex === 1 && botViz.type === 'thinking'} difficulty={state.settings.bot1Personality} />
+      {/* ═══ ZONE A — HEADER BAR ═══ */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '8px 12px', flexShrink: 0, height: 44,
+      }}>
+        {!gameOver && !jackpotInfo && state.gamePhase === 'playing' ? (
+          <motion.button onClick={() => setShowQuitDialog(true)} whileTap={{ scale: 0.9 }} transition={getTransition('snappy')} style={{
+            width: 32, height: 32, borderRadius: 99, border: 'none',
+            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+            fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          }}>←</motion.button>
+        ) : <div style={{ width: 32 }} />}
+
+        <div style={{ fontWeight: 900, fontSize: 14, letterSpacing: '-0.02em', color: '#fff' }}>
+          STACKED<span style={{ color: JADE }}>!</span>
         </div>
-        <div style={{ position: 'relative' }}>
-          <ScoreBlock label={bot2Info.name} labelColor={bot2Info.fill} score={state.overallScores.bot2} target={target} active={state.currentPlayer === 2} glowColor={bot2Info.fill} />
-          <ThinkingBubble visible={!!botViz && botViz.playerIndex === 2 && botViz.type === 'thinking'} difficulty={state.settings.bot2Personality} />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 0 }}>
-          <span style={{ color: C.textSecondary, fontSize: 10, fontFamily: 'Inter, sans-serif', fontWeight: 500 }}>
-            {currentLevelId ? <span style={{ color: C.indigo, marginRight: 4 }}>L{currentLevelId}</span> : null}R{state.currentRound}
-          </span>
-          <span style={{
-            fontSize: 9, fontWeight: 600,
-            fontFamily: "'JetBrains Mono', monospace",
-            color: state.deck.length === 0 ? C.amber : C.textSecondary,
-          }}>
-            {state.deck.length === 0 ? 'EMPTY' : state.deck.length}
-          </span>
+
+        <div style={{
+          fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 500,
+          color: 'rgba(255,255,255,0.7)', letterSpacing: '0.12em',
+        }}>
+          {currentLevelId ? `ADVENTURE · ${Math.ceil(currentLevelId / 3)}:${((currentLevelId - 1) % 3) + 1}` : `CLASSIC · ${target}`}
         </div>
       </div>
 
-      {/* ═══ LAST CAPTURE ═══ */}
-      <div style={{ gridArea: 'lc' }}>
-        <LastCaptureCallout info={lastCapture} />
+      {/* ═══ ZONE B — MESSAGE STRIP ═══ */}
+      <div style={{
+        padding: '4px 16px', textAlign: 'center', flexShrink: 0, height: 28,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+      }}>
+        <span style={{
+          fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 500,
+          color: messageContent.color, letterSpacing: '0.05em',
+        }}>
+          {messageContent.text}
+        </span>
       </div>
 
-      {/* ═══ BOT 1 ═══ */}
-      <BotBadge area="bot1" info={bot1Info} handCount={bot1HandVisible.length} hand={bot1HandVisible} thinking={botViz?.playerIndex === 1 && botViz.type === 'thinking'} />
+      {/* ═══ ZONES C+D — BOT ZONES ═══ */}
+      <div style={{ display: 'flex', gap: 8, padding: '0 8px', flexShrink: 0 }}>
+        <BotZone
+          name={bot1.name} color={bot1.color} score={state.overallScores.bot1}
+          target={target} hand={bot1HandVisible} active={state.currentPlayer === 1}
+          thinking={!!botViz && botViz.playerIndex === 1 && botViz.type === 'thinking'}
+        />
+        <BotZone
+          name={bot2.name} color={bot2.color} score={state.overallScores.bot2}
+          target={target} hand={bot2HandVisible} active={state.currentPlayer === 2}
+          thinking={!!botViz && botViz.playerIndex === 2 && botViz.type === 'thinking'}
+        />
+      </div>
 
-      {/* ═══ BOARD ZONE ═══ */}
+      {/* ═══ ZONE E — GAME BOARD ═══ */}
       <div ref={boardRef} onClick={handleBoardAreaTap} style={{
-        gridArea: 'board', display: 'flex', flexWrap: 'wrap', gap: BOARD_GAP,
+        flex: 1, margin: '8px 8px 0', borderRadius: 12, padding: '8px 6px',
+        background: 'rgba(255,255,255,0.03)',
+        border: hoveredBoard ? '1px solid rgba(16,185,129,0.5)' : deckEmpty ? `1px solid ${TAN}55` : '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', flexWrap: 'wrap', gap: BOARD_GAP,
         justifyContent: 'center', alignItems: 'center', alignContent: 'center',
-        padding: '8px 4px', background: C.board, borderRadius: 8,
-        border: hoveredBoard ? `1px solid ${C.success}` : deckEmpty ? `1px solid ${C.amber}` : `1px solid ${C.divider}`,
-        boxShadow: hoveredBoard ? `0 0 12px rgba(16,185,129,0.15)` : 'none',
-        transition: 'border 150ms, box-shadow 150ms, background 150ms',
-        minHeight: 0, position: 'relative' as const, zIndex: 15,
+        position: 'relative', zIndex: 15, minHeight: 0, overflow: 'visible',
+        transition: 'border 150ms',
       }}>
         {visibleBoard.length === 0 && !botCombo && (
-          <span style={{ fontSize: 11, color: C.disabledText, fontFamily: 'Inter, sans-serif' }}>Board empty</span>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>Board empty</span>
         )}
         {visibleBoard.map((card) => (
           <div key={card.id} style={{ transform: `scale(${boardCardScale})`, transformOrigin: 'center' }}>
@@ -280,42 +280,37 @@ export function GameView({
         ))}
         {deckEmpty && (
           <motion.div
-            style={{ position: 'absolute', inset: -1, borderRadius: 8, pointerEvents: 'none' }}
-            animate={{ boxShadow: ['0 0 8px rgba(245,158,11,0.12)', '0 0 20px rgba(245,158,11,0.28)', '0 0 8px rgba(245,158,11,0.12)'] }}
+            style={{ position: 'absolute', inset: -1, borderRadius: 12, pointerEvents: 'none' }}
+            animate={{ boxShadow: [`0 0 8px ${TAN}20`, `0 0 20px ${TAN}48`, `0 0 8px ${TAN}20`] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           />
         )}
       </div>
 
-      {/* ═══ BOT 2 ═══ */}
-      <BotBadge area="bot2" info={bot2Info} handCount={bot2HandVisible.length} hand={bot2HandVisible} thinking={botViz?.playerIndex === 2 && botViz.type === 'thinking'} />
-
-      {/* ═══ COMBO ZONE ═══ */}
+      {/* ═══ ZONE F — COMBO STRIP ═══ */}
       <div style={{
-        gridArea: 'combo', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', gap: 6, padding: '6px 8px',
-        background: '#222236',
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        gap: 6, padding: '6px 8px', flexShrink: 0,
       }}>
-        {/* Slots */}
         <div style={{ display: 'flex', gap: 6, width: '100%', justifyContent: 'center' }}>
           {SLOT_KEYS.map((key, i) => {
-            const slotIdx = i; // 0=base,1=combo1,2=combo2,3=combo3
+            const slotIdx = i;
             const staged = slotIdx === 0 ? (displayCombo.base ? [displayCombo.base] : []) : displayCombo.slots[slotIdx - 1];
             const filled = staged.length > 0;
             const isBase = key === 'base';
             const isHovered = hoveredSlot === key && draggingCardId !== null;
             return (
               <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: '1 1 0', maxWidth: 72 }}>
-                <span style={{ fontSize: 8, color: C.textSecondary, fontWeight: 500, letterSpacing: 1, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' }}>{SLOT_LABELS[key]}</span>
+                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 500, letterSpacing: 1, textTransform: 'uppercase' }}>{SLOT_LABELS[key]}</span>
                 <div
                   ref={(el) => { slotRefs.current[i] = el; }}
                   onClick={(e) => { e.stopPropagation(); handleSlotTap(key); }}
                   style={{
                     width: '100%', aspectRatio: '2.5/3.5', borderRadius: 6,
-                    border: isHovered ? `2px solid ${C.indigo}` : isBase ? (filled ? `2px solid ${C.indigo}` : `1px solid ${C.indigo}`) : (filled ? `2px solid ${C.indigo}` : `1px dashed ${C.slotEmpty}`),
-                    boxShadow: isHovered ? '0 0 8px rgba(79,70,229,0.4)' : 'none',
+                    border: isHovered ? `2px solid ${JADE}` : isBase ? (filled ? `2px solid ${JADE}` : `1px solid ${JADE}`) : (filled ? `2px solid ${JADE}` : '1px dashed rgba(255,255,255,0.12)'),
+                    boxShadow: isHovered ? `0 0 8px ${JADE}66` : 'none',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                    background: isHovered ? 'rgba(79,70,229,0.12)' : filled ? 'rgba(79,70,229,0.06)' : 'transparent',
+                    background: isHovered ? `${JADE}1A` : filled ? `${JADE}0F` : 'transparent',
                     transition: 'border 150ms, box-shadow 150ms, background 150ms',
                   }}
                 >
@@ -324,78 +319,84 @@ export function GameView({
                       <CardComponent card={c} small />
                     </div>
                   )) : (
-                    <span style={{ fontSize: 9, color: C.disabledText, fontFamily: 'Inter, sans-serif' }}>EMPTY</span>
+                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>EMPTY</span>
                   )}
                 </div>
               </div>
             );
           })}
         </div>
-
-        {/* Buttons */}
         {isPlayerTurn && hasCombo && !botCombo && (
           <div style={{ display: 'flex', gap: 6 }}>
             <Btn label="SUBMIT" primary disabled={!comboValid} onClick={handleSubmit} />
             <Btn label="RESET" onClick={actions.resetCombo} />
           </div>
         )}
-        {error && <span style={{ fontSize: 11, color: C.error }}>{error}</span>}
+        {error && <span style={{ fontSize: 11, color: '#EF4444' }}>{error}</span>}
       </div>
 
-      {/* ═══ PLAYER HAND ═══ */}
+      {/* ═══ ZONES G+H — PLAYER HAND + SCORE ═══ */}
       <div style={{
-        gridArea: 'hand', display: 'flex', flexDirection: 'column',
-        alignItems: 'center', justifyContent: 'center', gap: 4,
-        background: '#1A1A28', borderTop: `1px solid ${C.divider}`, position: 'relative' as const, zIndex: 20,
+        display: 'flex', padding: '0 8px 8px', gap: 8, flexShrink: 0,
       }}>
-        <span style={{ fontSize: 9, color: C.textSecondary, letterSpacing: 1, fontWeight: 500, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' }}>YOUR HAND</span>
-        <div style={{ display: 'flex', gap: 6, justifyContent: 'center' }}>
-          {visibleHand.map((card) => (
-            <CardComponent key={card.id} card={card}
-              selected={selectedHandCard === card.id}
-              draggable={isPlayerTurn}
-              isDragging={draggingCardId === card.id}
-              onTap={() => handleHandTap(card.id)}
-              onDragMove={(pt) => { handleDragStart(card.id, 'hand'); handleDragMove(pt, 'hand'); }}
-              onDragEnd={(pt) => handleDragEnd(card.id, 'hand', pt)}
-            />
-          ))}
+        {/* Zone H — Player score block */}
+        <div style={{
+          width: 72, borderRadius: 10, padding: '8px 4px',
+          background: 'rgba(255,255,255,0.03)',
+          border: state.currentPlayer === 0 ? '2px solid #F59E0B' : '1px solid rgba(255,255,255,0.06)',
+          boxShadow: state.currentPlayer === 0 ? '0 0 12px rgba(245,158,11,0.25)' : 'none',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+          transition: 'border 200ms, box-shadow 200ms',
+        }}>
+          <span style={{ fontSize: 9, fontWeight: 600, color: '#F59E0B', letterSpacing: '0.1em' }}>YOU</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 22, color: '#fff' }}>
+            {state.overallScores.player}
+          </span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
+            /{target}
+          </span>
+          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
+            {visibleHand.length} cards
+          </span>
+        </div>
+
+        {/* Zone G — Your hand */}
+        <div style={{
+          flex: 1, borderRadius: 10, padding: '6px 4px',
+          background: 'rgba(255,255,255,0.03)',
+          border: state.currentPlayer === 0 ? '2px solid #F59E0B' : '1px solid rgba(255,255,255,0.06)',
+          boxShadow: state.currentPlayer === 0 ? '0 0 12px rgba(245,158,11,0.25)' : 'none',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+          transition: 'border 200ms, box-shadow 200ms',
+          position: 'relative', zIndex: 20,
+        }}>
+          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, fontWeight: 500, textTransform: 'uppercase' }}>YOUR HAND</span>
+          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+            {visibleHand.map((card) => (
+              <CardComponent key={card.id} card={card}
+                selected={selectedHandCard === card.id}
+                draggable={isPlayerTurn}
+                isDragging={draggingCardId === card.id}
+                onTap={() => handleHandTap(card.id)}
+                onDragMove={(pt) => { handleDragStart(card.id, 'hand'); handleDragMove(pt, 'hand'); }}
+                onDragEnd={(pt) => handleDragEnd(card.id, 'hand', pt)}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
       {/* ═══ QUIT DIALOG ═══ */}
       <AnimatePresence>
         {showQuitDialog && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
             onClick={() => setShowQuitDialog(false)}
-            style={{
-              position: 'fixed', inset: 0,
-              background: 'rgba(0,0,0,0.7)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              zIndex: 250, padding: 20,
-            }}
-          >
-            <motion.div
-              initial={{ scale: 0.95 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.95 }}
+            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 250, padding: 20 }}>
+            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              style={{
-                background: C.board, borderRadius: 12,
-                padding: 24, maxWidth: 280, width: '100%',
-                display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-              }}
-            >
-              <h3 style={{ fontFamily: 'Inter, sans-serif', fontWeight: 700, fontSize: 18, color: C.textPrimary, margin: 0 }}>
-                Quit Game?
-              </h3>
-              <p style={{ fontFamily: 'Inter, sans-serif', fontSize: 13, color: C.textSecondary, textAlign: 'center', margin: 0 }}>
-                Your progress in this game will be lost.
-              </p>
+              style={{ background: '#1a1a1a', borderRadius: 12, padding: 24, maxWidth: 280, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <h3 style={{ fontWeight: 700, fontSize: 18, color: '#fff', margin: 0 }}>Quit Game?</h3>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', margin: 0 }}>Your progress in this game will be lost.</p>
               <div style={{ display: 'flex', gap: 10, marginTop: 4, width: '100%' }}>
                 <Btn label="QUIT" onClick={() => { setShowQuitDialog(false); onQuit(); }} big />
                 <Btn label="RESUME" primary onClick={() => setShowQuitDialog(false)} big />
@@ -405,71 +406,54 @@ export function GameView({
         )}
       </AnimatePresence>
 
-      {/* ═══ ROUND END ═══ */}
-      <RoundEndOverlay
-        visible={state.gamePhase === 'roundEnd'}
-        roundNumber={state.currentRound}
-        roundStats={state.roundStats}
-        gameStats={state.gameStats}
-        targetScore={state.settings.targetScore}
-        bot1Personality={state.settings.bot1Personality}
-        bot2Personality={state.settings.bot2Personality}
-        onContinue={actions.continueRound}
-      />
-
-      {/* ═══ JACKPOT CELEBRATION ═══ */}
-      <JackpotCelebration
-        info={jackpotInfo}
-        bot1Personality={state.settings.bot1Personality}
-        bot2Personality={state.settings.bot2Personality}
-      />
-
-      {/* ═══ GAME OVER ═══ */}
-      <GameOverOverlay
-        winner={gameOver as { winner: PlayerIndex; winnerName: string } | null}
-        state={state}
-        adventureMode={!!currentLevelId}
-        onPlayAgain={onPlayAgain}
-        onHome={onHome}
-      />
+      {/* ═══ OVERLAYS ═══ */}
+      <RoundEndOverlay visible={state.gamePhase === 'roundEnd'} roundNumber={state.currentRound} roundStats={state.roundStats} gameStats={state.gameStats} targetScore={target} bot1Personality={state.settings.bot1Personality} bot2Personality={state.settings.bot2Personality} onContinue={actions.continueRound} />
+      <JackpotCelebration info={jackpotInfo} bot1Personality={state.settings.bot1Personality} bot2Personality={state.settings.bot2Personality} />
+      <GameOverOverlay winner={gameOver as { winner: PlayerIndex; winnerName: string } | null} state={state} adventureMode={!!currentLevelId} onPlayAgain={onPlayAgain} onHome={onHome} />
     </div>
   );
 }
 
-// ─── Sub-components ──────────────────────────────────
+// ─── Bot Zone ───────────────────────────────────────
 
-function ScoreBlock({ label, labelColor, score, target, active, amber, glowColor }: {
-  label: string; labelColor: string; score: number; target: number; active: boolean; amber?: boolean; glowColor?: string;
+function BotZone({ name, color, score, target, hand, active, thinking }: {
+  name: string; color: string; score: number; target: number;
+  hand: readonly Card[]; active: boolean; thinking: boolean;
 }) {
-  const gc = glowColor ?? C.indigo;
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', borderBottom: active ? `3px solid ${gc}` : '3px solid transparent', boxShadow: active ? `0 2px 10px ${gc}55` : 'none', paddingBottom: 1, transition: 'border-color 200ms, box-shadow 200ms' }}>
-      <span style={{ fontSize: 10, fontWeight: 500, color: labelColor, letterSpacing: 1, fontFamily: 'Inter, sans-serif', textTransform: 'uppercase' }}>{label}</span>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-        <span style={{ color: amber ? C.amber : C.textPrimary, fontWeight: 700, fontSize: 20, fontFamily: "'JetBrains Mono', monospace" }}>{score}</span>
-        <span style={{ color: C.textSecondary, fontSize: 12, fontFamily: "'JetBrains Mono', monospace", opacity: 0.6 }}>/{target}</span>
+    <div style={{
+      flex: 1, borderRadius: 10, padding: '8px 10px',
+      background: 'rgba(255,255,255,0.03)',
+      border: active ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
+      boxShadow: active ? `0 0 12px ${color}44` : 'none',
+      display: 'flex', flexDirection: 'column', gap: 6,
+      transition: 'border 200ms, box-shadow 200ms',
+    }}>
+      {/* Name + score */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color, letterSpacing: '0.05em' }}>
+          {name}{thinking ? ' ...' : ''}
+        </span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 18, color: '#fff' }}>{score}</span>
+          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>/{target}</span>
+        </div>
       </div>
-    </div>
-  );
-}
 
-function BotBadge({ area, info, handCount, hand, thinking }: {
-  area: string; info: { fill: string; border: string; name: string }; handCount: number; hand: readonly Card[]; thinking: boolean;
-}) {
-  return (
-    <div style={{ gridArea: area, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: 4 }}>
-      <div style={{ width: 32, height: 32, borderRadius: 16, background: info.fill, border: `2px solid ${info.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFF', fontWeight: 700, fontSize: 14, fontFamily: 'Inter, sans-serif' }}>{info.name[0]}</div>
-      <span style={{ fontSize: 10, fontWeight: 600, color: info.fill, fontFamily: 'Inter, sans-serif' }}>{info.name}</span>
-      <span style={{ fontSize: 9, color: C.textSecondary, fontFamily: 'Inter, sans-serif' }}>{handCount}</span>
-      <div style={{ position: 'relative', width: 28, height: 16 + Math.min(hand.length, 4) * 5 }}>
+      {/* Face-down hand */}
+      <div style={{ display: 'flex', gap: -4 }}>
         {hand.slice(0, 4).map((c, i) => (
-          <div key={c.id} style={{ position: 'absolute', top: i * 5, left: 0, width: 28, height: 16, borderRadius: 3, background: C.indigo, border: `1px solid ${C.indigoHover}` }} />
+          <div key={c.id} style={{ marginLeft: i > 0 ? -8 : 0 }}>
+            <CardComponent card={c} faceDown small />
+          </div>
         ))}
+        {hand.length === 0 && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>No cards</span>}
       </div>
-      {thinking && <span style={{ fontSize: 9, color: info.fill, fontStyle: 'italic' }}>...</span>}
     </div>
   );
 }
+
+// ─── Button ─────────────────────────────────────────
 
 function Btn({ label, primary, disabled, big, onClick }: {
   label: string; primary?: boolean; disabled?: boolean; big?: boolean; onClick: () => void;
@@ -477,10 +461,10 @@ function Btn({ label, primary, disabled, big, onClick }: {
   return (
     <motion.button onClick={onClick} disabled={disabled} whileTap={disabled ? undefined : { scale: 0.97 }} transition={getTransition('snappy')} style={{
       padding: big ? '10px 24px' : '5px 14px', borderRadius: 6,
-      border: primary ? 'none' : `1px solid ${C.textSecondary}`,
-      background: primary ? (disabled ? C.disabled : C.indigo) : 'transparent',
-      color: primary ? (disabled ? C.disabledText : C.card) : C.textSecondary,
-      fontSize: big ? 15 : 12, fontWeight: 600, fontFamily: 'Inter, sans-serif',
+      border: primary ? 'none' : '1px solid rgba(255,255,255,0.3)',
+      background: primary ? (disabled ? 'rgba(255,255,255,0.08)' : JADE) : 'transparent',
+      color: primary ? (disabled ? 'rgba(255,255,255,0.3)' : '#fff') : 'rgba(255,255,255,0.6)',
+      fontSize: big ? 15 : 12, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif',
       cursor: disabled ? 'default' : 'pointer',
     }}>{label}</motion.button>
   );

@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { GameView } from './components/GameView';
 import { ClassicSetup } from './components/ClassicSetup';
-import { WorldMap } from './components/WorldMap';
+import { ChapterMap } from './components/ChapterMap';
 import { useGameController } from './game/useGameController';
 import type { Difficulty, GameSettings } from './engine/types';
 import { C, SHADOWS } from './config/colors';
@@ -11,8 +11,9 @@ import { loadGame, clearSavedGame } from './game/persistence';
 import { getLevel } from './engine/adventure/levelConfig';
 import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked } from './engine/adventure/progressManager';
 import { LevelCompleteOverlay } from './components/LevelCompleteOverlay';
+import { CardAtomTest } from './components/CardAtomTest';
 
-type Screen = 'home' | 'setup' | 'worldMap' | 'game';
+type Screen = 'home' | 'setup' | 'worldMap' | 'game' | 'cardtest';
 
 const DEFAULT_SETTINGS: GameSettings = {
   targetScore: 300,
@@ -69,9 +70,13 @@ function App() {
     setSettings({ targetScore: next.targetScore, bot1Personality: next.bots[0], bot2Personality: next.bots[1] });
   }, [currentLevelId]);
 
+  if (screen === 'cardtest') {
+    return <CardAtomTest />;
+  }
+
   if (screen === 'worldMap') {
     return (
-      <WorldMap
+      <ChapterMap
         onBack={() => setScreen('home')}
         onSelectLevel={(id) => {
           const level = getLevel(id);
@@ -120,149 +125,82 @@ function App() {
   );
 }
 
-// ─── Title Screen ───────────────────────────────────
+// ─── Homepage constants (LOCKED) ────────────────────
+
+const JADE = '#065F46';
+const JADE_DIM = '#0a3d2e';
+const TAN = '#E8C577';
+const BROWN = '#72571C';
+const HOME_BG = '#0A0A0A';
+
+// ─── Animation keyframes (injected once) ────────────
+
+const styleId = 'stacked-home-anims';
+if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
+  const s = document.createElement('style');
+  s.id = styleId;
+  s.textContent = `
+    @keyframes breathe { 0%,100% { transform: rotate(var(--tilt,0deg)) translateY(0); } 50% { transform: rotate(var(--tilt,0deg)) translateY(-4px); } }
+    @keyframes breathe2 { 0%,100% { transform: rotate(var(--tilt,0deg)) translateY(0); } 50% { transform: rotate(var(--tilt,0deg)) translateY(-6px); } }
+    @keyframes drawPath { to { stroke-dashoffset: 0; } }
+    @keyframes nodeFade { from { opacity: 0; } to { opacity: 1; } }
+    .breathe { animation: breathe 4s ease-in-out infinite; }
+    .breathe-2 { animation: breathe2 4s ease-in-out infinite 0.5s; }
+    .draw-path { stroke-dashoffset: 200; animation: drawPath 2s ease forwards; }
+    .node-fade { opacity: 0; animation: nodeFade 0.4s ease forwards; }
+  `;
+  document.head.appendChild(s);
+}
+
+// ─── Title Screen (LOCKED) ──────────────────────────
 
 function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => void; onAdventure: () => void; onContinue?: () => void }) {
   const [showRules, setShowRules] = useState(false);
+  const hasAdventureProgress = (() => {
+    try { const r = localStorage.getItem('stacked_v2_adventure_progress'); return !!r; } catch { return false; }
+  })();
 
   return (
-    <div
-      style={{
-        width: '100vw',
-        height: '100dvh',
-        background: C.slateBg,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 16,
-        position: 'relative',
-        overflow: 'hidden',
-        padding: '24px 16px',
-      }}
-    >
-      {/* Wordmark */}
-      <h1
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 700,
-          fontSize: 48,
-          color: C.textPrimary,
-          letterSpacing: -1,
-          lineHeight: 1,
-          margin: 0,
-        }}
-      >
-        STACKED<span style={{ color: C.indigo }}>!</span>
-      </h1>
-
-      {/* Tagline */}
-      <p
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          fontWeight: 500,
-          fontSize: 14,
-          color: C.textSecondary,
-          letterSpacing: 2,
-          textTransform: 'uppercase',
-          marginTop: -8,
-          marginBottom: 4,
-        }}
-      >
-        CAPTURE · COMBO · WIN
-      </p>
-
-      {/* Mode grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr',
-        gap: 10,
-        width: '100%',
-        maxWidth: 320,
-      }}>
-        <ModeCard
-          name="Classic"
-          tagline="Race to target score, 1v2 AI"
-          active
-          onClick={onNewGame}
-        />
-        <ModeCard
-          name="Adventure"
-          tagline="18 levels, 6 worlds"
-          active={true}
-          onClick={onAdventure}
-        />
-        <ModeCard
-          name="Speed"
-          tagline="Faster pace, same combat"
-          active={false}
-        />
-        <ModeCard
-          name="Tournament"
-          tagline="Bracket play to crown a champion"
-          active={false}
-        />
+    <div style={{
+      position: 'absolute', inset: 0, background: HOME_BG, color: '#fff',
+      padding: '74px 24px 54px', display: 'flex', flexDirection: 'column',
+      fontFamily: 'Inter, system-ui, sans-serif',
+      backgroundImage: 'radial-gradient(circle at 30% 10%, rgba(6,95,70,0.10) 0%, transparent 50%), radial-gradient(circle at 80% 90%, rgba(232,197,119,0.05) 0%, transparent 50%)',
+      overflow: 'hidden',
+    }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ fontWeight: 900, fontSize: 18, letterSpacing: '-0.02em' }}>
+          STACKED<span style={{ color: JADE }}>!</span>
+        </div>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#7a8580', letterSpacing: '0.22em', fontWeight: 500 }}>
+          CHOOSE YOUR GAME
+        </div>
       </div>
 
-      {/* Continue saved game */}
-      {onContinue && (
-        <motion.button
-          onClick={onContinue}
-          whileTap={{ scale: 0.97 }}
-          transition={getTransition('snappy')}
-          style={{
-            fontFamily: 'Inter, sans-serif',
-            fontSize: 13, fontWeight: 500,
-            color: C.indigo,
-            background: 'transparent',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '4px 8px',
-          }}
-        >
-          Continue saved game
-        </motion.button>
-      )}
-
-      {/* How to Play */}
-      <button
-        onClick={() => setShowRules(true)}
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize: 13,
-          color: C.textSecondary,
-          background: 'transparent',
-          border: 'none',
-          cursor: 'pointer',
-          padding: '4px 8px',
-        }}
-      >
-        How to Play
-      </button>
+      {/* Hero cards */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24, minHeight: 0 }}>
+        <ClassicHeroCard onPlay={onNewGame} />
+        <AdventureHeroCard onPlay={onAdventure} returning={hasAdventureProgress} />
+      </div>
 
       {/* Footer */}
-      <p
-        style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize: 11,
-          color: C.disabledText,
-          marginTop: 4,
-        }}
-      >
-        Built by TC with AI collaboration
-      </p>
-
-      {/* Card peek — bottom right */}
-      <div
-        style={{
-          position: 'absolute',
-          bottom: -20,
-          right: -16,
-          transform: 'rotate(10deg)',
-          pointerEvents: 'none',
-        }}
-      >
-        <PeekCard />
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 16, flexShrink: 0 }}>
+        {onContinue && (
+          <button onClick={onContinue} style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: JADE, background: 'transparent', border: 'none', cursor: 'pointer' }}>
+            Continue saved game
+          </button>
+        )}
+        <button onClick={() => setShowRules(true)} style={{
+          display: 'inline-flex', gap: 8, alignItems: 'center',
+          padding: '8px 14px', borderRadius: 999,
+          border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
+          color: '#9aa9a3', fontSize: 12, fontWeight: 500, cursor: 'pointer',
+          fontFamily: 'Inter, system-ui, sans-serif',
+        }}>
+          <span style={{ width: 16, height: 16, borderRadius: 99, border: '1.2px solid currentColor', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>?</span>
+          How to play
+        </button>
       </div>
 
       {/* Rules modal */}
@@ -273,123 +211,147 @@ function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => 
   );
 }
 
-// ─── Mode Card ─────────────────────────────────────
+// ─── Mini card primitives (proportional to locked spec) ──
 
-function ModeCard({ name, tagline, active, onClick }: {
-  name: string; tagline: string; active: boolean; onClick?: () => void;
-}) {
+function MiniCardFace({ w, rank, suit }: { w: number; rank: string; suit: string }) {
+  const h = w * (3.5 / 2.5);
+  const bottomR = Math.max(4, Math.round(w * 0.03));
+  const isRed = suit === '♥' || suit === '♦';
+  const rankColor = isRed ? TAN : BROWN;
+  const suitColor = isRed ? BROWN : TAN;
   return (
-    <motion.button
-      onClick={active ? onClick : undefined}
-      whileTap={active ? { scale: 0.97 } : undefined}
-      transition={getTransition('snappy')}
-      style={{
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'flex-start',
-        gap: 4,
-        padding: '14px 14px 16px',
-        borderRadius: 10,
-        border: active ? `1px solid ${C.indigo}` : `1px solid ${C.divider}`,
-        background: active ? 'rgba(79,70,229,0.08)' : 'rgba(255,255,255,0.02)',
-        cursor: active ? 'pointer' : 'default',
-        opacity: active ? 1 : 0.5,
-        width: '100%',
-        textAlign: 'left' as const,
-        position: 'relative' as const,
-        overflow: 'hidden',
-      }}
-    >
-      <span style={{
-        fontFamily: 'Inter, sans-serif',
-        fontWeight: 700,
-        fontSize: 15,
-        color: active ? C.textPrimary : C.disabledText,
-        textTransform: 'uppercase',
-        letterSpacing: 0.5,
-      }}>
-        {name}
-      </span>
-      <span style={{
-        fontFamily: 'Inter, sans-serif',
-        fontSize: 11,
-        color: active ? C.textSecondary : C.disabledText,
-        lineHeight: 1.3,
-      }}>
-        {tagline}
-      </span>
-      {!active && (
-        <span style={{
-          fontFamily: 'Inter, sans-serif',
-          fontSize: 9,
-          fontWeight: 600,
-          color: C.disabledText,
-          letterSpacing: 1,
-          textTransform: 'uppercase',
-          marginTop: 2,
-        }}>
-          COMING SOON
-        </span>
-      )}
-    </motion.button>
+    <div style={{ width: w, height: h, borderRadius: Math.round(w * 0.06), background: '#FFFFFF', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ position: 'absolute', left: '10%', top: 0, width: '18%', height: '70%', background: JADE, borderRadius: `0 0 ${bottomR}px ${bottomR}px`, zIndex: 1 }} />
+      <div style={{ position: 'absolute', left: '34%', right: '6%', top: 0, bottom: 0, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: w * 0.01 }}>
+        <div style={{ fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 900, fontSize: w * 0.50, lineHeight: 0.85, letterSpacing: '-0.05em', color: rankColor }}>{rank}</div>
+        <div style={{ fontFamily: "'Noto Sans Symbols 2', Inter, system-ui, sans-serif", fontSize: w * 0.30, lineHeight: 1, color: suitColor, fontVariantEmoji: 'text' as any }}>{suit}&#xFE0E;</div>
+      </div>
+    </div>
   );
 }
 
-// ─── Card Peek (Queen of Hearts) ────────────────────
-
-function PeekCard() {
-  const w = 120;
-  const h = Math.round(w * (3.5 / 2.5));
-  const sw = Math.round(w * 0.22);
-  const sh = Math.round(h * 0.50);
-  const sl = Math.round(w * 0.07);
-  const st = 0;
+function MiniCardBack({ w }: { w: number }) {
+  const h = w * (3.5 / 2.5);
+  const bottomR = Math.max(4, Math.round(w * 0.03));
+  const wordSize = Math.max(5, Math.round(w * 0.18 * 0.55));
   return (
-    <div
-      style={{
-        width: w,
-        height: h,
-        borderRadius: 12,
-        background: C.card,
-        position: 'relative',
-        overflow: 'hidden',
-        boxShadow: SHADOWS.cardPeek,
-      }}
-    >
-      {/* Stripe panel */}
-      <div
-        style={{
-          position: 'absolute',
-          left: sl,
-          top: st,
-          width: sw,
-          height: sh,
-          background: C.indigo,
-          borderRadius: '0 0 6px 6px',
-        }}
-      />
-      <div
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100%',
-          gap: 2,
-        }}
-      >
-        <span
-          style={{
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 700,
-            fontSize: 48,
-            lineHeight: 1,
-            color: C.suitRed,
-          }}
-        >
-          Q
-        </span>
-        <span style={{ fontSize: 28, lineHeight: 1, color: '#DC2626' }}>♥</span>
+    <div style={{ width: w, height: h, borderRadius: Math.round(w * 0.06), background: JADE, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ position: 'absolute', left: '10%', top: 0, width: '18%', height: '70%', background: TAN, borderRadius: `0 0 ${bottomR}px ${bottomR}px`, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <div style={{ transform: 'rotate(-90deg)', whiteSpace: 'nowrap' as const, fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 900, fontSize: wordSize, lineHeight: 1, letterSpacing: '0.18em', color: JADE, opacity: 0.65, userSelect: 'none' as const }}>STACKED!</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Classic Hero Card (LOCKED V5 stagger) ──────────
+
+function ClassicHeroCard({ onPlay }: { onPlay: () => void }) {
+  const W = 88;
+  const STEP = W * 0.5;
+  const totalSpan = STEP + W * 1.08;
+  const tallest = W * 1.08 * (3.5 / 2.5);
+
+  return (
+    <div onClick={onPlay} style={{
+      flex: 1, background: 'linear-gradient(180deg, #0f2620 0%, #0a1f1a 100%)',
+      borderRadius: 20, padding: 22, position: 'relative',
+      border: '1px solid rgba(126,209,179,0.15)',
+      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+      overflow: 'hidden', cursor: 'pointer',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+    }}>
+      {/* Suit watermark */}
+      {/* Scattered suit watermarks */}
+      <div style={{ position: 'absolute', right: -20, bottom: -30, fontSize: 200, color: 'rgba(126,209,179,0.04)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none' }}>{'\u2665\uFE0E'}</div>
+      <div style={{ position: 'absolute', left: -30, bottom: 10, fontSize: 140, color: 'rgba(126,209,179,0.03)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(-15deg)' }}>{'\u2660\uFE0E'}</div>
+      <div style={{ position: 'absolute', right: 30, top: -20, fontSize: 120, color: 'rgba(126,209,179,0.03)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(10deg)' }}>{'\u2666\uFE0E'}</div>
+      <div style={{ position: 'absolute', left: 40, top: -10, fontSize: 100, color: 'rgba(126,209,179,0.025)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(-8deg)' }}>{'\u2663\uFE0E'}</div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', flex: 1 }}>
+        <div style={{ flexShrink: 0, paddingRight: 8 }}>
+          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#7ed1b3', letterSpacing: '0.22em', fontWeight: 600 }}>QUICK MATCH · 5 MIN</div>
+          <div style={{ fontWeight: 900, fontSize: 36, color: '#fff', marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>Classic</div>
+        </div>
+
+        {/* V5 stagger: back + Q♥ */}
+        <div style={{ position: 'relative', width: totalSpan, height: tallest + 16, marginRight: -totalSpan * 0.10 }}>
+          <div className="breathe" style={{ '--tilt': '-2deg', position: 'absolute', left: 0, top: (tallest - W * (3.5/2.5)) / 2 + 8, zIndex: 1, filter: 'drop-shadow(0 0 18px rgba(20,184,154,0.35)) drop-shadow(0 8px 18px rgba(0,0,0,0.5))' } as React.CSSProperties}>
+            <MiniCardBack w={W} />
+          </div>
+          <div className="breathe-2" style={{ '--tilt': '4deg', position: 'absolute', left: STEP, top: (tallest - W * 1.08 * (3.5/2.5)) / 2 + 8, zIndex: 2, filter: 'drop-shadow(0 0 18px rgba(20,184,154,0.35)) drop-shadow(0 8px 18px rgba(0,0,0,0.5))' } as React.CSSProperties}>
+            <MiniCardFace w={W * 1.08} rank="Q" suit="♥" />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: 14 }}>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 400, lineHeight: 1.4, maxWidth: '60%' }}>
+          Capture · Combo · Win.<br/>
+          <span style={{ color: 'rgba(255,255,255,0.4)' }}>Best of three rounds.</span>
+        </div>
+        <div style={{ fontWeight: 800, fontSize: 12, color: TAN, background: JADE, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(6,95,70,0.45), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+          PLAY <span style={{ fontSize: 14 }}>→</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Adventure Hero Card ────────────────────────────
+
+function AdventureHeroCard({ onPlay, returning }: { onPlay: () => void; returning: boolean }) {
+  const nodes: [number, number][] = [
+    [22,268],[78,250],[40,222],[110,208],[170,220],[130,178],
+    [220,168],[200,130],[275,142],[245,100],[320,88],[355,48],
+  ];
+  const currentIdx = returning ? 2 : 0;
+  const pathD = nodes.reduce((acc, [x, y], i) => i === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`, '');
+
+  return (
+    <div onClick={onPlay} style={{
+      flex: 1.1, background: 'linear-gradient(180deg, #1a1410 0%, #0d0805 100%)',
+      borderRadius: 20, padding: 22, position: 'relative',
+      border: '1px solid rgba(184,134,47,0.25)',
+      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
+      overflow: 'hidden', cursor: 'pointer',
+      boxShadow: '0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03)',
+    }}>
+      {/* Chapter map peek */}
+      <div style={{ position: 'absolute', inset: 0, opacity: 0.32, pointerEvents: 'none' }}>
+        <svg viewBox="0 0 380 290" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}>
+          <path d={pathD} fill="none" stroke={BROWN} strokeWidth="1.5" strokeDasharray="4 6" strokeLinecap="round" className="draw-path" />
+          {nodes.map(([x, y], i) => {
+            const isCurrent = i === currentIdx;
+            const isPast = i < currentIdx;
+            return (
+              <g key={i} className="node-fade" style={{ animationDelay: `${i * 0.08}s` }}>
+                {isCurrent && <circle cx={x} cy={y} r="10" fill="none" stroke={TAN} strokeWidth="1.5" opacity="0.5" />}
+                <circle cx={x} cy={y} r={isCurrent ? 5 : 4} fill={isPast ? BROWN : isCurrent ? TAN : 'transparent'} stroke={BROWN} strokeWidth="1.5" />
+                {isCurrent && <text x={x} y={y + 2} textAnchor="middle" fontSize="6" fill="#1a1410" fontFamily="Inter" fontWeight="800">★</text>}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+
+      <div style={{ position: 'relative' }}>
+        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: TAN, letterSpacing: '0.22em', fontWeight: 600 }}>
+          {returning ? 'CAMPAIGN · CH. 1' : 'CAMPAIGN · NEW'}
+        </div>
+        <div style={{ fontWeight: 900, fontSize: 36, color: '#fff', marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>Adventure</div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: 14 }}>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.4 }}>
+          {returning ? (
+            <><span style={{ color: TAN, fontWeight: 600 }}>Level 3 of 18</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>★★☆ · resume run</span></>
+          ) : (
+            <><span style={{ color: TAN, fontWeight: 600 }}>18 levels</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>6 worlds to conquer</span></>
+          )}
+        </div>
+        <div style={{ fontWeight: 800, fontSize: 12, color: BROWN, background: TAN, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(232,197,119,0.25), inset 0 1px 0 rgba(255,255,255,0.18)' }}>
+          {returning ? 'RESUME' : 'BEGIN'} <span style={{ fontSize: 14 }}>→</span>
+        </div>
       </div>
     </div>
   );

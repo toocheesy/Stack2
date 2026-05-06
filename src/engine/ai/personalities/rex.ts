@@ -20,5 +20,7 @@ export const REX: PersonalityProfile = {
   preferHighestNumberCardOnPlace: false,
   riskThreshold: 0.08,
   deckAwareness: 7,
+  opponentAwareness: 7,
+  positionAwareness: 8,
   thinkingDelay: { min: 400, max: 900 },
 };

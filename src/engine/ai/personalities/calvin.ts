@@ -19,6 +19,8 @@ export interface PersonalityProfile {
   preferHighestNumberCardOnPlace: boolean;
   riskThreshold: number;
   deckAwareness: number;
+  opponentAwareness: number;
+  positionAwareness: number;
   thinkingDelay: { min: number; max: number };
 }
 
@@ -31,5 +33,7 @@ export const CALVIN: PersonalityProfile = {
   preferHighestNumberCardOnPlace: true,
   riskThreshold: 0.02,
   deckAwareness: 2,
+  opponentAwareness: 1,
+  positionAwareness: 2,
   thinkingDelay: { min: 1500, max: 3000 },
 };

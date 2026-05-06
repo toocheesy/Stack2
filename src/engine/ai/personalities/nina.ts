@@ -20,5 +20,7 @@ export const NINA: PersonalityProfile = {
   preferHighestNumberCardOnPlace: false,
   riskThreshold: 0.05,
   deckAwareness: 5,
+  opponentAwareness: 4,
+  positionAwareness: 6,
   thinkingDelay: { min: 800, max: 1500 },
 };

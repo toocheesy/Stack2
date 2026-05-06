@@ -5,6 +5,7 @@ import type {
   PlayerIndex,
   GameState,
 } from '../types';
+import { SCORE_KEYS } from '../types';
 import type { PRNG } from '../utils/prng';
 import type { CardTrackerState } from './cardTracker';
 import {
@@ -12,11 +13,14 @@ import {
   evaluateChainCapture,
   calvinNumberCardPick,
   getSelectiveDeckAwareness,
+  getPositionContext,
+  applyPositionModifiers,
   modifyWeightsForGameState,
 } from './evaluator';
 import type {
   ActionScore,
   SelectiveDeckInfo,
+  OpponentInfo,
   ChainPlan,
   ScoredAction,
   PersonalityWeights,
@@ -135,6 +139,54 @@ function toBotDecision(action: ScoredAction): BotDecision {
   };
 }
 
+function opponentInfoFor(state: GameState, idx: PlayerIndex): OpponentInfo {
+  const score = state.overallScores[SCORE_KEYS[idx]];
+  if (idx === 0) {
+    return {
+      playerIndex: idx,
+      score,
+      difficulty: null,
+      preferHighestNumberCardOnPlace: false,
+      mistakeRate: 0,
+      allowMultiSlot: true,
+    };
+  }
+  const diff =
+    idx === 1 ? state.settings.bot1Personality : state.settings.bot2Personality;
+  const prof = getPersonalityProfile(diff);
+  return {
+    playerIndex: idx,
+    score,
+    difficulty: diff,
+    preferHighestNumberCardOnPlace: prof.preferHighestNumberCardOnPlace,
+    mistakeRate: prof.weights.mistakeRate,
+    allowMultiSlot: prof.allowMultiSlot,
+  };
+}
+
+function buildOpponentInfo(
+  state: GameState,
+  playerIndex: PlayerIndex,
+): OpponentInfo[] {
+  const opponents: OpponentInfo[] = [];
+  for (const idx of [0, 1, 2] as PlayerIndex[]) {
+    if (idx === playerIndex) continue;
+    opponents.push(opponentInfoFor(state, idx));
+  }
+  return opponents;
+}
+
+function findNextActiveOpponent(
+  state: GameState,
+  playerIndex: PlayerIndex,
+): PlayerIndex | null {
+  for (let i = 1; i <= 2; i++) {
+    const next = ((playerIndex + i) % 3) as PlayerIndex;
+    if (state.hands[next].length > 0) return next;
+  }
+  return null;
+}
+
 export interface DecideBotOptions {
   restrictions?: readonly ('pairsOnly' | 'noSum2' | 'noSum3')[];
 }
@@ -148,7 +200,19 @@ export function decideBotAction(
   options: DecideBotOptions = {},
 ): BotDecision {
   const profile = getPersonalityProfile(difficulty);
-  const weights = modifyWeightsForGameState(profile.weights, difficulty, state, playerIndex);
+  let weights = modifyWeightsForGameState(profile.weights, difficulty, state, playerIndex);
+
+  // Position awareness: 5-layer strategic loop (doctrine 5.1)
+  if (profile.positionAwareness >= 2) {
+    const posContext = getPositionContext(state, playerIndex);
+    // Layer 3 attention: Rex (PA >= 7) has 70% reliable recent-action read
+    if (profile.positionAwareness >= 7 && prng.next() < 0.7) {
+      if (posContext.previousAction === 'capture') {
+        weights = { ...weights, placementDanger: weights.placementDanger * 1.3, boardControl: weights.boardControl * 1.2 };
+      }
+    }
+    weights = applyPositionModifiers(weights, profile.positionAwareness, posContext, state, playerIndex);
+  }
 
   // Selective deck awareness: attention roll based on deckAwareness level
   let selectiveDeck: SelectiveDeckInfo | null = null;
@@ -160,10 +224,24 @@ export function decideBotAction(
     }
   }
 
+  // Opponent awareness plumbing: expose opponent profiles for OA >= 4
+  let opponents: OpponentInfo[] | undefined;
+  let nextOpponent: OpponentInfo | null = null;
+  if (profile.opponentAwareness >= 4) {
+    opponents = buildOpponentInfo(state, playerIndex);
+    const nextIdx = findNextActiveOpponent(state, playerIndex);
+    if (nextIdx !== null) {
+      nextOpponent = opponents.find((o) => o.playerIndex === nextIdx) ?? null;
+    }
+  }
+
   let actions = evaluateAllActions(state, playerIndex, tracker, weights, {
     allowMultiSlot: profile.allowMultiSlot,
     restrictions: options.restrictions,
     selectiveDeck,
+    opponents,
+    nextOpponent,
+    opponentAwareness: profile.opponentAwareness,
   });
 
   if (actions.length === 0) {

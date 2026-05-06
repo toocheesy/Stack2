@@ -70,6 +70,102 @@ export interface SelectiveDeckInfo {
   oddOnes: Rank[];
 }
 
+export type SeatPosition = 'dealer' | 'first' | 'second';
+
+export interface PositionContext {
+  currentPosition: SeatPosition;
+  handOfRound: number;
+  activePlayerCount: number;
+  previousAction: 'capture' | 'place' | null;
+}
+
+export function getPositionContext(
+  state: GameState,
+  playerIndex: PlayerIndex,
+): PositionContext {
+  const dealer = state.currentDealer;
+  const first = ((dealer + 1) % 3) as PlayerIndex;
+  let currentPosition: SeatPosition;
+  if (playerIndex === dealer) currentPosition = 'dealer';
+  else if (playerIndex === first) currentPosition = 'first';
+  else currentPosition = 'second';
+
+  const activePlayerCount = state.hands.filter((h) => h.length > 0).length;
+
+  return {
+    currentPosition,
+    handOfRound: state.handNumber,
+    activePlayerCount,
+    previousAction: state.lastAction,
+  };
+}
+
+export function applyPositionModifiers(
+  weights: PersonalityWeights,
+  positionAwareness: number,
+  context: PositionContext,
+  state: GameState,
+  playerIndex: PlayerIndex,
+): PersonalityWeights {
+  if (positionAwareness < 2) return weights;
+
+  const modified = { ...weights };
+  const target = state.settings.targetScore;
+  const myScore = state.overallScores[SCORE_KEYS[playerIndex]];
+
+  // Layer 1: Round arc position (Nina+ at PA >= 4)
+  if (positionAwareness >= 4) {
+    if (context.currentPosition === 'dealer' && context.handOfRound === 2) {
+      // Dealer Hand 2 = Press Hand (doctrine 5.8)
+      modified.rawPoints *= 1.3;
+      modified.placementDanger *= 0.7;
+    }
+    if (context.currentPosition === 'first') {
+      // First Player advantage — press fresh board (doctrine 2.10)
+      modified.rawPoints *= 1.15;
+    }
+    if (context.currentPosition === 'dealer') {
+      // Dealer penalty awareness — cautious placement (doctrine 2.9)
+      modified.placementDanger *= 1.2;
+    }
+  }
+
+  // Layer 4: Active player count (Calvin partially at PA >= 2)
+  if (positionAwareness >= 2) {
+    if (context.activePlayerCount === 1) {
+      // Solo state — no opponents to deny or fear
+      modified.opponentDenial *= 0.1;
+      modified.placementDanger *= 0.3;
+    } else if (context.activePlayerCount === 2) {
+      // 2-player — reduced threat surface
+      modified.opponentDenial *= 0.7;
+    }
+  }
+
+  // Hand 3 Fork (doctrine 6.6) — Nina+ at PA >= 6
+  if (positionAwareness >= 6 && context.handOfRound >= 3) {
+    if (target > 0 && myScore >= target * 0.7) {
+      // PRESS path: target reachable this round
+      modified.rawPoints *= 1.4;
+    } else {
+      // PIVOT path: engineer jackpot
+      modified.jackpotValue *= 1.5;
+      modified.boardControl *= 1.3;
+    }
+  }
+
+  return modified;
+}
+
+export interface OpponentInfo {
+  playerIndex: PlayerIndex;
+  score: number;
+  difficulty: Difficulty | null;
+  preferHighestNumberCardOnPlace: boolean;
+  mistakeRate: number;
+  allowMultiSlot: boolean;
+}
+
 export function getSelectiveDeckAwareness(
   tracker: CardTrackerState,
 ): SelectiveDeckInfo {
@@ -137,6 +233,8 @@ export function scoreCapture(
   playerIndex: PlayerIndex,
   tracker: CardTrackerState,
   selectiveDeck?: SelectiveDeckInfo | null,
+  opponents?: OpponentInfo[],
+  opponentAwareness?: number,
 ): Omit<ActionScore, 'total'> {
   const capturedIds = new Set(capturedCards.map((c) => c.id));
   const boardCaptured = capturedCards.filter((c) => c.id !== handCard.id);
@@ -176,7 +274,16 @@ export function scoreCapture(
       if (partnersOnBoard > 0) deniedCount += 0.5;
     }
   }
-  const opponentDenial = deniedCount * 15;
+  // Per-opponent denial: weight by threat level when awareness is high enough
+  let denialMultiplier = 1.0;
+  if ((opponentAwareness ?? 0) >= 4 && opponents && opponents.length > 0) {
+    const target = state.settings.targetScore;
+    if (target > 0) {
+      const maxThreat = Math.max(...opponents.map((o) => o.score / target));
+      denialMultiplier = 1.0 + Math.min(maxThreat, 1.0);
+    }
+  }
+  const opponentDenial = deniedCount * 15 * denialMultiplier;
 
   let jackpotValue = 0;
   const inLateGame =
@@ -217,6 +324,7 @@ export function scorePlacement(
   playerIndex: PlayerIndex,
   tracker: CardTrackerState,
   selectiveDeck?: SelectiveDeckInfo | null,
+  nextOpponent?: OpponentInfo | null,
 ): Omit<ActionScore, 'total'> {
   const placedIsFace = isFace(handCard.rank);
   const placedValue = handCard.value;
@@ -237,7 +345,16 @@ export function scorePlacement(
     if (remaining === 0) continue;
 
     if (rank === handCard.rank) {
-      danger += SCORE_VALUES[rank];
+      let pairDanger = SCORE_VALUES[rank];
+      // Personality-aware: Calvin won't capture face cards (he places
+      // number cards), so face card placements before Calvin are safer
+      if (
+        nextOpponent?.preferHighestNumberCardOnPlace &&
+        placedIsFace
+      ) {
+        pairDanger *= 0.3;
+      }
+      danger += pairDanger;
       continue;
     }
 
@@ -352,6 +469,9 @@ export interface EvaluateOptions {
   allowMultiSlot?: boolean;
   restrictions?: readonly ComboRestrictionKey[];
   selectiveDeck?: SelectiveDeckInfo | null;
+  opponents?: OpponentInfo[];
+  nextOpponent?: OpponentInfo | null;
+  opponentAwareness?: number;
 }
 
 function captureViolatesRestrictions(
@@ -379,6 +499,9 @@ export function evaluateAllActions(
   const hand = state.hands[playerIndex];
   const allowMultiSlot = options.allowMultiSlot !== false;
   const selectiveDeck = options.selectiveDeck;
+  const opponents = options.opponents;
+  const nextOpponent = options.nextOpponent;
+  const opponentAwareness = options.opponentAwareness ?? 0;
 
   for (const handCard of hand) {
     const singles = findAllCaptures(handCard, state.board);
@@ -386,7 +509,7 @@ export function evaluateAllActions(
       if (captureViolatesRestrictions(s.type, s.boardCards.length, options.restrictions))
         continue;
       const capturedCards = [handCard, ...s.boardCards];
-      const base = scoreCapture(state, handCard, capturedCards, playerIndex, tracker, selectiveDeck);
+      const base = scoreCapture(state, handCard, capturedCards, playerIndex, tracker, selectiveDeck, opponents, opponentAwareness);
       const total = applyWeights(base, weights);
       actions.push({
         action: 'capture',
@@ -417,6 +540,8 @@ export function evaluateAllActions(
           playerIndex,
           tracker,
           selectiveDeck,
+          opponents,
+          opponentAwareness,
         );
         const total = applyWeights(base, weights);
         actions.push({
@@ -434,7 +559,7 @@ export function evaluateAllActions(
       }
     }
 
-    const place = scorePlacement(state, handCard, playerIndex, tracker, selectiveDeck);
+    const place = scorePlacement(state, handCard, playerIndex, tracker, selectiveDeck, nextOpponent);
     const placeTotal = applyWeights(place, weights);
     actions.push({
       action: 'place',

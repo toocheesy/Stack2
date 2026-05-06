@@ -64,6 +64,30 @@ export interface ChainPlan {
   totalPoints: number;
 }
 
+export interface SelectiveDeckInfo {
+  acesRemaining: number;
+  faceCardScarcity: { J: number; Q: number; K: number };
+  oddOnes: Rank[];
+}
+
+export function getSelectiveDeckAwareness(
+  tracker: CardTrackerState,
+): SelectiveDeckInfo {
+  const acesRemaining = getRemainingOfRank(tracker, 'A');
+  const faceCardScarcity = {
+    J: getRemainingOfRank(tracker, 'J'),
+    Q: getRemainingOfRank(tracker, 'Q'),
+    K: getRemainingOfRank(tracker, 'K'),
+  };
+  const oddOnes: Rank[] = [];
+  for (const rank of ['J', 'Q', 'K'] as Rank[]) {
+    if (getRemainingOfRank(tracker, rank) === 1) {
+      oddOnes.push(rank);
+    }
+  }
+  return { acesRemaining, faceCardScarcity, oddOnes };
+}
+
 const FACE_SET = new Set<Rank>(['J', 'Q', 'K']);
 
 function isFace(rank: Rank): boolean {
@@ -112,11 +136,19 @@ export function scoreCapture(
   capturedCards: readonly Card[],
   playerIndex: PlayerIndex,
   tracker: CardTrackerState,
+  selectiveDeck?: SelectiveDeckInfo | null,
 ): Omit<ActionScore, 'total'> {
   const capturedIds = new Set(capturedCards.map((c) => c.id));
   const boardCaptured = capturedCards.filter((c) => c.id !== handCard.id);
 
-  const rawPoints = calculateCardsPoints(capturedCards);
+  let rawPoints = calculateCardsPoints(capturedCards);
+
+  // Selective deck awareness: Ace scarcity bonus
+  if (selectiveDeck && selectiveDeck.acesRemaining <= 2) {
+    for (const c of capturedCards) {
+      if (c.rank === 'A') rawPoints += 10;
+    }
+  }
 
   const remainingBoard = removeCardsById(state.board, capturedIds);
   const remainingHand = state.hands[playerIndex].filter(
@@ -184,11 +216,21 @@ export function scorePlacement(
   handCard: Card,
   playerIndex: PlayerIndex,
   tracker: CardTrackerState,
+  selectiveDeck?: SelectiveDeckInfo | null,
 ): Omit<ActionScore, 'total'> {
   const placedIsFace = isFace(handCard.rank);
   const placedValue = handCard.value;
 
   let danger = 0;
+
+  // Selective deck awareness: Odd-One Trap penalty
+  if (
+    selectiveDeck &&
+    placedIsFace &&
+    selectiveDeck.oddOnes.includes(handCard.rank)
+  ) {
+    danger += SCORE_VALUES[handCard.rank] * 1.5;
+  }
 
   for (const rank of RANKS) {
     const remaining = getRemainingOfRank(tracker, rank);
@@ -309,6 +351,7 @@ export type ComboRestrictionKey = 'pairsOnly' | 'noSum2' | 'noSum3';
 export interface EvaluateOptions {
   allowMultiSlot?: boolean;
   restrictions?: readonly ComboRestrictionKey[];
+  selectiveDeck?: SelectiveDeckInfo | null;
 }
 
 function captureViolatesRestrictions(
@@ -335,6 +378,7 @@ export function evaluateAllActions(
   const actions: ScoredAction[] = [];
   const hand = state.hands[playerIndex];
   const allowMultiSlot = options.allowMultiSlot !== false;
+  const selectiveDeck = options.selectiveDeck;
 
   for (const handCard of hand) {
     const singles = findAllCaptures(handCard, state.board);
@@ -342,7 +386,7 @@ export function evaluateAllActions(
       if (captureViolatesRestrictions(s.type, s.boardCards.length, options.restrictions))
         continue;
       const capturedCards = [handCard, ...s.boardCards];
-      const base = scoreCapture(state, handCard, capturedCards, playerIndex, tracker);
+      const base = scoreCapture(state, handCard, capturedCards, playerIndex, tracker, selectiveDeck);
       const total = applyWeights(base, weights);
       actions.push({
         action: 'capture',
@@ -372,6 +416,7 @@ export function evaluateAllActions(
           capturedCards,
           playerIndex,
           tracker,
+          selectiveDeck,
         );
         const total = applyWeights(base, weights);
         actions.push({
@@ -389,7 +434,7 @@ export function evaluateAllActions(
       }
     }
 
-    const place = scorePlacement(state, handCard, playerIndex, tracker);
+    const place = scorePlacement(state, handCard, playerIndex, tracker, selectiveDeck);
     const placeTotal = applyWeights(place, weights);
     actions.push({
       action: 'place',
@@ -448,16 +493,15 @@ export function modifyWeightsForGameState(
   return baseWeights;
 }
 
-export function calvinPlacementPick(hand: readonly Card[]): Card {
-  // Calvin's tell — always places his highest-value card
-  let best = hand[0];
-  let bestScore = calculateCardPoints(best);
-  for (const c of hand) {
-    const s = calculateCardPoints(c);
-    if (s > bestScore) {
-      best = c;
-      bestScore = s;
-    }
+export function calvinNumberCardPick(hand: readonly Card[]): Card | null {
+  // Calvin's tell — always places his highest number card (2-9)
+  // Per doctrine 3.2: spend high number cards first, defer sum vehicles,
+  // face cards, and Aces. Returns null if no number cards in hand.
+  const numberCards = hand.filter((c) => c.value >= 2 && c.value <= 9);
+  if (numberCards.length === 0) return null;
+  let best = numberCards[0];
+  for (const c of numberCards) {
+    if (c.value > best.value) best = c;
   }
   return best;
 }

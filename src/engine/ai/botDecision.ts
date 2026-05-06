@@ -10,11 +10,13 @@ import type { CardTrackerState } from './cardTracker';
 import {
   evaluateAllActions,
   evaluateChainCapture,
-  calvinPlacementPick,
+  calvinNumberCardPick,
+  getSelectiveDeckAwareness,
   modifyWeightsForGameState,
 } from './evaluator';
 import type {
   ActionScore,
+  SelectiveDeckInfo,
   ChainPlan,
   ScoredAction,
   PersonalityWeights,
@@ -147,9 +149,21 @@ export function decideBotAction(
 ): BotDecision {
   const profile = getPersonalityProfile(difficulty);
   const weights = modifyWeightsForGameState(profile.weights, difficulty, state, playerIndex);
+
+  // Selective deck awareness: attention roll based on deckAwareness level
+  let selectiveDeck: SelectiveDeckInfo | null = null;
+  if (profile.deckAwareness > 0) {
+    const attentionChance =
+      profile.deckAwareness <= 2 ? 0.3 : profile.deckAwareness <= 5 ? 0.8 : 0.95;
+    if (prng.next() < attentionChance) {
+      selectiveDeck = getSelectiveDeckAwareness(tracker);
+    }
+  }
+
   let actions = evaluateAllActions(state, playerIndex, tracker, weights, {
     allowMultiSlot: profile.allowMultiSlot,
     restrictions: options.restrictions,
+    selectiveDeck,
   });
 
   if (actions.length === 0) {
@@ -183,6 +197,23 @@ export function decideBotAction(
     }
   }
 
+  // Risk threshold gate: demote sub-threshold captures below best placement
+  const targetScore = state.settings.targetScore;
+  if (profile.riskThreshold > 0 && targetScore > 0) {
+    const threshold = targetScore * profile.riskThreshold;
+    const topAction = actions[0];
+    if (
+      topAction.action === 'capture' &&
+      topAction.captureDetails &&
+      topAction.captureDetails.totalPoints < threshold
+    ) {
+      const bestPlace = actions.find((a) => a.action === 'place');
+      if (bestPlace && bestPlace.score.placementDanger > -threshold) {
+        actions = [bestPlace, ...actions.filter((a) => a !== bestPlace)];
+      }
+    }
+  }
+
   const top = actions[0];
   const mistakeRoll = prng.next();
   let chosen = top;
@@ -195,11 +226,11 @@ export function decideBotAction(
   }
 
   if (
-    profile.preferHighestValueOnPlace &&
+    profile.preferHighestNumberCardOnPlace &&
     chosen.action === 'place'
   ) {
-    const highest = calvinPlacementPick(state.hands[playerIndex]);
-    if (highest.id !== chosen.handCard.id) {
+    const highest = calvinNumberCardPick(state.hands[playerIndex]);
+    if (highest && highest.id !== chosen.handCard.id) {
       const swap = actions.find(
         (a) => a.action === 'place' && a.handCard.id === highest.id,
       );

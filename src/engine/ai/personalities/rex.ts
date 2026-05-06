@@ -17,6 +17,8 @@ export const REX: PersonalityProfile = {
   allowMultiSlot: true,
   useChainEval: true,
   preferSumsOnTie: false,
-  preferHighestValueOnPlace: false,
+  preferHighestNumberCardOnPlace: false,
+  riskThreshold: 0.08,
+  deckAwareness: 7,
   thinkingDelay: { min: 400, max: 900 },
 };

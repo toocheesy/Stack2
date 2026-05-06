@@ -16,7 +16,9 @@ export interface PersonalityProfile {
   allowMultiSlot: boolean;
   useChainEval: boolean;
   preferSumsOnTie: boolean;
-  preferHighestValueOnPlace: boolean;
+  preferHighestNumberCardOnPlace: boolean;
+  riskThreshold: number;
+  deckAwareness: number;
   thinkingDelay: { min: number; max: number };
 }
 
@@ -26,6 +28,8 @@ export const CALVIN: PersonalityProfile = {
   allowMultiSlot: false,
   useChainEval: false,
   preferSumsOnTie: false,
-  preferHighestValueOnPlace: true,
+  preferHighestNumberCardOnPlace: true,
+  riskThreshold: 0.02,
+  deckAwareness: 2,
   thinkingDelay: { min: 1500, max: 3000 },
 };

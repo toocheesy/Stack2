@@ -133,25 +133,22 @@ describe('decideBotAction', () => {
     }
   });
 
-  it('Calvin places highest-value card when placing', () => {
+  it('Calvin places highest number card (2-9) when placing', () => {
     const low = card('2');
     const mid = card('5');
-    const high = card('A');
+    const ace = card('A');
     const s = state({
-      hands: [[low, mid, high], [], []],
+      hands: [[low, mid, ace], [], []],
       board: [card('K'), card('Q')],
     });
     const t = createCardTracker();
-    let placedHigh = 0;
-    let placedOther = 0;
+    let placedMid = 0;
     for (let seed = 0; seed < 10; seed++) {
       const d = decideBotAction(s, 0, 'beginner', t, createPRNG(seed));
-      if (d.action === 'place') {
-        if (d.handCard.id === high.id) placedHigh++;
-        else placedOther++;
-      }
+      if (d.action === 'place' && d.handCard.id === mid.id) placedMid++;
     }
-    expect(placedHigh).toBeGreaterThan(placedOther);
+    // Calvin's tell: places highest number card (5) over Ace and 2
+    expect(placedMid).toBe(10);
   });
 
   it('getPersonalityProfile for beginner is Calvin', () => {

@@ -169,18 +169,22 @@ export function findAllCaptures(handCard: Card, board: readonly Card[]): Capture
   const options: CaptureOption[] = [];
   const handCardPoints = calculateCardPoints(handCard);
 
-  for (const b of board) {
-    if (b.rank === handCard.rank) {
-      options.push({
-        type: 'pair',
-        boardCards: [b],
-        points: handCardPoints + calculateCardPoints(b),
-      });
+  const matchingBoard = board.filter((b) => b.rank === handCard.rank);
+  for (let mask = 1; mask < 1 << matchingBoard.length; mask++) {
+    const subset: Card[] = [];
+    for (let i = 0; i < matchingBoard.length; i++) {
+      if (mask & (1 << i)) subset.push(matchingBoard[i]);
     }
+    options.push({
+      type: 'pair',
+      boardCards: subset,
+      points: handCardPoints + calculateCardsPoints(subset),
+    });
   }
 
   if (!isFaceCard(handCard)) {
-    for (const size of [2, 3]) {
+    const maxSumSize = Math.min(board.length, 10);
+    for (let size = 2; size <= maxSumSize; size++) {
       const subsets = subsetSumsToValue(board, handCard.value, size);
       for (const subset of subsets) {
         options.push({

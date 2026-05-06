@@ -17,6 +17,8 @@ export const NINA: PersonalityProfile = {
   allowMultiSlot: true,
   useChainEval: false,
   preferSumsOnTie: true,
-  preferHighestValueOnPlace: false,
+  preferHighestNumberCardOnPlace: false,
+  riskThreshold: 0.05,
+  deckAwareness: 5,
   thinkingDelay: { min: 800, max: 1500 },
 };

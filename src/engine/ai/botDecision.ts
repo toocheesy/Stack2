@@ -11,10 +11,12 @@ import type { CardTrackerState } from './cardTracker';
 import {
   evaluateAllActions,
   evaluateChainCapture,
+  evaluatePlaceChain,
   calvinNumberCardPick,
   getSelectiveDeckAwareness,
   getPositionContext,
   applyPositionModifiers,
+  applyPressureExpansion,
   modifyWeightsForGameState,
 } from './evaluator';
 import type {
@@ -214,6 +216,9 @@ export function decideBotAction(
     weights = applyPositionModifiers(weights, profile.positionAwareness, posContext, state, playerIndex);
   }
 
+  // Pressure handling expansion: hand-of-round, jackpot proximity, target aggression
+  weights = applyPressureExpansion(weights, profile.pressureHandling, state, playerIndex);
+
   // Selective deck awareness: attention roll based on deckAwareness level
   let selectiveDeck: SelectiveDeckInfo | null = null;
   if (profile.deckAwareness > 0) {
@@ -242,6 +247,7 @@ export function decideBotAction(
     opponents,
     nextOpponent,
     opponentAwareness: profile.opponentAwareness,
+    setupEngineering: profile.setupEngineering,
   });
 
   if (actions.length === 0) {
@@ -270,6 +276,26 @@ export function decideBotAction(
           if (idx > 0) {
             actions = [chainAction, ...actions.filter((_, i) => i !== idx)];
           }
+        }
+      }
+    }
+  }
+
+  // Setup Engineering: place-then-capture chain evaluation (SE >= 5)
+  if (profile.setupEngineering >= 5) {
+    const placeChain = evaluatePlaceChain(state.hands[playerIndex], state.board);
+    if (placeChain) {
+      const bestCaptureTotal = actions
+        .filter((a) => a.action === 'capture')
+        .reduce((m, a) => Math.max(m, a.captureDetails?.totalPoints ?? 0), 0);
+      const survivalDiscount = 0.6;
+      const chainExpected = placeChain.totalExpectedPoints * survivalDiscount;
+      if (chainExpected > bestCaptureTotal * 1.3 || bestCaptureTotal === 0) {
+        const placeAction = actions.find(
+          (a) => a.action === 'place' && a.handCard.id === placeChain.placedCard.id,
+        );
+        if (placeAction) {
+          actions = [placeAction, ...actions.filter((a) => a !== placeAction)];
         }
       }
     }

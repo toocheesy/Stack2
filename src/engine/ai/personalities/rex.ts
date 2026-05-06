@@ -22,5 +22,7 @@ export const REX: PersonalityProfile = {
   deckAwareness: 7,
   opponentAwareness: 7,
   positionAwareness: 8,
+  pressureHandling: 9,
+  setupEngineering: 7,
   thinkingDelay: { min: 400, max: 900 },
 };

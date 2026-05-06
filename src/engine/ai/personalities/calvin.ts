@@ -21,6 +21,8 @@ export interface PersonalityProfile {
   deckAwareness: number;
   opponentAwareness: number;
   positionAwareness: number;
+  pressureHandling: number;
+  setupEngineering: number;
   thinkingDelay: { min: number; max: number };
 }
 
@@ -35,5 +37,7 @@ export const CALVIN: PersonalityProfile = {
   deckAwareness: 2,
   opponentAwareness: 1,
   positionAwareness: 2,
+  pressureHandling: 1,
+  setupEngineering: 1,
   thinkingDelay: { min: 1500, max: 3000 },
 };

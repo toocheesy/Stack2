@@ -22,5 +22,7 @@ export const NINA: PersonalityProfile = {
   deckAwareness: 5,
   opponentAwareness: 4,
   positionAwareness: 6,
+  pressureHandling: 6,
+  setupEngineering: 4,
   thinkingDelay: { min: 800, max: 1500 },
 };

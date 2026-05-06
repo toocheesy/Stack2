@@ -157,6 +157,57 @@ export function applyPositionModifiers(
   return modified;
 }
 
+export function applyPressureExpansion(
+  weights: PersonalityWeights,
+  pressureHandling: number,
+  state: GameState,
+  playerIndex: PlayerIndex,
+): PersonalityWeights {
+  if (pressureHandling < 4) return weights;
+
+  const modified = { ...weights };
+  const target = state.settings.targetScore;
+  const myScore = state.overallScores[SCORE_KEYS[playerIndex]];
+  const handOfRound = state.handNumber;
+
+  // 1. Hand-of-round posture shifts (PH >= 4)
+  if (handOfRound === 2) {
+    // Non-dealer Hand 2 press when trailing (dealer press is in position modifiers)
+    const opponentIndices = ([0, 1, 2] as PlayerIndex[]).filter((i) => i !== playerIndex);
+    const maxOpp = Math.max(...opponentIndices.map((i) => state.overallScores[SCORE_KEYS[i]]));
+    const deficit = maxOpp - myScore;
+    if (target > 0 && deficit > target * 0.1) {
+      modified.rawPoints *= 1.2;
+    }
+  }
+
+  // 2. Jackpot proximity awareness (PH >= 5)
+  if (pressureHandling >= 5) {
+    const jackpotNear = handOfRound >= 3 && state.deck.length < 12;
+    if (jackpotNear) {
+      if (state.lastCapturer === playerIndex) {
+        // Protect last-capturer status — jackpot is ours to lose
+        modified.jackpotValue *= 1.8;
+        modified.placementDanger *= 0.5;
+      } else {
+        // Need to capture to become last capturer before round ends
+        modified.rawPoints *= 1.3;
+      }
+    }
+  }
+
+  // 3. Target-score aggression scaling (PH >= 6)
+  if (pressureHandling >= 6 && target > 0) {
+    if (target <= 200) {
+      modified.rawPoints *= 1.3;
+    } else if (target >= 400) {
+      modified.rawPoints *= 0.85;
+    }
+  }
+
+  return modified;
+}
+
 export interface OpponentInfo {
   playerIndex: PlayerIndex;
   score: number;
@@ -325,11 +376,44 @@ export function scorePlacement(
   tracker: CardTrackerState,
   selectiveDeck?: SelectiveDeckInfo | null,
   nextOpponent?: OpponentInfo | null,
+  setupEngineering?: number,
 ): Omit<ActionScore, 'total'> {
   const placedIsFace = isFace(handCard.rank);
   const placedValue = handCard.value;
 
   let danger = 0;
+  let setupValue = 0;
+
+  // Place-To-Plant: face card from a hand-vs-hand pair (doctrine 3.3)
+  if ((setupEngineering ?? 0) >= 3 && placedIsFace) {
+    const remainingHand = state.hands[playerIndex].filter(
+      (c) => c.id !== handCard.id,
+    );
+    const hasMatch = remainingHand.some((c) => c.rank === handCard.rank);
+    if (hasMatch) {
+      const publicRemaining = getRemainingOfRank(tracker, handCard.rank);
+      const heldCount = state.hands[playerIndex].filter(
+        (c) => c.rank === handCard.rank,
+      ).length;
+      const opponentPool = Math.max(0, publicRemaining - heldCount);
+      let survival =
+        opponentPool === 0 ? 0.9 : opponentPool === 1 ? 0.5 : 0.3;
+      if (nextOpponent?.preferHighestNumberCardOnPlace) {
+        survival = Math.min(survival + 0.3, 0.95);
+      }
+      const captureValue = SCORE_VALUES[handCard.rank] * 2;
+      setupValue = captureValue * survival;
+
+      // Jackpot Trap bonus: dead face card in Hand 3 (doctrine 6.4)
+      if (
+        (setupEngineering ?? 0) >= 7 &&
+        selectiveDeck?.oddOnes.includes(handCard.rank) &&
+        state.handNumber >= 3
+      ) {
+        setupValue += 20;
+      }
+    }
+  }
 
   // Selective deck awareness: Odd-One Trap penalty
   if (
@@ -381,7 +465,7 @@ export function scorePlacement(
   }
 
   return {
-    rawPoints: 0,
+    rawPoints: setupValue,
     chainPotential: 0,
     placementDanger: -danger,
     opponentDenial: 0,
@@ -463,6 +547,48 @@ export function evaluateChainCapture(
   return best;
 }
 
+export interface PlaceChainPlan {
+  placedCard: Card;
+  followupCapture: {
+    handCard: Card;
+    capturedCards: Card[];
+    points: number;
+  };
+  totalExpectedPoints: number;
+}
+
+export function evaluatePlaceChain(
+  handCards: readonly Card[],
+  board: readonly Card[],
+): PlaceChainPlan | null {
+  let best: PlaceChainPlan | null = null;
+
+  for (const placed of handCards) {
+    const newBoard = [...board, placed];
+    const remainingHand = handCards.filter((c) => c.id !== placed.id);
+
+    for (const h of remainingHand) {
+      const cap = bestSingleCapture(h, newBoard);
+      if (!cap) continue;
+      // Only count chains that recapture the planted card
+      if (!cap.boardCards.some((c) => c.id === placed.id)) continue;
+      if (!best || cap.points > best.totalExpectedPoints) {
+        best = {
+          placedCard: placed,
+          followupCapture: {
+            handCard: h,
+            capturedCards: cap.boardCards,
+            points: cap.points,
+          },
+          totalExpectedPoints: cap.points,
+        };
+      }
+    }
+  }
+
+  return best;
+}
+
 export type ComboRestrictionKey = 'pairsOnly' | 'noSum2' | 'noSum3';
 
 export interface EvaluateOptions {
@@ -472,6 +598,7 @@ export interface EvaluateOptions {
   opponents?: OpponentInfo[];
   nextOpponent?: OpponentInfo | null;
   opponentAwareness?: number;
+  setupEngineering?: number;
 }
 
 function captureViolatesRestrictions(
@@ -502,6 +629,7 @@ export function evaluateAllActions(
   const opponents = options.opponents;
   const nextOpponent = options.nextOpponent;
   const opponentAwareness = options.opponentAwareness ?? 0;
+  const setupEngineering = options.setupEngineering ?? 0;
 
   for (const handCard of hand) {
     const singles = findAllCaptures(handCard, state.board);
@@ -559,7 +687,7 @@ export function evaluateAllActions(
       }
     }
 
-    const place = scorePlacement(state, handCard, playerIndex, tracker, selectiveDeck, nextOpponent);
+    const place = scorePlacement(state, handCard, playerIndex, tracker, selectiveDeck, nextOpponent, setupEngineering);
     const placeTotal = applyWeights(place, weights);
     actions.push({
       action: 'place',

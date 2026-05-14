@@ -33,8 +33,18 @@ export interface ActionScore {
   opponentDenial: number;
   jackpotValue: number;
   boardControl: number;
+  // Doctrine 3.2 — Placement Value Tier enforcement. Universal penalty
+  // for placing face / Ace / 10 cards. Subtracted from total UNWEIGHTED
+  // (doctrine-locked floor, not a per-bot preference). Always 0 for
+  // captures and for 2-9 placements.
+  valueLossPenalty: number;
   total: number;
 }
+
+// VALUE_LOSS_FACTOR — multiplier on SCORE_VALUES for high-value placement
+// penalty. Locked starting value per canonical spec; retune via playtest.
+// Ace: 15 × 1.5 = 22.5; face/10: 10 × 1.5 = 15; 2-9: penalty = 0.
+const VALUE_LOSS_FACTOR = 1.5;
 
 export interface ScoredCaptureDetails {
   slots: MultiSlotCaptureSlot[];
@@ -212,9 +222,26 @@ export interface OpponentInfo {
   playerIndex: PlayerIndex;
   score: number;
   difficulty: Difficulty | null;
-  preferHighestNumberCardOnPlace: boolean;
+  // Canonical rebuild S3 — replaces the retired `preferHighestNumberCardOnPlace`
+  // flag. PI ≤ 2 produces the same "places highest 2-9" behavior architecturally.
+  // undefined for the human player (we don't model their PI).
+  placementIntelligence: number | undefined;
   mistakeRate: number;
-  allowMultiSlot: boolean;
+  // captureComplexity replaces the retired `allowMultiSlot` flag here too;
+  // opponent modeling uses canEvaluateMultiSlot(cc) at consumers.
+  captureComplexity: number;
+}
+
+// Canonical rebuild S3 — Capture Complexity gates. Replace the retired
+// `allowMultiSlot` and `useChainEval` binary flags. Same behavior as the
+// prior gates with the lockdown roster (Calvin CC 1 → false, Nina CC 5 →
+// multi-slot YES / chain NO, Rex CC 6 / Jett CC 8 → both).
+export function canEvaluateMultiSlot(cc: number): boolean {
+  return cc >= 3;
+}
+
+export function canEvaluateChainCapture(cc: number): boolean {
+  return cc >= 6;
 }
 
 export function getSelectiveDeckAwareness(
@@ -260,7 +287,9 @@ function applyWeights(
     score.placementDanger * w.placementDanger +
     score.opponentDenial * w.opponentDenial +
     score.jackpotValue * w.jackpotValue +
-    score.boardControl * w.boardControl
+    score.boardControl * w.boardControl -
+    // Doctrine 3.2 — unweighted floor; doctrine-locked, not a preference.
+    score.valueLossPenalty
   );
 }
 
@@ -366,6 +395,7 @@ export function scoreCapture(
     opponentDenial,
     jackpotValue,
     boardControl,
+    valueLossPenalty: 0, // captures don't trigger doctrine 3.2 floor
   };
 }
 
@@ -377,9 +407,24 @@ export function scorePlacement(
   selectiveDeck?: SelectiveDeckInfo | null,
   nextOpponent?: OpponentInfo | null,
   setupEngineering?: number,
+  // placementIntelligence reserved for future PI ≥ 6 / ≥ 9 sub-rules that
+  // need to feed scoring (stubbed in S1; consumed at decideBotAction layer
+  // for PI ≤ 2 selection). Threaded now so we don't churn the signature
+  // again when S3+ wires the deeper sub-rules.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _placementIntelligence?: number,
 ): Omit<ActionScore, 'total'> {
   const placedIsFace = isFace(handCard.rank);
   const placedValue = handCard.value;
+  const placedRawValue = SCORE_VALUES[handCard.rank];
+
+  // Doctrine 3.2 — Placement Value Tier. Universal floor for every bot.
+  // Face / Ace / 10 incur a fixed penalty proportional to SCORE_VALUES.
+  const isHighValue =
+    placedIsFace || handCard.rank === 'A' || handCard.rank === '10';
+  const valueLossPenalty = isHighValue
+    ? placedRawValue * VALUE_LOSS_FACTOR
+    : 0;
 
   let danger = 0;
   let setupValue = 0;
@@ -398,7 +443,12 @@ export function scorePlacement(
       const opponentPool = Math.max(0, publicRemaining - heldCount);
       let survival =
         opponentPool === 0 ? 0.9 : opponentPool === 1 ? 0.5 : 0.3;
-      if (nextOpponent?.preferHighestNumberCardOnPlace) {
+      if (
+        nextOpponent?.placementIntelligence !== undefined &&
+        nextOpponent.placementIntelligence <= 2
+      ) {
+        // Calvin-tier opponent (PI ≤ 2) always places their highest 2-9 —
+        // face plants are safer because they won't be the one to capture them.
         survival = Math.min(survival + 0.3, 0.95);
       }
       const captureValue = SCORE_VALUES[handCard.rank] * 2;
@@ -430,12 +480,12 @@ export function scorePlacement(
 
     if (rank === handCard.rank) {
       let pairDanger = SCORE_VALUES[rank];
-      // Personality-aware: Calvin won't capture face cards (he places
-      // number cards), so face card placements before Calvin are safer
-      if (
-        nextOpponent?.preferHighestNumberCardOnPlace &&
-        placedIsFace
-      ) {
+      // Calvin-tier opponent (PI ≤ 2) won't capture face cards (places highest
+      // 2-9 instead), so face card placements before such an opponent are safer.
+      const opponentPlacesHighest =
+        nextOpponent?.placementIntelligence !== undefined &&
+        nextOpponent.placementIntelligence <= 2;
+      if (opponentPlacesHighest && placedIsFace) {
         pairDanger *= 0.3;
       }
       danger += pairDanger;
@@ -471,6 +521,7 @@ export function scorePlacement(
     opponentDenial: 0,
     jackpotValue,
     boardControl: 0,
+    valueLossPenalty,
   };
 }
 
@@ -599,6 +650,7 @@ export interface EvaluateOptions {
   nextOpponent?: OpponentInfo | null;
   opponentAwareness?: number;
   setupEngineering?: number;
+  placementIntelligence?: number;
 }
 
 function captureViolatesRestrictions(
@@ -630,6 +682,7 @@ export function evaluateAllActions(
   const nextOpponent = options.nextOpponent;
   const opponentAwareness = options.opponentAwareness ?? 0;
   const setupEngineering = options.setupEngineering ?? 0;
+  const placementIntelligence = options.placementIntelligence ?? 0;
 
   for (const handCard of hand) {
     const singles = findAllCaptures(handCard, state.board);
@@ -687,7 +740,7 @@ export function evaluateAllActions(
       }
     }
 
-    const place = scorePlacement(state, handCard, playerIndex, tracker, selectiveDeck, nextOpponent, setupEngineering);
+    const place = scorePlacement(state, handCard, playerIndex, tracker, selectiveDeck, nextOpponent, setupEngineering, placementIntelligence);
     const placeTotal = applyWeights(place, weights);
     actions.push({
       action: 'place',
@@ -757,15 +810,3 @@ export function modifyWeightsForGameState(
   return baseWeights;
 }
 
-export function calvinNumberCardPick(hand: readonly Card[]): Card | null {
-  // Calvin's tell — always places his highest number card (2-9)
-  // Per doctrine 3.2: spend high number cards first, defer sum vehicles,
-  // face cards, and Aces. Returns null if no number cards in hand.
-  const numberCards = hand.filter((c) => c.value >= 2 && c.value <= 9);
-  if (numberCards.length === 0) return null;
-  let best = numberCards[0];
-  for (const c of numberCards) {
-    if (c.value > best.value) best = c;
-  }
-  return best;
-}

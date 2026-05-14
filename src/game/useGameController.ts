@@ -230,7 +230,7 @@ export function useGameController(seed: number, settings: GameSettings) {
       player,
       trackerRef.current,
       profile.weights,
-      { allowMultiSlot: profile.allowMultiSlot },
+      { allowMultiSlot: profile.captureComplexity >= 3 },
     );
     const top3 = allActions.slice(0, 3);
     console.log(

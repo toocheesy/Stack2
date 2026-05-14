@@ -151,6 +151,51 @@ describe('scorePlacement', () => {
     const score = scorePlacement(s, hand, 0, t);
     expect(score.jackpotValue).toBe(-10);
   });
+
+  // ─── Doctrine 3.2 — valueLossPenalty (universal floor) ─────
+
+  it('Ace placement carries valueLossPenalty of 22.5 (15 * 1.5)', () => {
+    const hand = card('A');
+    const s = state({});
+    const t = createCardTracker();
+    const score = scorePlacement(s, hand, 0, t);
+    expect(score.valueLossPenalty).toBe(22.5);
+  });
+
+  it('face card placement (K/Q/J) carries valueLossPenalty of 15 (10 * 1.5)', () => {
+    const t = createCardTracker();
+    const s = state({});
+    for (const rank of ['K', 'Q', 'J'] as const) {
+      const score = scorePlacement(s, card(rank), 0, t);
+      expect(score.valueLossPenalty).toBe(15);
+    }
+  });
+
+  it('10 placement carries valueLossPenalty of 15 (10 * 1.5)', () => {
+    const hand = card('10');
+    const s = state({});
+    const t = createCardTracker();
+    const score = scorePlacement(s, hand, 0, t);
+    expect(score.valueLossPenalty).toBe(15);
+  });
+
+  it('2-9 placements carry zero valueLossPenalty', () => {
+    const s = state({});
+    const t = createCardTracker();
+    for (const rank of ['2', '3', '4', '5', '6', '7', '8', '9'] as const) {
+      const score = scorePlacement(s, card(rank), 0, t);
+      expect(score.valueLossPenalty).toBe(0);
+    }
+  });
+
+  it('capture scores carry zero valueLossPenalty (placement-only floor)', () => {
+    const hand = card('A');
+    const board = [card('A', 'clubs')];
+    const s = state({ hands: [[hand], [], []], board });
+    const t = createCardTracker();
+    const score = scoreCapture(s, hand, [hand, ...board], 0, t);
+    expect(score.valueLossPenalty).toBe(0);
+  });
 });
 
 describe('evaluateAllActions', () => {
@@ -188,7 +233,10 @@ describe('evaluateAllActions', () => {
     ).toBe(true);
   });
 
-  it('zero-weight dimension contributes zero to total', () => {
+  it('zero-weight dimensions zero out the weighted total but valueLossPenalty floor remains', () => {
+    // Doctrine 3.2: valueLossPenalty is unweighted. Even with all weight
+    // dimensions at zero, placing a face/Ace/10 still incurs the floor
+    // penalty (Ace → -22.5). Captures and 2-9 placements unaffected.
     const hand = card('A');
     const b = card('A', 'clubs');
     const s = state({ hands: [[hand], [], []], board: [b] });
@@ -203,7 +251,14 @@ describe('evaluateAllActions', () => {
       mistakeRate: 0,
     };
     const actions = evaluateAllActions(s, 0, t, zeroWeights);
-    for (const a of actions) expect(a.score.total).toBe(0);
+    for (const a of actions) {
+      if (a.action === 'capture') {
+        expect(a.score.total).toBe(0);
+      } else {
+        // Ace placement carries the doctrine 3.2 floor.
+        expect(a.score.total).toBe(-22.5);
+      }
+    }
   });
 });
 

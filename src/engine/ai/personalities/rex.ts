@@ -14,15 +14,14 @@ export const REX_WEIGHTS: PersonalityWeights = {
 export const REX: PersonalityProfile = {
   name: 'Rex',
   weights: REX_WEIGHTS,
-  allowMultiSlot: true,
-  useChainEval: true,
   preferSumsOnTie: false,
-  preferHighestNumberCardOnPlace: false,
-  riskThreshold: 0.08,
-  deckAwareness: 7,
-  opponentAwareness: 7,
-  positionAwareness: 8,
-  pressureHandling: 9,
-  setupEngineering: 7,
+  riskThreshold: 5,            // PASS 3A — selective on captures
+  deckAwareness: 6,            // PASS 3A — tracks well
+  opponentAwareness: 6,        // PASS 3A — models opponents
+  positionAwareness: 7,        // PASS 3A — HIGHER (positional hunter)
+  pressureHandling: 7,         // PASS 3A — HIGHER (reactive to score state)
+  setupEngineering: 6,         // PASS 3A — Place-To-Plant + Multi-Turn (no Jackpot Trap; SE=6 < 7 gate)
+  captureComplexity: 6,        // PASS 3A — multi-slot + chain eval
+  placementIntelligence: 5,    // PASS 3A — placement isn't his focus (slightly LOWER)
   thinkingDelay: { min: 400, max: 900 },
 };

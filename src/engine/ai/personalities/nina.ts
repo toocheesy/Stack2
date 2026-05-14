@@ -14,15 +14,14 @@ export const NINA_WEIGHTS: PersonalityWeights = {
 export const NINA: PersonalityProfile = {
   name: 'Nina',
   weights: NINA_WEIGHTS,
-  allowMultiSlot: true,
-  useChainEval: false,
-  preferSumsOnTie: true,
-  preferHighestNumberCardOnPlace: false,
-  riskThreshold: 0.05,
-  deckAwareness: 5,
-  opponentAwareness: 4,
-  positionAwareness: 6,
-  pressureHandling: 6,
-  setupEngineering: 4,
+  preferSumsOnTie: true,        // only surviving flag — Nina's flavor
+  riskThreshold: 3,            // PASS 3A — takes most captures
+  deckAwareness: 4,            // PASS 3A — tracks cards okay
+  opponentAwareness: 3,        // PASS 3A — notices opponents, shallow modeling
+  positionAwareness: 4,        // PASS 3A — mid layers of strategic loop
+  pressureHandling: 4,         // PASS 3A — some pressure response
+  setupEngineering: 3,         // PASS 3A — Place-To-Plant only (plays what she sees)
+  captureComplexity: 5,        // PASS 3A — multi-slot YES, chain eval NO (her CC > SE asymmetry)
+  placementIntelligence: 4,    // PASS 3A — lowest-danger 2-9 selection
   thinkingDelay: { min: 800, max: 1500 },
 };

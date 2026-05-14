@@ -13,31 +13,31 @@ export const CALVIN_WEIGHTS: PersonalityWeights = {
 export interface PersonalityProfile {
   name: string;
   weights: PersonalityWeights;
-  allowMultiSlot: boolean;
-  useChainEval: boolean;
+  // Only surviving flag — Nina's sum-preference stylistic identity per spec 7.3.
   preferSumsOnTie: boolean;
-  preferHighestNumberCardOnPlace: boolean;
+  // ─── Canonical skill points (1-10 scale)
   riskThreshold: number;
   deckAwareness: number;
   opponentAwareness: number;
   positionAwareness: number;
   pressureHandling: number;
   setupEngineering: number;
+  captureComplexity: number;       // gates multi-slot (≥3) + chain eval (≥6)
+  placementIntelligence: number;   // drives valueLossPenalty PI sub-rules
   thinkingDelay: { min: number; max: number };
 }
 
 export const CALVIN: PersonalityProfile = {
   name: 'Calvin',
   weights: CALVIN_WEIGHTS,
-  allowMultiSlot: false,
-  useChainEval: false,
   preferSumsOnTie: false,
-  preferHighestNumberCardOnPlace: true,
-  riskThreshold: 0.02,
-  deckAwareness: 2,
-  opponentAwareness: 1,
-  positionAwareness: 2,
-  pressureHandling: 1,
-  setupEngineering: 1,
+  riskThreshold: 1,            // PASS 3A — floor (greedy)
+  deckAwareness: 1,            // PASS 3A — doesn't track
+  opponentAwareness: 1,        // PASS 3A — undifferentiated opponents
+  positionAwareness: 2,        // PASS 3A — basic active-count only
+  pressureHandling: 1,         // PASS 3A — no pressure response
+  setupEngineering: 1,         // PASS 3A — no setup planning
+  captureComplexity: 1,        // PASS 3A — single captures only
+  placementIntelligence: 2,    // PASS 3A — Calvin's tell (highest 2-9 selection)
   thinkingDelay: { min: 1500, max: 3000 },
 };

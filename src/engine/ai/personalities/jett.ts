@@ -14,15 +14,14 @@ export const JETT_WEIGHTS: PersonalityWeights = {
 export const JETT: PersonalityProfile = {
   name: 'Jett',
   weights: JETT_WEIGHTS,
-  allowMultiSlot: true,
-  useChainEval: true,
   preferSumsOnTie: false,
-  preferHighestNumberCardOnPlace: false,
-  riskThreshold: 0.10,
-  deckAwareness: 8,
-  opponentAwareness: 8,
-  positionAwareness: 9,
-  pressureHandling: 9,
-  setupEngineering: 8,
+  riskThreshold: 7,            // PASS 3A — very selective
+  deckAwareness: 8,            // PASS 3A — HIGHEST (tracks everything)
+  opponentAwareness: 8,        // PASS 3A — HIGHEST (deep opponent reading)
+  positionAwareness: 8,        // PASS 3A — all strategic loop layers
+  pressureHandling: 6,         // PASS 3A — slightly LOWER (stalker, not reactive expert)
+  setupEngineering: 8,         // PASS 3A — all three setup features incl. Jackpot Trap (Jett-only)
+  captureComplexity: 8,        // PASS 3A — strong capture vision + chain eval
+  placementIntelligence: 9,    // PASS 3A — HIGHEST (PI 9 unlocks multi-turn, stubbed)
   thinkingDelay: { min: 300, max: 700 },
 };

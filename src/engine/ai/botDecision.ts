@@ -12,7 +12,8 @@ import {
   evaluateAllActions,
   evaluateChainCapture,
   evaluatePlaceChain,
-  calvinNumberCardPick,
+  canEvaluateMultiSlot,
+  canEvaluateChainCapture,
   getSelectiveDeckAwareness,
   getPositionContext,
   applyPositionModifiers,
@@ -150,13 +151,15 @@ function toBotDecision(action: ScoredAction): BotDecision {
 function opponentInfoFor(state: GameState, idx: PlayerIndex): OpponentInfo {
   const score = state.overallScores[SCORE_KEYS[idx]];
   if (idx === 0) {
+    // Human player — we don't model PI; treat as "unknown" for placement
+    // intelligence. captureComplexity at floor (single captures only).
     return {
       playerIndex: idx,
       score,
       difficulty: null,
-      preferHighestNumberCardOnPlace: false,
+      placementIntelligence: undefined,
       mistakeRate: 0,
-      allowMultiSlot: true,
+      captureComplexity: 1,
     };
   }
   const diff =
@@ -166,9 +169,9 @@ function opponentInfoFor(state: GameState, idx: PlayerIndex): OpponentInfo {
     playerIndex: idx,
     score,
     difficulty: diff,
-    preferHighestNumberCardOnPlace: prof.preferHighestNumberCardOnPlace,
+    placementIntelligence: prof.placementIntelligence,
     mistakeRate: prof.weights.mistakeRate,
-    allowMultiSlot: prof.allowMultiSlot,
+    captureComplexity: prof.captureComplexity,
   };
 }
 
@@ -222,6 +225,38 @@ function setupChainThreshold(se: number): number {
   if (se <= 8) return 1.25;
   if (se <= 9) return 1.20;
   return 1.15;
+}
+
+// Canonical rebuild S2 — RT skill (1-10) translates to internal capture-value
+// gate percentage. Replaces the prior pattern where the field stored a
+// fractional cutoff directly. Per spec section 5.
+//
+// Bot RT values on the new scale:
+//   Calvin RT 1 → 2% (6pt at target 300)
+//   Nina   RT 3 → 5% (15pt)
+//   Rex    RT 5 → 8% (24pt)
+//   Jett   RT 7 → 10% (30pt)
+export function captureValueThreshold(rt: number): number {
+  if (rt <= 1) return 0.02;
+  if (rt <= 3) return 0.05;
+  if (rt <= 5) return 0.08;
+  if (rt <= 7) return 0.10;
+  if (rt <= 9) return 0.12;
+  return 0.15;
+}
+
+// Highest non-face / non-Ace card in hand. Used by the PI ≤ 2 sub-rule to
+// surface Calvin's tell architecturally (replaces the retired
+// calvinNumberCardPick helper from evaluator.ts; same logic). Returns null
+// when no 2-9 cards exist in hand.
+function highestNumberCard(hand: readonly Card[]): Card | null {
+  const numberCards = hand.filter((c) => c.value >= 2 && c.value <= 9);
+  if (numberCards.length === 0) return null;
+  let best = numberCards[0];
+  for (const c of numberCards) {
+    if (c.value > best.value) best = c;
+  }
+  return best;
 }
 
 // Capture-chain promotion threshold — gates whether a 2-turn capture plan
@@ -289,13 +324,14 @@ export function decideBotAction(
   }
 
   let actions = evaluateAllActions(state, playerIndex, tracker, weights, {
-    allowMultiSlot: profile.allowMultiSlot,
+    allowMultiSlot: canEvaluateMultiSlot(profile.captureComplexity),
     restrictions: options.restrictions,
     selectiveDeck,
     opponents,
     nextOpponent,
     opponentAwareness: profile.opponentAwareness,
     setupEngineering: profile.setupEngineering,
+    placementIntelligence: profile.placementIntelligence,
   });
 
   if (actions.length === 0) {
@@ -309,8 +345,9 @@ export function decideBotAction(
     const placeActions = actions.filter((a) => a.action === 'place');
     if (placeActions.length > 0) {
       let chosen = placeActions[0];
-      if (profile.preferHighestNumberCardOnPlace) {
-        const highest = calvinNumberCardPick(state.hands[playerIndex]);
+      // PI ≤ 2: same architectural sub-rule as the non-dump path.
+      if (profile.placementIntelligence <= 2) {
+        const highest = highestNumberCard(state.hands[playerIndex]);
         if (highest) {
           const swap = placeActions.find((a) => a.handCard.id === highest.id);
           if (swap) chosen = swap;
@@ -324,7 +361,7 @@ export function decideBotAction(
     actions = applyNinaSumPreference(actions);
   }
 
-  if (profile.useChainEval) {
+  if (canEvaluateChainCapture(profile.captureComplexity)) {
     const plan = evaluateChainCapture(
       state,
       playerIndex,
@@ -335,7 +372,9 @@ export function decideBotAction(
       const bestCaptureTotal = actions
         .filter((a) => a.action === 'capture')
         .reduce((m, a) => Math.max(m, a.captureDetails?.totalPoints ?? 0), 0);
-      if (plan.totalPoints > bestCaptureTotal * captureChainThreshold(profile.setupEngineering)) {
+      // Chain threshold migrated from SE-keyed to CC-keyed (S3) — chain
+      // evaluation belongs in capture-complexity, not setup-engineering.
+      if (plan.totalPoints > bestCaptureTotal * captureChainThreshold(profile.captureComplexity)) {
         const chainAction = chainPlanAsAction(plan, actions);
         if (chainAction) {
           const idx = actions.indexOf(chainAction);
@@ -347,7 +386,11 @@ export function decideBotAction(
     }
   }
 
-  // Setup Engineering: place-then-capture chain evaluation (SE >= 5)
+  // Setup Engineering: place-then-capture chain evaluation (SE >= 5).
+  // Respects doctrine 3.2: when the planted card would carry a
+  // valueLossPenalty (face/Ace/10), require chainExpected to overcome
+  // that floor before promoting — closes the Place-Chain × doctrine 3.2
+  // conflict surfaced in S1.
   if (profile.setupEngineering >= 5) {
     const placeChain = evaluatePlaceChain(state.hands[playerIndex], state.board);
     if (placeChain) {
@@ -356,7 +399,18 @@ export function decideBotAction(
         .reduce((m, a) => Math.max(m, a.captureDetails?.totalPoints ?? 0), 0);
       const survivalDiscount = 0.6;
       const chainExpected = placeChain.totalExpectedPoints * survivalDiscount;
-      if (chainExpected > bestCaptureTotal * setupChainThreshold(profile.setupEngineering) || bestCaptureTotal === 0) {
+      // Doctrine 3.2 floor on the planted card. Engine RANK_VALUES has Ace=1,
+      // so we compute the floor from SCORE_VALUES semantics directly: Ace=22.5,
+      // face/10=15, 2-9=0. Same shape as scorePlacement's valueLossPenalty.
+      const plantedRank = placeChain.placedCard.rank;
+      const valueLossFloor =
+        plantedRank === 'A'
+          ? 22.5
+          : plantedRank === '10' || plantedRank === 'J' || plantedRank === 'Q' || plantedRank === 'K'
+            ? 15
+            : 0;
+      const required = bestCaptureTotal * setupChainThreshold(profile.setupEngineering) + valueLossFloor;
+      if (chainExpected > required || (bestCaptureTotal === 0 && chainExpected > valueLossFloor)) {
         const placeAction = actions.find(
           (a) => a.action === 'place' && a.handCard.id === placeChain.placedCard.id,
         );
@@ -367,18 +421,21 @@ export function decideBotAction(
     }
   }
 
-  // Risk threshold gate: demote sub-threshold captures below best placement
+  // Risk threshold gate (S2 — doctrine 1.10 Reactive Strategy aligned).
+  // Demotes a sub-threshold capture below best placement. Now keys on the
+  // bot's own WEIGHTED score.total (so denial bonuses, jackpot bonuses,
+  // and board-control bonuses respect the gate per the bot's preferences)
+  // rather than raw captureDetails.totalPoints which was doctrine-naive.
   const targetScore = state.settings.targetScore;
   if (profile.riskThreshold > 0 && targetScore > 0) {
-    const threshold = targetScore * profile.riskThreshold;
+    const threshold = targetScore * captureValueThreshold(profile.riskThreshold);
     const topAction = actions[0];
     if (
       topAction.action === 'capture' &&
-      topAction.captureDetails &&
-      topAction.captureDetails.totalPoints < threshold
+      topAction.score.total < threshold
     ) {
       const bestPlace = actions.find((a) => a.action === 'place');
-      if (bestPlace && bestPlace.score.placementDanger > -threshold) {
+      if (bestPlace && bestPlace.score.total > -threshold) {
         actions = [bestPlace, ...actions.filter((a) => a !== bestPlace)];
       }
     }
@@ -395,11 +452,13 @@ export function decideBotAction(
     chosen = pool[pick];
   }
 
-  if (
-    profile.preferHighestNumberCardOnPlace &&
-    chosen.action === 'place'
-  ) {
-    const highest = calvinNumberCardPick(state.hands[playerIndex]);
+  // PI sub-rules — Placement Intelligence post-selection layers (doctrine 3.2).
+  // PI ≤ 2: prefer highest-value 2-9 (Calvin's tell, architecturally derived).
+  // PI ≥ 3: prefer lowest-danger 2-9 (default scorePlacement ordering).
+  // PI ≥ 6: setup-value contribution — stub.
+  // PI ≥ 9: multi-turn placement strategy — stub.
+  if (chosen.action === 'place' && profile.placementIntelligence <= 2) {
+    const highest = highestNumberCard(state.hands[playerIndex]);
     if (highest && highest.id !== chosen.handCard.id) {
       const swap = actions.find(
         (a) => a.action === 'place' && a.handCard.id === highest.id,

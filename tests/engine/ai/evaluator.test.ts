@@ -43,6 +43,19 @@ function state(overrides: Partial<GameState>): GameState {
     },
     currentRound: 1,
     currentDealer: 0,
+    handNumber: 1,
+    gamePhase: 'playing',
+    roundStats: [
+      { roundScore: 0, highestCapture: null },
+      { roundScore: 0, highestCapture: null },
+      { roundScore: 0, highestCapture: null },
+    ],
+    gameStats: [
+      { totalScore: 0, highestCapture: null },
+      { totalScore: 0, highestCapture: null },
+      { totalScore: 0, highestCapture: null },
+    ],
+    dumpActive: false,
     ...overrides,
   };
 }

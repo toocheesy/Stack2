@@ -1,5 +1,14 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { LEVELS, getLevel, getLevelsForWorld } from '../levelConfig';
+import {
+  LEVELS,
+  TOTAL_LEVELS,
+  TOTAL_WORLDS,
+  LEVELS_PER_WORLD,
+  getLevel,
+  getLevelsForWorld,
+  getDisplayId,
+  getWorldName,
+} from '../levelConfig';
 import {
   getInitialProgress,
   getDefaultProgress,
@@ -14,6 +23,10 @@ import {
   saveProgress,
   loadProgress,
   clearProgress,
+  isJettUnlockedInClassic,
+  unlockJettInClassic,
+  clearJettUnlock,
+  isFinalLevel,
 } from '../progressManager';
 
 // ─── localStorage mock for Node test environment ────
@@ -31,12 +44,15 @@ Object.defineProperty(globalThis, 'localStorage', { value: mockStorage, configur
 // ─── Level config ───────────────────────────────────
 
 describe('level config', () => {
-  it('has exactly 18 levels', () => {
-    expect(LEVELS).toHaveLength(18);
+  it('exposes 12 total levels across 4 worlds × 3 levels', () => {
+    expect(TOTAL_LEVELS).toBe(12);
+    expect(TOTAL_WORLDS).toBe(4);
+    expect(LEVELS_PER_WORLD).toBe(3);
+    expect(LEVELS).toHaveLength(12);
   });
 
-  it('each level has correct world assignment (3 per world)', () => {
-    for (let world = 1; world <= 6; world++) {
+  it('each world has exactly 3 levels', () => {
+    for (let world = 1; world <= TOTAL_WORLDS; world++) {
       expect(getLevelsForWorld(world)).toHaveLength(3);
     }
   });
@@ -47,28 +63,93 @@ describe('level config', () => {
     }
   });
 
-  it('level IDs are sequential 1-18', () => {
+  it('level IDs are sequential 1-12', () => {
     for (let i = 0; i < LEVELS.length; i++) {
       expect(LEVELS[i].id).toBe(i + 1);
     }
   });
 
-  it('target scores match the design', () => {
-    expect(getLevel(1)!.targetScore).toBe(50);
-    expect(getLevel(6)!.targetScore).toBe(200);
-    expect(getLevel(12)!.targetScore).toBe(250);
-    expect(getLevel(18)!.targetScore).toBe(500);
+  it('every level has a displayId in W-L format', () => {
+    for (const level of LEVELS) {
+      expect(level.displayId).toBe(`${level.world}-${level.levelInWorld}`);
+    }
   });
 
-  it('world 1 is all beginner bots', () => {
+  it('getDisplayId returns the correct W-L label', () => {
+    expect(getDisplayId(1)).toBe('1-1');
+    expect(getDisplayId(6)).toBe('2-3');
+    expect(getDisplayId(12)).toBe('4-3');
+  });
+
+  it('getWorldName returns the named worlds', () => {
+    expect(getWorldName(1)).toBe('The Basics');
+    expect(getWorldName(2)).toBe('Sharper Play');
+    expect(getWorldName(3)).toBe('The Hunter');
+    expect(getWorldName(4)).toBe('The Endgame');
+  });
+
+  it('target scores match the locked design', () => {
+    expect(getLevel(1)!.targetScore).toBe(100);
+    expect(getLevel(2)!.targetScore).toBe(150);
+    expect(getLevel(3)!.targetScore).toBe(200);
+    expect(getLevel(4)!.targetScore).toBe(200);
+    expect(getLevel(5)!.targetScore).toBe(250);
+    expect(getLevel(6)!.targetScore).toBe(300);
+    expect(getLevel(7)!.targetScore).toBe(250);
+    expect(getLevel(8)!.targetScore).toBe(300);
+    expect(getLevel(9)!.targetScore).toBe(400);
+    expect(getLevel(10)!.targetScore).toBe(300);
+    expect(getLevel(11)!.targetScore).toBe(350);
+    expect(getLevel(12)!.targetScore).toBe(400);
+  });
+
+  it('W1 is Calvin + Calvin throughout', () => {
     for (const l of getLevelsForWorld(1)) {
       expect(l.bots).toEqual(['beginner', 'beginner']);
     }
   });
 
-  it('world 6 is all advanced bots', () => {
-    for (const l of getLevelsForWorld(6)) {
-      expect(l.bots).toEqual(['advanced', 'advanced']);
+  it('W2 introduces Nina (mixed then full)', () => {
+    expect(getLevel(4)!.bots).toEqual(['beginner', 'intermediate']);
+    expect(getLevel(5)!.bots).toEqual(['intermediate', 'intermediate']);
+    expect(getLevel(6)!.bots).toEqual(['intermediate', 'intermediate']);
+  });
+
+  it('W3 introduces Rex (mixed then full)', () => {
+    expect(getLevel(7)!.bots).toEqual(['intermediate', 'advanced']);
+    expect(getLevel(8)!.bots).toEqual(['advanced', 'advanced']);
+    expect(getLevel(9)!.bots).toEqual(['advanced', 'advanced']);
+  });
+
+  it('W4 introduces Jett (always paired, never solo Jett+Jett)', () => {
+    expect(getLevel(10)!.bots).toEqual(['advanced', 'expert']);
+    expect(getLevel(11)!.bots).toEqual(['intermediate', 'expert']);
+    expect(getLevel(12)!.bots).toEqual(['advanced', 'expert']);
+    for (const l of getLevelsForWorld(4)) {
+      expect(l.bots).toContain('expert');
+    }
+  });
+
+  it('hint strip ON for W1+W2, OFF for W3+W4', () => {
+    for (const l of [...getLevelsForWorld(1), ...getLevelsForWorld(2)]) {
+      expect(l.hintStripEnabled).toBe(true);
+    }
+    for (const l of [...getLevelsForWorld(3), ...getLevelsForWorld(4)]) {
+      expect(l.hintStripEnabled).toBe(false);
+    }
+  });
+
+  it('turn-order swap is disabled on every Adventure level', () => {
+    for (const l of LEVELS) {
+      expect(l.turnOrderSwap).toBe(false);
+    }
+  });
+
+  it('Jett (expert) only appears in W4', () => {
+    for (const l of LEVELS) {
+      const hasJett = l.bots.includes('expert');
+      if (l.world === 4) expect(hasJett).toBe(true);
+      else expect(hasJett).toBe(false);
     }
   });
 });
@@ -86,9 +167,14 @@ describe('getLevelWorld', () => {
     expect(getLevelWorld(6)).toBe(2);
   });
 
-  it('maps levels 16-18 to world 6', () => {
-    expect(getLevelWorld(16)).toBe(6);
-    expect(getLevelWorld(18)).toBe(6);
+  it('maps levels 7-9 to world 3', () => {
+    expect(getLevelWorld(7)).toBe(3);
+    expect(getLevelWorld(9)).toBe(3);
+  });
+
+  it('maps levels 10-12 to world 4', () => {
+    expect(getLevelWorld(10)).toBe(4);
+    expect(getLevelWorld(12)).toBe(4);
   });
 });
 
@@ -157,6 +243,15 @@ describe('isWorldUnlocked', () => {
     p = recordLevelCompletion(p, 2, 3);
     p = recordLevelCompletion(p, 3, 3);
     expect(isWorldUnlocked(p, 2)).toBe(true);
+  });
+
+  it('World 4 unlocks only when World 3 has 9 stars', () => {
+    let p = getDefaultProgress();
+    // 3-star W1, W2, W3
+    for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+      p = recordLevelCompletion(p, id, 3);
+    }
+    expect(isWorldUnlocked(p, 4)).toBe(true);
   });
 
   it('World 2 stays locked with only 8 stars in World 1', () => {
@@ -233,8 +328,8 @@ describe('recordLevelCompletion', () => {
   it('does NOT unlock across world boundary via 2-star alone', () => {
     let p = getDefaultProgress();
     p = { ...p, unlockedLevels: [1, 2, 3] };
-    p = recordLevelCompletion(p, 3, 2); // Level 3 is last in World 1
-    // Level 4 is World 2 — should NOT unlock because world gate not satisfied
+    p = recordLevelCompletion(p, 3, 2); // Last level of W1
+    // Level 4 is W2 — should NOT unlock; world gate not satisfied
     expect(p.unlockedLevels).not.toContain(4);
   });
 
@@ -244,7 +339,15 @@ describe('recordLevelCompletion', () => {
     p = recordLevelCompletion(p, 2, 3);
     p = recordLevelCompletion(p, 3, 3);
     expect(starsInWorld(p, 1)).toBe(9);
-    expect(p.unlockedLevels).toContain(4); // first level of World 2
+    expect(p.unlockedLevels).toContain(4); // first level of W2
+  });
+
+  it('3-starring all of World 3 unlocks first level of World 4', () => {
+    let p = getDefaultProgress();
+    for (const id of [1, 2, 3, 4, 5, 6, 7, 8, 9]) {
+      p = recordLevelCompletion(p, id, 3);
+    }
+    expect(p.unlockedLevels).toContain(10);
   });
 
   it('mix of stars (3,2,3 = 8 total) does NOT unlock World 2', () => {
@@ -263,10 +366,10 @@ describe('recordLevelCompletion', () => {
     expect(p.starsPerLevel[1]).toBe(3);
   });
 
-  it('does NOT unlock past level 18', () => {
+  it('does NOT unlock past level 12', () => {
     let p = getInitialProgress();
-    const next = recordLevelCompletion(p, 18, 3);
-    expect(next.unlockedLevels).not.toContain(19);
+    const next = recordLevelCompletion(p, 12, 3);
+    expect(next.unlockedLevels).not.toContain(13);
   });
 
   it('accumulates totalStars correctly', () => {
@@ -290,12 +393,12 @@ describe('isLevelUnlocked (production)', () => {
 
   it('level in locked world returns false even if in unlockedLevels', () => {
     const p: ReturnType<typeof getDefaultProgress> = {
-      unlockedLevels: [1, 4], // Level 4 is World 2
+      unlockedLevels: [1, 4], // Level 4 is W2
       starsPerLevel: {},
       lastCompleted: null,
       totalStars: 0,
     };
-    expect(isLevelUnlocked(p, 4)).toBe(false); // World 2 not unlocked
+    expect(isLevelUnlocked(p, 4)).toBe(false);
   });
 });
 
@@ -308,6 +411,35 @@ describe('getStarsForLevel', () => {
     let p = getDefaultProgress();
     p = recordLevelCompletion(p, 1, 2);
     expect(getStarsForLevel(p, 1)).toBe(2);
+  });
+});
+
+// ─── Jett Classic-mode unlock gate ──────────────────
+
+describe('Jett Classic-mode unlock gate', () => {
+  beforeEach(() => { store.clear(); });
+
+  it('isJettUnlockedInClassic returns false by default', () => {
+    expect(isJettUnlockedInClassic()).toBe(false);
+  });
+
+  it('unlockJettInClassic flips the gate to true', () => {
+    expect(isJettUnlockedInClassic()).toBe(false);
+    unlockJettInClassic();
+    expect(isJettUnlockedInClassic()).toBe(true);
+  });
+
+  it('clearJettUnlock removes the flag', () => {
+    unlockJettInClassic();
+    expect(isJettUnlockedInClassic()).toBe(true);
+    clearJettUnlock();
+    expect(isJettUnlockedInClassic()).toBe(false);
+  });
+
+  it('isFinalLevel identifies W4 L3 only', () => {
+    expect(isFinalLevel(12)).toBe(true);
+    expect(isFinalLevel(11)).toBe(false);
+    expect(isFinalLevel(1)).toBe(false);
   });
 });
 
@@ -353,5 +485,59 @@ describe('localStorage persistence', () => {
     mockStorage.setItem = orig.setItem;
     mockStorage.getItem = orig.getItem;
     mockStorage.removeItem = orig.removeItem;
+  });
+});
+
+// ─── Old-schema migration ───────────────────────────
+
+describe('old-schema migration (18-level → 12-level reset)', () => {
+  beforeEach(() => { store.clear(); });
+
+  it('resets when stored unlockedLevels reference levels > 12', () => {
+    const oldShape = {
+      unlockedLevels: [1, 2, 3, 4, 5, 13, 14],
+      starsPerLevel: { 1: 3, 13: 2, 18: 3 },
+      lastCompleted: 18,
+      totalStars: 25,
+    };
+    localStorage.setItem('stacked_v2_adventure_progress', JSON.stringify(oldShape));
+    const warn = console.warn;
+    let warned = false;
+    console.warn = () => { warned = true; };
+    const loaded = loadProgress();
+    console.warn = warn;
+    expect(warned).toBe(true);
+    expect(loaded.unlockedLevels).toEqual([1]);
+    expect(loaded.starsPerLevel).toEqual({});
+    expect(loaded.lastCompleted).toBeNull();
+    expect(loaded.totalStars).toBe(0);
+  });
+
+  it('resets when starsPerLevel keys reference levels > 12', () => {
+    const oldShape = {
+      unlockedLevels: [1],
+      starsPerLevel: { 15: 3 },
+      lastCompleted: null,
+      totalStars: 3,
+    };
+    localStorage.setItem('stacked_v2_adventure_progress', JSON.stringify(oldShape));
+    const warn = console.warn;
+    console.warn = () => {};
+    const loaded = loadProgress();
+    console.warn = warn;
+    expect(loaded.starsPerLevel).toEqual({});
+  });
+
+  it('keeps valid 12-level data untouched', () => {
+    const validShape = {
+      unlockedLevels: [1, 2, 3, 4],
+      starsPerLevel: { 1: 3, 2: 3, 3: 3 },
+      lastCompleted: 3,
+      totalStars: 9,
+    };
+    localStorage.setItem('stacked_v2_adventure_progress', JSON.stringify(validShape));
+    const loaded = loadProgress();
+    expect(loaded.unlockedLevels).toEqual([1, 2, 3, 4]);
+    expect(loaded.totalStars).toBe(9);
   });
 });

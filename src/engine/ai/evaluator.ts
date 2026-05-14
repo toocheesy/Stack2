@@ -12,7 +12,7 @@ import {
   findAllCaptures,
   findBestMultiSlotCapture,
 } from '../core/captureValidator';
-import { calculateCardPoints, calculateCardsPoints } from '../core/scoring';
+import { calculateCardsPoints } from '../core/scoring';
 import type { CardTrackerState } from './cardTracker';
 import { estimateDeckComposition, getRemainingOfRank } from './cardTracker';
 
@@ -722,6 +722,17 @@ export function modifyWeightsForGameState(
   const myScore = state.overallScores[SCORE_KEYS[playerIndex]];
   const opponentIndices = ([0, 1, 2] as PlayerIndex[]).filter((i) => i !== playerIndex);
   const maxOpponent = Math.max(...opponentIndices.map((i) => state.overallScores[SCORE_KEYS[i]]));
+
+  if (difficulty === 'expert') {
+    // Jett: tighter thresholds than Rex — patient hunter
+    if (maxOpponent >= target * 0.45) {
+      return { ...baseWeights, opponentDenial: 2.0, boardControl: 1.3 };
+    }
+    if (myScore - maxOpponent >= target * 0.15) {
+      return { ...baseWeights, rawPoints: 0.4, placementDanger: 1.8, opponentDenial: 0.3 };
+    }
+    return baseWeights;
+  }
 
   if (difficulty === 'advanced') {
     // Denial takes precedence: opponent at 50%+ of target → block everything

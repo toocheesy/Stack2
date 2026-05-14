@@ -1,18 +1,20 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import type { Difficulty } from '../engine/types';
 import { getTransition } from '../config/motion';
+import { isJettUnlockedInClassic } from '../engine/adventure/progressManager';
 
 const JADE = '#065F46';
 const BG = '#0A0A0A';
 const TARGET_PRESETS = [100, 300, 500, 1000] as const;
 
-type BotId = 'calvin' | 'nina' | 'rex';
+type BotId = 'calvin' | 'nina' | 'rex' | 'jett';
 
 const BOTS: { id: BotId; name: string; color: string; textOnAvatar: string; difficulty: Difficulty; label: string; flavor: string }[] = [
-  { id: 'calvin', name: 'Calvin', color: '#3B82F6', textOnAvatar: '#fff',  difficulty: 'beginner',     label: 'Easy',   flavor: 'Cautious, hesitant. Easy.' },
+  { id: 'calvin', name: 'Calvin', color: '#3B82F6', textOnAvatar: '#fff',    difficulty: 'beginner',     label: 'Easy',   flavor: 'Cautious, hesitant. Easy.' },
   { id: 'nina',   name: 'Nina',   color: '#DBEAFE', textOnAvatar: '#1E293B', difficulty: 'intermediate', label: 'Medium', flavor: 'Balanced, calculating. Medium.' },
-  { id: 'rex',    name: 'Rex',    color: '#DC2626', textOnAvatar: '#fff',  difficulty: 'advanced',     label: 'Hard',   flavor: 'Aggressive, combo-greedy. Hard.' },
+  { id: 'rex',    name: 'Rex',    color: '#DC2626', textOnAvatar: '#fff',    difficulty: 'advanced',     label: 'Hard',   flavor: 'Aggressive, combo-greedy. Hard.' },
+  { id: 'jett',   name: 'Jett',   color: '#0D9488', textOnAvatar: '#fff',    difficulty: 'expert',       label: 'Expert', flavor: 'Patient, relentless. Expert.' },
 ];
 
 interface Props {
@@ -23,8 +25,12 @@ interface Props {
 export function ClassicSetup({ onStart, onBack }: Props) {
   const [targetScore, setTargetScore] = useState(300);
   const [selectedBots, setSelectedBots] = useState<BotId[]>([]);
+  const [jettUnlocked, setJettUnlocked] = useState(false);
+
+  useEffect(() => { setJettUnlocked(isJettUnlockedInClassic()); }, []);
 
   const toggleBot = (id: BotId) => {
+    if (id === 'jett' && !jettUnlocked) return;
     setSelectedBots((prev) => {
       if (prev.includes(id)) return prev.filter((b) => b !== id);
       if (prev.length < 2) return [...prev, id];
@@ -99,15 +105,18 @@ export function ClassicSetup({ onStart, onBack }: Props) {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
           {BOTS.map((bot) => {
             const selected = selectedBots.includes(bot.id);
+            const locked = bot.id === 'jett' && !jettUnlocked;
             return (
-              <motion.button key={bot.id} onClick={() => toggleBot(bot.id)} whileTap={{ scale: 0.97 }} transition={getTransition('snappy')} style={{
+              <motion.button key={bot.id} onClick={() => toggleBot(bot.id)} whileTap={locked ? undefined : { scale: 0.97 }} transition={getTransition('snappy')} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 14px', borderRadius: 12,
                 border: selected ? `2px solid ${bot.color}` : '1px solid rgba(255,255,255,0.08)',
                 boxShadow: selected ? `0 0 14px ${bot.color}44` : 'none',
                 background: selected ? 'rgba(255,255,255,0.04)' : 'transparent',
-                cursor: 'pointer', textAlign: 'left' as const, width: '100%',
-                transition: 'border 200ms, box-shadow 200ms',
+                cursor: locked ? 'default' : 'pointer', textAlign: 'left' as const, width: '100%',
+                opacity: locked ? 0.55 : 1,
+                transition: 'border 200ms, box-shadow 200ms, opacity 200ms',
+                position: 'relative' as const,
               }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: 20,
@@ -129,9 +138,15 @@ export function ClassicSetup({ onStart, onBack }: Props) {
                     </span>
                   </div>
                   <span style={{ fontSize: 11, color: selected ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', fontStyle: 'italic', transition: 'color 200ms' }}>
-                    {bot.flavor}
+                    {locked ? 'Beat Adventure World 4 to unlock' : bot.flavor}
                   </span>
                 </div>
+                {locked && (
+                  <span style={{
+                    position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
+                    fontSize: 14, color: 'rgba(255,255,255,0.45)',
+                  }}>&#128274;</span>
+                )}
               </motion.button>
             );
           })}

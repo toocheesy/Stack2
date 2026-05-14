@@ -56,15 +56,19 @@ export function determineTurnResult(state: GameState): TurnResult {
       return { type: 'CONTINUE_TURN', nextPlayer: next };
     }
     if (skipCurrent && state.hands[state.currentPlayer].length > 0) {
-      return { type: 'CONTINUE_TURN', nextPlayer: state.currentPlayer };
+      // Doctrine 2.7 — Forced-Placement Dump trigger: current player just
+      // placed, others are empty, current still has cards. Capture window
+      // shuts. Subsequent turns are forced placements.
+      return { type: 'CONTINUE_TURN', nextPlayer: state.currentPlayer, dumpActive: true };
     }
   }
 
   if (state.deck.length >= 12) {
-    const startingPlayer: PlayerIndex =
-      state.lastAction === 'place'
-        ? (((state.currentPlayer + 1) % 3) as PlayerIndex)
-        : state.currentPlayer;
+    // Position locks for the whole round — first player is always
+    // (dealer + 1) % 3, regardless of who placed last in the previous
+    // hand. Round-boundary rotation lives in startNewRound.
+    // Doctrine 5.7.
+    const startingPlayer = ((state.currentDealer + 1) % 3) as PlayerIndex;
     return { type: 'DEAL_NEW_HAND', startingPlayer };
   }
 

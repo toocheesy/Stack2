@@ -58,11 +58,11 @@ export const PERSONALITY_PROFILES: readonly PersonalityProfile[] = [
   {
     key: 'jett',
     name: 'Jett',
-    difficulty: 'advanced',
-    label: 'Advanced',
-    flavor: 'Speed kills',
-    color: '#EF4444',
-    colorHex: 0xef4444,
+    difficulty: 'expert',
+    label: 'Expert',
+    flavor: 'Patient, relentless',
+    color: '#0D9488',
+    colorHex: 0x0d9488,
   },
   {
     key: 'mira',

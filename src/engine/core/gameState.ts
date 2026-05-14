@@ -65,8 +65,10 @@ export function createInitialState(
   prng: PRNG,
   idGenerator: IdGenerator,
 ): GameState {
-  // Randomize bot seating: 50/50 coin flip swaps bot1 ↔ bot2
-  const swapBots = prng.next() < 0.5;
+  // Randomize bot seating: 50/50 coin flip swaps bot1 ↔ bot2.
+  // Adventure mode disables this (settings.disableSeatingSwap === true) so
+  // bot pairings stay deterministic per the level config.
+  const swapBots = settings.disableSeatingSwap ? false : prng.next() < 0.5;
   const finalSettings = swapBots
     ? { ...settings, bot1Personality: settings.bot2Personality, bot2Personality: settings.bot1Personality }
     : settings;
@@ -103,6 +105,7 @@ export function createInitialState(
     gamePhase: 'playing',
     roundStats: [emptyRoundStats(), emptyRoundStats(), emptyRoundStats()],
     gameStats: [emptyGameStats(), emptyGameStats(), emptyGameStats()],
+    dumpActive: false,
   };
 }
 
@@ -118,7 +121,8 @@ export function dealNewHand(state: GameState): GameState {
     hands[p] = hands[p].concat(taken);
     deck = remaining;
   }
-  return { ...state, deck, hands, handNumber: state.handNumber + 1 };
+  // Dealing new cards clears the dump (all 3 players have cards again).
+  return { ...state, deck, hands, handNumber: state.handNumber + 1, dumpActive: false };
 }
 
 export function nextPlayer(state: GameState): GameState {
@@ -277,5 +281,6 @@ export function startNewRound(
     handNumber: 1,
     gamePhase: 'playing' as const,
     roundStats: [emptyRoundStats(), emptyRoundStats(), emptyRoundStats()],
+    dumpActive: false,
   };
 }

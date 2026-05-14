@@ -35,13 +35,13 @@ const PLAYER_COLORS: Record<Difficulty, { color: string; name: string }> = {
   beginner:     { color: '#3B82F6', name: 'Calvin' },
   intermediate: { color: '#DBEAFE', name: 'Nina' },
   advanced:     { color: '#DC2626', name: 'Rex' },
+  expert:       { color: '#0D9488', name: 'Jett' },
 };
 
 const JADE = '#065F46';
 const TAN = '#E8C577';
 const BG = '#0A0A0A';
 const BOARD_GAP = 4;
-const BOT_CARD_W = Math.round(CARD_W * 0.7);
 
 export function GameView({
   state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain,
@@ -192,6 +192,18 @@ export function GameView({
     return { text: `R${state.currentRound} · ${state.deck.length} CARDS LEFT`, color: 'rgba(255,255,255,0.5)' };
   }, [lastCapture, state.currentRound, state.deck.length]);
 
+  // ── Hint strip (Adventure W1+W2) ──────────────────
+
+  const hintText = useMemo(() => {
+    if (!state.settings.hintStripEnabled) return null;
+    if (state.gamePhase !== 'playing') return null;
+    if (!isPlayerTurn) return 'Watch the bots play their turn';
+    if (hasCombo && !comboValid) return 'Combo groups must sum (or match) the base card value';
+    if (hasCombo && comboValid) return 'Tap SUBMIT to capture, or RESET to clear';
+    if (selectedHandCard) return 'Tap a board card to capture, or tap the board to place';
+    return 'Tap a card in your hand to start your turn';
+  }, [state.settings.hintStripEnabled, state.gamePhase, isPlayerTurn, hasCombo, comboValid, selectedHandCard]);
+
   // ── Render ─────────────────────────────────────────
 
   return (
@@ -223,7 +235,7 @@ export function GameView({
           fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 500,
           color: 'rgba(255,255,255,0.7)', letterSpacing: '0.12em',
         }}>
-          {currentLevelId ? `ADVENTURE · ${Math.ceil(currentLevelId / 3)}:${((currentLevelId - 1) % 3) + 1}` : `CLASSIC · ${target}`}
+          {currentLevelId ? `ADVENTURE · ${Math.ceil(currentLevelId / 3)}-${((currentLevelId - 1) % 3) + 1}` : `CLASSIC · ${target}`}
         </div>
       </div>
 
@@ -239,6 +251,25 @@ export function GameView({
           {messageContent.text}
         </span>
       </div>
+
+      {/* ═══ HINT STRIP (Adventure W1+W2 only) ═══ */}
+      {hintText && (
+        <div data-testid="hint-strip" style={{
+          padding: '4px 16px 6px', textAlign: 'center', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+        }}>
+          <span style={{
+            fontFamily: 'Inter, system-ui, sans-serif', fontSize: 9, fontWeight: 700,
+            color: TAN, letterSpacing: '0.18em',
+          }}>HINT</span>
+          <span style={{
+            fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500,
+            color: 'rgba(232,197,119,0.75)',
+          }}>
+            {hintText}
+          </span>
+        </div>
+      )}
 
       {/* ═══ ZONES C+D — BOT ZONES ═══ */}
       <div style={{ display: 'flex', gap: 8, padding: '0 8px', flexShrink: 0 }}>
@@ -328,9 +359,17 @@ export function GameView({
         </div>
         {isPlayerTurn && hasCombo && !botCombo && (
           <div style={{ display: 'flex', gap: 6 }}>
-            <Btn label="SUBMIT" primary disabled={!comboValid} onClick={handleSubmit} />
+            <Btn label="SUBMIT" primary disabled={!comboValid || state.dumpActive} onClick={handleSubmit} />
             <Btn label="RESET" onClick={actions.resetCombo} />
           </div>
+        )}
+        {isPlayerTurn && state.dumpActive && (
+          <span style={{
+            fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11, fontWeight: 500,
+            color: TAN, letterSpacing: '0.04em',
+          }}>
+            Last cards — place only
+          </span>
         )}
         {error && <span style={{ fontSize: 11, color: '#EF4444' }}>{error}</span>}
       </div>
@@ -395,10 +434,16 @@ export function GameView({
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
               style={{ background: '#1a1a1a', borderRadius: 12, padding: 24, maxWidth: 280, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <h3 style={{ fontWeight: 700, fontSize: 18, color: '#fff', margin: 0 }}>Quit Game?</h3>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', margin: 0 }}>Your progress in this game will be lost.</p>
+              <h3 style={{ fontWeight: 700, fontSize: 18, color: '#fff', margin: 0 }}>
+                {currentLevelId ? 'Return to Adventure Map?' : 'Quit Game?'}
+              </h3>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', margin: 0 }}>
+                {currentLevelId
+                  ? 'This level will restart next time. Star progress is safe.'
+                  : 'Your progress in this game will be lost.'}
+              </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 4, width: '100%' }}>
-                <Btn label="QUIT" onClick={() => { setShowQuitDialog(false); onQuit(); }} big />
+                <Btn label={currentLevelId ? 'BACK' : 'QUIT'} onClick={() => { setShowQuitDialog(false); onQuit(); }} big />
                 <Btn label="RESUME" primary onClick={() => setShowQuitDialog(false)} big />
               </div>
             </motion.div>

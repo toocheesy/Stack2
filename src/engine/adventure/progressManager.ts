@@ -1,16 +1,11 @@
-import { LEVELS } from './levelConfig';
+import { TOTAL_LEVELS, TOTAL_WORLDS, LEVELS_PER_WORLD } from './levelConfig';
 
-// =============================================================================
-// TEMPORARY DEV FLAG — REVERT TO false BEFORE WAVE 3 TRACK 5 SHIPS
-// =============================================================================
-// When true, all 18 Adventure levels are unlocked for testing.
-// =============================================================================
 const DEV_UNLOCK_ALL = false;
 
 const STORAGE_KEY = 'stacked_v2_adventure_progress';
-const MAX_LEVEL = 18;
-const LEVELS_PER_WORLD = 3;
+const JETT_UNLOCK_KEY = 'stacked_v2_jett_unlocked_classic';
 const STARS_PER_WORLD = LEVELS_PER_WORLD * 3; // 9
+const FINAL_LEVEL_ID = TOTAL_LEVELS; // 12 — beating this unlocks Jett in Classic
 
 export interface AdventureProgress {
   unlockedLevels: number[];
@@ -80,7 +75,7 @@ export function getDefaultProgress(): AdventureProgress {
 export function getInitialProgress(): AdventureProgress {
   if (DEV_UNLOCK_ALL) {
     return {
-      unlockedLevels: Array.from({ length: MAX_LEVEL }, (_, i) => i + 1),
+      unlockedLevels: Array.from({ length: TOTAL_LEVELS }, (_, i) => i + 1),
       starsPerLevel: {},
       lastCompleted: null,
       totalStars: 0,
@@ -128,19 +123,17 @@ export function recordLevelCompletion(
   if (stars >= 2) {
     const nextLevel = levelId + 1;
     const sameWorld = getLevelWorld(nextLevel) === getLevelWorld(levelId);
-    if (sameWorld && nextLevel <= MAX_LEVEL && !unlockedLevels.includes(nextLevel)) {
+    if (sameWorld && nextLevel <= TOTAL_LEVELS && !unlockedLevels.includes(nextLevel)) {
       unlockedLevels.push(nextLevel);
     }
   }
 
-  // Rebuild progress for world-gate check
   const tempProgress: AdventureProgress = { ...progress, starsPerLevel, unlockedLevels };
 
-  // World-gate unlock: if completing this level causes a world to fully 3-star,
-  // unlock the first level of the next world
+  // World-gate unlock: 9 stars in current world unlocks first level of next world
   const currentWorld = getLevelWorld(levelId);
   const nextWorldId = currentWorld + 1;
-  if (nextWorldId <= 6) {
+  if (nextWorldId <= TOTAL_WORLDS) {
     if (starsInWorld(tempProgress, currentWorld) === STARS_PER_WORLD) {
       const firstOfNext = firstLevelOfWorld(nextWorldId);
       if (!unlockedLevels.includes(firstOfNext)) {
@@ -162,6 +155,36 @@ export function recordLevelCompletion(
   };
 }
 
+// ─── Jett Classic-mode unlock gate ──────────────────
+
+export function isJettUnlockedInClassic(): boolean {
+  try {
+    return localStorage.getItem(JETT_UNLOCK_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function unlockJettInClassic(): void {
+  try {
+    localStorage.setItem(JETT_UNLOCK_KEY, 'true');
+  } catch {
+    // ignore
+  }
+}
+
+export function clearJettUnlock(): void {
+  try {
+    localStorage.removeItem(JETT_UNLOCK_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+export function isFinalLevel(levelId: number): boolean {
+  return levelId === FINAL_LEVEL_ID;
+}
+
 // ─── localStorage persistence ───────────────────────
 
 export function saveProgress(progress: AdventureProgress): void {
@@ -172,6 +195,15 @@ export function saveProgress(progress: AdventureProgress): void {
   }
 }
 
+function isOldSchema(parsed: Partial<AdventureProgress>): boolean {
+  if (parsed.unlockedLevels?.some((l) => l > TOTAL_LEVELS)) return true;
+  for (const k of Object.keys(parsed.starsPerLevel ?? {})) {
+    if (parseInt(k, 10) > TOTAL_LEVELS) return true;
+  }
+  if ((parsed.lastCompleted ?? 0) > TOTAL_LEVELS) return true;
+  return false;
+}
+
 export function loadProgress(): AdventureProgress {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -179,6 +211,13 @@ export function loadProgress(): AdventureProgress {
     const parsed = JSON.parse(raw) as Partial<AdventureProgress>;
     if (!parsed.unlockedLevels || !Array.isArray(parsed.unlockedLevels)) {
       return getInitialProgress();
+    }
+    if (isOldSchema(parsed)) {
+      // Old 18-level / 6-world progress detected — reset per ticket spec.
+      console.warn('[Adventure] Old 18-level progress detected; resetting to new 12-level schema.');
+      const fresh = getInitialProgress();
+      saveProgress(fresh);
+      return fresh;
     }
     return {
       unlockedLevels: parsed.unlockedLevels,

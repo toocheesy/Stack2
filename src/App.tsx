@@ -1,15 +1,12 @@
-import { useCallback, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { GameView } from './components/GameView';
 import { ClassicSetup } from './components/ClassicSetup';
 import { ChapterMap } from './components/ChapterMap';
 import { useGameController } from './game/useGameController';
 import type { Difficulty, GameSettings } from './engine/types';
-import { C, SHADOWS } from './config/colors';
-import { getTransition, tween } from './config/motion';
 import { loadGame, clearSavedGame } from './game/persistence';
-import { getLevel } from './engine/adventure/levelConfig';
-import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked } from './engine/adventure/progressManager';
+import { getLevel, TOTAL_LEVELS } from './engine/adventure/levelConfig';
+import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked, unlockJettInClassic, isFinalLevel } from './engine/adventure/progressManager';
 import { LevelCompleteOverlay } from './components/LevelCompleteOverlay';
 import { CardAtomTest } from './components/CardAtomTest';
 
@@ -39,6 +36,17 @@ function App() {
     setScreen('game');
   }, []);
 
+  const settingsForLevel = useCallback((levelId: number): GameSettings => {
+    const level = getLevel(levelId)!;
+    return {
+      targetScore: level.targetScore,
+      bot1Personality: level.bots[0],
+      bot2Personality: level.bots[1],
+      hintStripEnabled: level.hintStripEnabled,
+      disableSeatingSwap: !level.turnOrderSwap,
+    };
+  }, []);
+
   const continueGame = useCallback(() => {
     setScreen('game');
   }, []);
@@ -62,13 +70,12 @@ function App() {
   const nextLevel = useCallback(() => {
     if (!currentLevelId) return;
     const nextId = currentLevelId + 1;
-    const next = getLevel(nextId);
-    if (!next) return;
+    if (!getLevel(nextId)) return;
     setCurrentLevelId(nextId);
     clearSavedGame();
     setSeed(Math.floor(Math.random() * 1_000_000));
-    setSettings({ targetScore: next.targetScore, bot1Personality: next.bots[0], bot2Personality: next.bots[1] });
-  }, [currentLevelId]);
+    setSettings(settingsForLevel(nextId));
+  }, [currentLevelId, settingsForLevel]);
 
   if (screen === 'cardtest') {
     return <CardAtomTest />;
@@ -79,12 +86,11 @@ function App() {
       <ChapterMap
         onBack={() => setScreen('home')}
         onSelectLevel={(id) => {
-          const level = getLevel(id);
-          if (!level) return;
+          if (!getLevel(id)) return;
           setCurrentLevelId(id);
           clearSavedGame();
           setSeed(Math.floor(Math.random() * 1_000_000));
-          setSettings({ targetScore: level.targetScore, bot1Personality: level.bots[0], bot2Personality: level.bots[1] });
+          setSettings(settingsForLevel(id));
           setScreen('game');
         }}
       />
@@ -128,7 +134,6 @@ function App() {
 // ─── Homepage constants (LOCKED) ────────────────────
 
 const JADE = '#065F46';
-const JADE_DIM = '#0a3d2e';
 const TAN = '#E8C577';
 const BROWN = '#72571C';
 const HOME_BG = '#0A0A0A';
@@ -155,7 +160,6 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 // ─── Title Screen (LOCKED) ──────────────────────────
 
 function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => void; onAdventure: () => void; onContinue?: () => void }) {
-  const [showRules, setShowRules] = useState(false);
   const hasAdventureProgress = (() => {
     try { const r = localStorage.getItem('stacked_v2_adventure_progress'); return !!r; } catch { return false; }
   })();
@@ -185,28 +189,13 @@ function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => 
       </div>
 
       {/* Footer */}
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, marginTop: 16, flexShrink: 0 }}>
-        {onContinue && (
+      {onContinue && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16, flexShrink: 0 }}>
           <button onClick={onContinue} style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: JADE, background: 'transparent', border: 'none', cursor: 'pointer' }}>
             Continue saved game
           </button>
-        )}
-        <button onClick={() => setShowRules(true)} style={{
-          display: 'inline-flex', gap: 8, alignItems: 'center',
-          padding: '8px 14px', borderRadius: 999,
-          border: '1px solid rgba(255,255,255,0.1)', background: 'transparent',
-          color: '#9aa9a3', fontSize: 12, fontWeight: 500, cursor: 'pointer',
-          fontFamily: 'Inter, system-ui, sans-serif',
-        }}>
-          <span style={{ width: 16, height: 16, borderRadius: 99, border: '1.2px solid currentColor', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700 }}>?</span>
-          How to play
-        </button>
-      </div>
-
-      {/* Rules modal */}
-      <AnimatePresence>
-        {showRules && <RulesModal onClose={() => setShowRules(false)} />}
-      </AnimatePresence>
+        </div>
+      )}
     </div>
   );
 }
@@ -341,12 +330,18 @@ function AdventureHeroCard({ onPlay, returning }: { onPlay: () => void; returnin
         <div style={{ fontWeight: 900, fontSize: 36, color: '#fff', marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>Adventure</div>
       </div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: 14 }}>
+      {!returning && (
+        <div style={{ fontSize: 11, color: TAN, fontWeight: 500, position: 'relative', marginTop: 10 }}>
+          New here? Adventure starts with a tutorial.
+        </div>
+      )}
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: returning ? 14 : 8 }}>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.4 }}>
           {returning ? (
-            <><span style={{ color: TAN, fontWeight: 600 }}>Level 3 of 18</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>★★☆ · resume run</span></>
+            <><span style={{ color: TAN, fontWeight: 600 }}>Resume your run</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>{TOTAL_LEVELS} levels · 4 worlds</span></>
           ) : (
-            <><span style={{ color: TAN, fontWeight: 600 }}>18 levels</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>6 worlds to conquer</span></>
+            <><span style={{ color: TAN, fontWeight: 600 }}>{TOTAL_LEVELS} levels</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>4 worlds to conquer</span></>
           )}
         </div>
         <div style={{ fontWeight: 800, fontSize: 12, color: BROWN, background: TAN, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(232,197,119,0.25), inset 0 1px 0 rgba(255,255,255,0.18)' }}>
@@ -357,126 +352,13 @@ function AdventureHeroCard({ onPlay, returning }: { onPlay: () => void; returnin
   );
 }
 
-// ─── Rules Modal ────────────────────────────────────
-
-function RulesModal({ onClose }: { onClose: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      transition={tween.default}
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(30, 30, 46, 0.95)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 300,
-        padding: 20,
-      }}
-    >
-      <motion.div
-        initial={{ opacity: 0, scale: 0.96 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.96 }}
-        transition={tween.micro}
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: C.board,
-          borderRadius: 12,
-          maxWidth: 360,
-          width: '100%',
-          padding: 24,
-          position: 'relative',
-          overflow: 'hidden',
-        }}
-      >
-        {/* Left stripe — carries the motif */}
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            top: 0,
-            bottom: 0,
-            width: 4,
-            background: C.indigo,
-            borderRadius: '12px 0 0 12px',
-          }}
-        />
-
-        <h2
-          style={{
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 700,
-            fontSize: 18,
-            color: C.textPrimary,
-            marginBottom: 16,
-          }}
-        >
-          How to Play
-        </h2>
-
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 12,
-          }}
-        >
-          {[
-            'Drag cards into combo slots to build captures',
-            'Match the BASE card with pairs or sums',
-            'Capture = go again. Place = turn ends.',
-            'First to reach the target score wins!',
-          ].map((rule, i) => (
-            <p
-              key={i}
-              style={{
-                fontFamily: 'Inter, sans-serif',
-                fontSize: 14,
-                color: C.ruleText,
-                lineHeight: 1.5,
-              }}
-            >
-              {rule}
-            </p>
-          ))}
-        </div>
-
-        <motion.button
-          onClick={onClose}
-          whileTap={{ scale: 0.97 }}
-          transition={getTransition('snappy')}
-          style={{
-            marginTop: 20,
-            width: '100%',
-            height: 44,
-            background: C.indigo,
-            color: '#FFF',
-            fontFamily: 'Inter, sans-serif',
-            fontWeight: 600,
-            fontSize: 15,
-            border: 'none',
-            borderRadius: 8,
-            cursor: 'pointer',
-          }}
-        >
-          GOT IT
-        </motion.button>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 // ─── Game Wrapper ───────────────────────────────────
 
 const BOT_NAMES: Record<Difficulty, string> = {
   beginner: 'Calvin',
   intermediate: 'Nina',
   advanced: 'Rex',
+  expert: 'Jett',
 };
 
 function GameWrapper({
@@ -499,8 +381,8 @@ function GameWrapper({
   const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, actions } =
     useGameController(seed, settings);
 
-  // Adventure level-complete logic
-  const levelComplete = currentLevelId && gameOver ? (() => {
+  const levelComplete = useMemo(() => {
+    if (!currentLevelId || !gameOver) return null;
     const playerScore = state.overallScores.player;
     const bot1Score = state.overallScores.bot1;
     const bot2Score = state.overallScores.bot2;
@@ -508,22 +390,24 @@ function GameWrapper({
     const stars = calculateStars(playerScore, bot1Score, bot2Score, true);
     const won = stars === 3;
     const margin = playerScore - opponentMax;
-
-    // Save progress (1+ stars = game completed)
-    if (stars > 0) {
-      const progress = loadProgress();
-      const updated = recordLevelCompletion(progress, currentLevelId, stars);
-      saveProgress(updated);
-    }
-
     const scores = [
       { name: 'You', score: playerScore, isPlayer: true },
       { name: BOT_NAMES[state.settings.bot1Personality], score: bot1Score, isPlayer: false },
       { name: BOT_NAMES[state.settings.bot2Personality], score: bot2Score, isPlayer: false },
     ].sort((a, b) => b.score - a.score);
+    return { won, stars, margin, scores, isFinalLevel: isFinalLevel(currentLevelId) };
+  }, [currentLevelId, gameOver, state.overallScores, state.settings.bot1Personality, state.settings.bot2Personality]);
 
-    return { won, stars, margin, scores, isLevel18: currentLevelId === 18 };
-  })() : null;
+  useEffect(() => {
+    if (!currentLevelId || !gameOver || !levelComplete) return;
+    if (levelComplete.stars <= 0) return;
+    const progress = loadProgress();
+    const updated = recordLevelCompletion(progress, currentLevelId, levelComplete.stars);
+    saveProgress(updated);
+    if (isFinalLevel(currentLevelId)) {
+      unlockJettInClassic();
+    }
+  }, [currentLevelId, gameOver, levelComplete]);
 
   return (
     <>
@@ -549,9 +433,9 @@ function GameWrapper({
           starsEarned={levelComplete.stars}
           margin={levelComplete.margin}
           scores={levelComplete.scores}
-          isLevel18={levelComplete.isLevel18}
+          isFinalLevel={levelComplete.isFinalLevel}
           onPlayAgain={onPlayAgain}
-          onNextLevel={levelComplete.stars >= 2 && currentLevelId! < 18 && (() => {
+          onNextLevel={levelComplete.stars >= 2 && currentLevelId! < TOTAL_LEVELS && (() => {
             const nextWorld = getLevelWorld(currentLevelId! + 1);
             const currentWorld = getLevelWorld(currentLevelId!);
             if (nextWorld !== currentWorld) {

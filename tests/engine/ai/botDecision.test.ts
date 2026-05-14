@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  captureChainThreshold,
   decideBotAction,
   getBotThinkingDelay,
   getPersonalityProfile,
@@ -46,6 +47,19 @@ function state(overrides: Partial<GameState>): GameState {
     },
     currentRound: 1,
     currentDealer: 0,
+    handNumber: 1,
+    gamePhase: 'playing',
+    roundStats: [
+      { roundScore: 0, highestCapture: null },
+      { roundScore: 0, highestCapture: null },
+      { roundScore: 0, highestCapture: null },
+    ],
+    gameStats: [
+      { totalScore: 0, highestCapture: null },
+      { totalScore: 0, highestCapture: null },
+      { totalScore: 0, highestCapture: null },
+    ],
+    dumpActive: false,
     ...overrides,
   };
 }
@@ -133,6 +147,47 @@ describe('decideBotAction', () => {
     }
   });
 
+  // ─── Doctrine 2.7 — Forced-Placement Dump ────────────
+
+  it('returns a place action when dumpActive (capture available but locked out)', () => {
+    // Bot holds an Ace; board has another Ace — a pair capture is the
+    // top-scoring action under normal play. With dumpActive=true, the
+    // bot must place instead.
+    const hand1 = card('A');
+    const hand2 = card('5');
+    const boardA = card('A', 'clubs');
+    const s = state({
+      hands: [[hand1, hand2], [], []],
+      board: [boardA, card('7')],
+      dumpActive: true,
+    });
+    const t = createCardTracker();
+    for (let seed = 0; seed < 10; seed++) {
+      const d = decideBotAction(s, 0, 'intermediate', t, createPRNG(seed));
+      expect(d.action).toBe('place');
+    }
+  });
+
+  it('without dumpActive the same setup permits capture', () => {
+    // Sanity check: without the dump flag, the bot should at least
+    // sometimes choose capture given the obvious pair on the board.
+    const hand1 = card('A');
+    const hand2 = card('5');
+    const boardA = card('A', 'clubs');
+    const s = state({
+      hands: [[hand1, hand2], [], []],
+      board: [boardA, card('7')],
+      dumpActive: false,
+    });
+    const t = createCardTracker();
+    let captured = 0;
+    for (let seed = 0; seed < 10; seed++) {
+      const d = decideBotAction(s, 0, 'intermediate', t, createPRNG(seed));
+      if (d.action === 'capture') captured++;
+    }
+    expect(captured).toBeGreaterThan(0);
+  });
+
   it('Calvin places highest number card (2-9) when placing', () => {
     const low = card('2');
     const mid = card('5');
@@ -153,6 +208,36 @@ describe('decideBotAction', () => {
 
   it('getPersonalityProfile for beginner is Calvin', () => {
     expect(getPersonalityProfile('beginner').name).toBe('Calvin');
+  });
+
+  it('getPersonalityProfile for expert is Jett', () => {
+    expect(getPersonalityProfile('expert').name).toBe('Jett');
+  });
+
+  it('Jett returns valid decisions across game states', () => {
+    const hand = [card('A'), card('K'), card('5'), card('3')];
+    const s = state({
+      hands: [hand, [], []],
+      board: [card('A', 'clubs'), card('K', 'clubs'), card('2'), card('7')],
+    });
+    const t = createCardTracker();
+    for (let seed = 0; seed < 20; seed++) {
+      const d = decideBotAction(s, 0, 'expert', t, createPRNG(seed));
+      expect(hand.some((c) => c.id === d.handCard.id)).toBe(true);
+      expect(['capture', 'place']).toContain(d.action);
+    }
+  });
+
+  it('Jett has lower mistake rate than Rex', () => {
+    const jettProfile = getPersonalityProfile('expert');
+    const rexProfile = getPersonalityProfile('advanced');
+    expect(jettProfile.weights.mistakeRate).toBeLessThan(rexProfile.weights.mistakeRate);
+  });
+
+  it('Jett has higher risk threshold than Rex', () => {
+    const jettProfile = getPersonalityProfile('expert');
+    const rexProfile = getPersonalityProfile('advanced');
+    expect(jettProfile.riskThreshold).toBeGreaterThan(rexProfile.riskThreshold);
   });
 });
 
@@ -195,5 +280,43 @@ describe('personality strength ordering (statistical)', () => {
     }
     expect(suboptimal).toBeGreaterThanOrEqual(0);
     expect(suboptimal).toBeLessThanOrEqual(runs);
+  });
+});
+
+// ─── Q3 — captureChainThreshold(se) curve ────────────
+
+describe('captureChainThreshold', () => {
+  it('returns 1.40 for SE 5 (and below)', () => {
+    expect(captureChainThreshold(1)).toBe(1.40);
+    expect(captureChainThreshold(5)).toBe(1.40);
+  });
+
+  it('returns 1.30 for SE 6-7 (Rex tier)', () => {
+    expect(captureChainThreshold(6)).toBe(1.30);
+    expect(captureChainThreshold(7)).toBe(1.30); // Rex
+  });
+
+  it('returns 1.20 for SE 8 (Jett tier — preserves prior default)', () => {
+    expect(captureChainThreshold(8)).toBe(1.20); // Jett
+  });
+
+  it('returns 1.15 for SE 9 and above', () => {
+    expect(captureChainThreshold(9)).toBe(1.15);
+    expect(captureChainThreshold(10)).toBe(1.15);
+  });
+
+  it('curve is monotonically non-increasing (higher SE = lower or equal threshold)', () => {
+    let prev = captureChainThreshold(0);
+    for (let se = 1; se <= 10; se++) {
+      const cur = captureChainThreshold(se);
+      expect(cur).toBeLessThanOrEqual(prev);
+      prev = cur;
+    }
+  });
+
+  it('Rex and Jett receive distinct thresholds (Rex more conservative)', () => {
+    const rexSE = getPersonalityProfile('advanced').setupEngineering;
+    const jettSE = getPersonalityProfile('expert').setupEngineering;
+    expect(captureChainThreshold(rexSE)).toBeGreaterThan(captureChainThreshold(jettSE));
   });
 });

@@ -15,7 +15,7 @@ interface Props {
   starsEarned: 0 | 1 | 2 | 3;
   margin: number;
   scores: PlayerScore[];
-  isLevel18: boolean;
+  isFinalLevel: boolean;
   onPlayAgain: () => void;
   onNextLevel?: () => void;
   onWorldMap: () => void;
@@ -23,7 +23,7 @@ interface Props {
 
 export function LevelCompleteOverlay({
   visible, won, levelId, starsEarned, margin, scores,
-  isLevel18, onPlayAgain, onNextLevel, onWorldMap,
+  isFinalLevel, onPlayAgain, onNextLevel, onWorldMap,
 }: Props) {
   return (
     <AnimatePresence>
@@ -53,7 +53,7 @@ export function LevelCompleteOverlay({
               letterSpacing: 1,
             }}
           >
-            {won ? `LEVEL ${levelId} COMPLETE` : 'TRY AGAIN'}
+            {won ? (isFinalLevel ? 'ADVENTURE COMPLETE' : `LEVEL ${levelId} COMPLETE`) : 'TRY AGAIN'}
           </motion.h1>
 
           {/* Stars */}
@@ -111,8 +111,8 @@ export function LevelCompleteOverlay({
             ))}
           </div>
 
-          {/* Level 18 celebration */}
-          {isLevel18 && won && (
+          {/* Final level celebration */}
+          {isFinalLevel && won && (
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -128,14 +128,14 @@ export function LevelCompleteOverlay({
                 fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 700,
                 color: C.amber,
               }}>
-                ADVENTURE COMPLETE
+                JETT UNLOCKED IN CLASSIC
               </span>
               <br />
               <span style={{
                 fontFamily: 'Inter, sans-serif', fontSize: 11,
                 color: C.textSecondary,
               }}>
-                More worlds coming soon!
+                Bot intelligence arc complete.
               </span>
             </motion.div>
           )}

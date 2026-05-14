@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { modifyWeightsForGameState } from '../evaluator';
-import { createCardTracker, seedInitialDeal, recordPlacement } from '../cardTracker';
+import { createCardTracker, createGameTracker, seedInitialDeal, recordPlacement } from '../cardTracker';
 import { CALVIN_WEIGHTS } from '../personalities/calvin';
 import { NINA_WEIGHTS } from '../personalities/nina';
 import { REX_WEIGHTS } from '../personalities/rex';
@@ -167,5 +167,55 @@ describe('CardTracker seedInitialDeal', () => {
     t = seedInitialDeal(t, 12);
     expect(t.totalSeen).toBe(28);
     expect(t.gamePhase).toBe('late');
+  });
+});
+
+// ─── Sibling 2 — createGameTracker factory ──────────
+
+describe('createGameTracker', () => {
+  it('with 4 board cards produces totalSeen=16, gamePhase=mid', () => {
+    const s = makeState();
+    const t = createGameTracker(s.board);
+    expect(t.totalSeen).toBe(16);
+    expect(t.deckRemaining).toBe(36);
+    expect(t.gamePhase).toBe('mid');
+  });
+
+  it('with 0 board cards still seeds the 12 dealt-hand cards', () => {
+    const t = createGameTracker([]);
+    expect(t.totalSeen).toBe(12);
+    expect(t.deckRemaining).toBe(40);
+    // 12/52 = 23% → still 'early' (threshold is 25%)
+    expect(t.gamePhase).toBe('early');
+  });
+
+  it('preserves identity tracking for board cards (seenCards populated)', () => {
+    const s = makeState();
+    const t = createGameTracker(s.board);
+    for (const card of s.board) {
+      expect(t.seenCards.has(card.id)).toBe(true);
+      expect(t.seenCards.get(card.id)).toBe('board');
+    }
+  });
+
+  it('does NOT track identity of the 12 dealt-hand cards (Option 1)', () => {
+    // Counters reflect 12 cards left the deck, but no specific cards
+    // are recorded — seenCards only contains the 4 board cards.
+    const s = makeState();
+    const t = createGameTracker(s.board);
+    expect(t.seenCards.size).toBe(s.board.length); // exactly board, nothing more
+  });
+
+  it('produces the same tracker shape as the manual 3-step pattern', () => {
+    const s = makeState();
+    let manual = createCardTracker();
+    for (const card of s.board) manual = recordPlacement(manual, card);
+    manual = seedInitialDeal(manual, 12);
+
+    const factory = createGameTracker(s.board);
+    expect(factory.totalSeen).toBe(manual.totalSeen);
+    expect(factory.deckRemaining).toBe(manual.deckRemaining);
+    expect(factory.gamePhase).toBe(manual.gamePhase);
+    expect(factory.seenCards.size).toBe(manual.seenCards.size);
   });
 });

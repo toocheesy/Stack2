@@ -6,6 +6,7 @@ const BOT_DISPLAY: Record<Difficulty, { name: string; color: string }> = {
   beginner:     { name: 'Calvin', color: C.botCalvin },
   intermediate: { name: 'Nina',   color: C.botNina },
   advanced:     { name: 'Rex',    color: C.botRex },
+  expert:       { name: 'Jett',   color: C.botJett },
 };
 
 export interface JackpotDisplay {
@@ -22,7 +23,7 @@ interface Props {
 
 export function JackpotCelebration({ info, bot1Personality, bot2Personality }: Props) {
   let winnerName = 'You';
-  let winnerColor = C.indigo;
+  let winnerColor: string = C.indigo;
   if (info) {
     if (info.winner === 1) {
       const b = BOT_DISPLAY[bot1Personality];

@@ -21,6 +21,7 @@ import { createPRNG, type PRNG } from '../engine/utils/prng';
 import { createIdGenerator, type IdGenerator } from '../engine/utils/uuid';
 import {
   createCardTracker,
+  createGameTracker,
   recordCapture,
   recordPlacement,
   seedInitialDeal,
@@ -84,19 +85,19 @@ export function useGameController(seed: number, settings: GameSettings) {
 
   const [state, setState] = useState<GameState>(() => {
     const saved = loadGame();
-    if (saved) return saved;
-    const initial = createInitialState(settings, prngRef.current, idGenRef.current);
-    for (const card of initial.board) {
-      trackerRef.current = recordPlacement(trackerRef.current, card);
+    if (saved) {
+      trackerRef.current = saved.tracker;
+      return saved.game;
     }
-    trackerRef.current = seedInitialDeal(trackerRef.current, initial.hands.length * 4);
+    const initial = createInitialState(settings, prngRef.current, idGenRef.current);
+    trackerRef.current = createGameTracker(initial.board);
     return initial;
   });
 
   const setAndPersist = useCallback((s: GameState) => {
     setState(s);
     stateRef.current = s;
-    saveGame(s);
+    saveGame(s, trackerRef.current);
   }, []);
   const [botViz, setBotViz] = useState<BotVizStep | null>(null);
   const [gameOver, setGameOver] = useState<{
@@ -125,7 +126,11 @@ export function useGameController(seed: number, settings: GameSettings) {
 
     switch (result.type) {
       case 'CONTINUE_TURN': {
-        const next = { ...current, currentPlayer: result.nextPlayer };
+        const next = {
+          ...current,
+          currentPlayer: result.nextPlayer,
+          dumpActive: result.dumpActive ?? current.dumpActive,
+        };
         setAndPersist(next);
         if (result.nextPlayer !== 0) {
           await runBotTurn(next);
@@ -369,6 +374,7 @@ export function useGameController(seed: number, settings: GameSettings) {
     if (botBusyRef.current) return 'Not your turn';
     const s = stateRef.current;
     if (s.currentPlayer !== 0) return 'Not your turn';
+    if (s.dumpActive) return 'Place only — last cards';
 
     const validation = validateFullCombo(s);
     if (!validation.isValid) return validation.errors[0] ?? 'Invalid combo';

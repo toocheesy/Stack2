@@ -4,16 +4,11 @@ import { SCORE_KEYS } from '../engine/types';
 import { C } from '../config/colors';
 import { getTransition } from '../config/motion';
 
-const PLAYER_INFO: Record<number, { label: string; defaultColor: string }> = {
-  0: { label: 'YOU', defaultColor: C.amber },
-  1: { label: 'Bot 1', defaultColor: C.textPrimary },
-  2: { label: 'Bot 2', defaultColor: C.textPrimary },
-};
-
 const BOT_DISPLAY: Record<Difficulty, { name: string; color: string }> = {
   beginner:     { name: 'Calvin', color: C.botCalvin },
   intermediate: { name: 'Nina',   color: C.botNina },
   advanced:     { name: 'Rex',    color: C.botRex },
+  expert:       { name: 'Jett',   color: C.botJett },
 };
 
 interface Props {

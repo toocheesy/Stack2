@@ -93,9 +93,6 @@ export function findAllSingleSlotCaptures(
   const handPoints = cardPoints(handCard);
   const handIsFace = isFace(handCard.rank);
 
-  // Filter board to non-face cards for sum consideration
-  const nonFaceBoard = board.filter((c) => !isFace(c.rank));
-
   for (const subset of allSubsets(board)) {
     if (subset.length === 0) continue;
 
@@ -223,7 +220,6 @@ export function enumerateAllCaptures(
   board: readonly Card[],
 ): GroundTruthCapture[] {
   const results: GroundTruthCapture[] = [];
-  const handPoints = cardPoints(handCard);
 
   // Single-slot captures
   const singles = findAllSingleSlotCaptures(handCard, board);

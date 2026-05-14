@@ -32,6 +32,31 @@ export function createCardTracker(): CardTrackerState {
   };
 }
 
+const INITIAL_HAND_CARDS = 12; // 4 cards × 3 players, dealt at game start
+
+/**
+ * Convenience factory for game start. Produces a tracker that correctly
+ * accounts for: initial board cards (full identity tracking) + 12 cards
+ * dealt to player + 2 bot hands (counter-only, no identity tracking).
+ *
+ * The 12-card counter-only treatment is deliberate (doctrine Option 1):
+ * the bot knows 12 cards have left the deck but NOT which cards went to
+ * which opponent's hand. This prevents opponent hand info leakage while
+ * keeping totalSeen / gamePhase / cardsRemaining counters accurate.
+ *
+ * Replaces the prior fragile caller pattern (manual createCardTracker
+ * → recordPlacement loop → seedInitialDeal(12)) per
+ * docs/post-foundation-calibration-diagnosis-2026-05-06.md Sibling 2.
+ */
+export function createGameTracker(boardCards: readonly Card[]): CardTrackerState {
+  let tracker = createCardTracker();
+  for (const card of boardCards) {
+    tracker = recordPlacement(tracker, card);
+  }
+  tracker = seedInitialDeal(tracker, INITIAL_HAND_CARDS);
+  return tracker;
+}
+
 export function updateGamePhase(tracker: CardTrackerState): GamePhase {
   const pct = tracker.totalSeen / DECK_SIZE;
   if (pct < 0.25) return 'early';

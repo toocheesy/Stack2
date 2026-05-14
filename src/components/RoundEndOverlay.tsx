@@ -8,6 +8,7 @@ const BOT_DISPLAY: Record<Difficulty, { name: string; color: string }> = {
   beginner:     { name: 'Calvin', color: C.botCalvin },
   intermediate: { name: 'Nina',   color: C.botNina },
   advanced:     { name: 'Rex',    color: C.botRex },
+  expert:       { name: 'Jett',   color: C.botJett },
 };
 
 const AUTO_ADVANCE_SEC = 10;

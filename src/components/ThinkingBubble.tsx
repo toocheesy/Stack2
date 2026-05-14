@@ -5,6 +5,7 @@ const BOT_COLORS: Record<Difficulty, { fill: string; name: string }> = {
   beginner:     { fill: '#60A5FA', name: 'Calvin' },
   intermediate: { fill: '#A78BFA', name: 'Nina' },
   advanced:     { fill: '#EF4444', name: 'Rex' },
+  expert:       { fill: '#FBBF24', name: 'Jett' },
 };
 
 interface Props {

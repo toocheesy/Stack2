@@ -89,6 +89,8 @@ export interface GameSettings {
   targetScore: number;
   bot1Personality: Difficulty;
   bot2Personality: Difficulty;
+  hintStripEnabled?: boolean;
+  disableSeatingSwap?: boolean;
 }
 
 export interface GameState {
@@ -108,6 +110,10 @@ export interface GameState {
   gamePhase: GamePhase;
   roundStats: [RoundStats, RoundStats, RoundStats];
   gameStats: [GamePlayerStats, GamePlayerStats, GamePlayerStats];
+  // Doctrine 2.7 — Forced-Placement Dump: true when only one player has
+  // cards left and they have just placed. Captures are locked out until
+  // a new hand is dealt or a new round starts.
+  dumpActive: boolean;
 }
 
 export type CaptureType = 'pair' | 'sum';
@@ -157,7 +163,7 @@ export interface MultiSlotCapture {
 }
 
 export type TurnResult =
-  | { type: 'CONTINUE_TURN'; nextPlayer: PlayerIndex }
+  | { type: 'CONTINUE_TURN'; nextPlayer: PlayerIndex; dumpActive?: boolean }
   | { type: 'DEAL_NEW_HAND'; startingPlayer: PlayerIndex }
   | {
       type: 'END_ROUND';
@@ -192,7 +198,7 @@ export interface GameAction {
   timestamp?: number;
 }
 
-export type Difficulty = 'beginner' | 'intermediate' | 'advanced';
+export type Difficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 
 export const RANK_VALUES: Record<Rank, number> = {
   A: 1,

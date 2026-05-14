@@ -22,11 +22,9 @@ import {
   calculateCardsPoints,
 } from '../../src/engine/core/scoring';
 import type { Card, CaptureOption, Rank, Suit } from '../../src/engine/types';
-import { RANK_VALUES, RANKS, SUITS, SCORE_VALUES } from '../../src/engine/types';
+import { RANK_VALUES, RANKS, SUITS } from '../../src/engine/types';
 import {
   enumerateAllCaptures,
-  findAllSingleSlotCaptures,
-  findAllMultiSlotCaptures,
   computeExpectedScore,
   type GroundTruthCapture,
 } from './brute-force-enumerator';

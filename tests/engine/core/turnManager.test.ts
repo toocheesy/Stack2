@@ -39,6 +39,19 @@ function state(overrides: Partial<GameState>): GameState {
     },
     currentRound: 1,
     currentDealer: 0,
+    handNumber: 1,
+    gamePhase: 'playing',
+    roundStats: [
+      { roundScore: 0, highestCapture: null },
+      { roundScore: 0, highestCapture: null },
+      { roundScore: 0, highestCapture: null },
+    ],
+    gameStats: [
+      { totalScore: 0, highestCapture: null },
+      { totalScore: 0, highestCapture: null },
+      { totalScore: 0, highestCapture: null },
+    ],
+    dumpActive: false,
     ...overrides,
   };
 }
@@ -119,12 +132,101 @@ describe('determineTurnResult', () => {
     else throw new Error('expected CONTINUE_TURN');
   });
 
+  // ─── Doctrine 2.7 — Forced-Placement Dump trigger ──────────
+
+  it('lone player + just placed → CONTINUE_TURN with dumpActive=true', () => {
+    const s = state({
+      currentPlayer: 0,
+      hands: [[card('2'), card('5')], [], []],
+      lastAction: 'place',
+    });
+    const r = determineTurnResult(s);
+    if (r.type !== 'CONTINUE_TURN') throw new Error('expected CONTINUE_TURN');
+    expect(r.nextPlayer).toBe(0);
+    expect(r.dumpActive).toBe(true);
+  });
+
+  it('normal CONTINUE_TURN does not signal dumpActive', () => {
+    const s = state({
+      currentPlayer: 0,
+      hands: [[card('2')], [card('5')], [card('A')]],
+      lastAction: 'place',
+    });
+    const r = determineTurnResult(s);
+    if (r.type !== 'CONTINUE_TURN') throw new Error('expected CONTINUE_TURN');
+    expect(r.dumpActive).toBeFalsy();
+  });
+
   it('all empty + deck >= 12 → DEAL_NEW_HAND', () => {
     const deck: Card[] = [];
     for (let i = 0; i < 12; i++) deck.push(card('2'));
     const s = state({ hands: [[], [], []], deck, lastAction: 'place' });
     const r = determineTurnResult(s);
     expect(r.type).toBe('DEAL_NEW_HAND');
+  });
+
+  // ─── Doctrine 5.7 — position locked within a round ─────────
+
+  it('DEAL_NEW_HAND startingPlayer is always (currentDealer + 1) % 3', () => {
+    const deck: Card[] = [];
+    for (let i = 0; i < 12; i++) deck.push(card('2'));
+    const s = state({
+      hands: [[], [], []],
+      deck,
+      currentDealer: 0,
+      currentPlayer: 2,
+      lastAction: 'place',
+    });
+    const r = determineTurnResult(s);
+    if (r.type !== 'DEAL_NEW_HAND') throw new Error('expected DEAL_NEW_HAND');
+    expect(r.startingPlayer).toBe(1);
+  });
+
+  it('startingPlayer ignores who placed last in the prior hand (lock)', () => {
+    const deck: Card[] = [];
+    for (let i = 0; i < 12; i++) deck.push(card('2'));
+
+    // Round dealer = 1 → round's first player = 2. Vary currentPlayer
+    // and lastAction across multiple hands; startingPlayer should
+    // remain 2 every time.
+    for (const currentPlayer of [0, 1, 2] as PlayerIndex[]) {
+      for (const lastAction of ['place', 'capture'] as const) {
+        const s = state({
+          hands: [[], [], []],
+          deck,
+          currentDealer: 1,
+          currentPlayer,
+          lastAction,
+        });
+        const r = determineTurnResult(s);
+        if (r.type !== 'DEAL_NEW_HAND') throw new Error('expected DEAL_NEW_HAND');
+        expect(r.startingPlayer).toBe(2);
+      }
+    }
+  });
+
+  it('startingPlayer rotates only when the dealer rotates (round boundary)', () => {
+    const deck: Card[] = [];
+    for (let i = 0; i < 12; i++) deck.push(card('2'));
+
+    // Each row simulates a freshly started round with a different dealer.
+    const cases: Array<[PlayerIndex, PlayerIndex]> = [
+      [0, 1],
+      [1, 2],
+      [2, 0],
+    ];
+    for (const [dealer, expected] of cases) {
+      const s = state({
+        hands: [[], [], []],
+        deck,
+        currentDealer: dealer,
+        currentPlayer: dealer, // does not affect startingPlayer
+        lastAction: 'place',
+      });
+      const r = determineTurnResult(s);
+      if (r.type !== 'DEAL_NEW_HAND') throw new Error('expected DEAL_NEW_HAND');
+      expect(r.startingPlayer).toBe(expected);
+    }
   });
 
   it('all empty + deck < 12 + scores below target → END_ROUND with jackpot', () => {

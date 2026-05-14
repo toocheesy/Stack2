@@ -8,7 +8,6 @@ import { getTransition } from '../config/motion';
 const CARD_W = 62;
 const CARD_H = Math.round(CARD_W * (3.5 / 2.5));
 const SMALL_W = 40;
-const SMALL_H = Math.round(SMALL_W * (3.5 / 2.5));
 
 // Brand colors (locked)
 const STK = {

@@ -90,6 +90,10 @@ describe('createInitialState', () => {
     expect(s.lastAction).toBeNull();
     expect(s.lastCapturer).toBeNull();
   });
+
+  it('dumpActive defaults to false (doctrine 2.7)', () => {
+    expect(makeState().dumpActive).toBe(false);
+  });
 });
 
 describe('dealNewHand', () => {
@@ -110,6 +114,12 @@ describe('dealNewHand', () => {
     const s = makeState();
     const dealt = dealNewHand(s);
     expect(dealt).not.toBe(s);
+  });
+
+  it('clears dumpActive when new cards are dealt (doctrine 2.7)', () => {
+    const s: GameState = { ...makeState(), dumpActive: true };
+    const dealt = dealNewHand(s);
+    expect(dealt.dumpActive).toBe(false);
   });
 });
 
@@ -243,5 +253,13 @@ describe('startNewRound', () => {
     expect(next.currentRound).toBe(2);
     expect(next.hands[0]).toHaveLength(4);
     expect(next.board).toHaveLength(4);
+  });
+
+  it('clears dumpActive at the start of a new round (doctrine 2.7)', () => {
+    const s: GameState = { ...makeState(10), dumpActive: true };
+    const prng = createPRNG(99);
+    const gen = createIdGenerator(createPRNG(100));
+    const next = startNewRound(s, prng, gen);
+    expect(next.dumpActive).toBe(false);
   });
 });

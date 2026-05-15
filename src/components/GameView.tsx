@@ -231,29 +231,35 @@ export function GameView({
       fontFamily: 'Inter, system-ui, sans-serif',
     }}>
 
-      {/* ═══ ZONE A — HEADER BAR ═══ */}
+      {/* ═══ ZONE A — HEADER BAR (Bundle B S1) ═══
+            5-segment format: MODE · TARGET/LEVEL · R[N] · H[N] · [N] LEFT.
+            Mid-dot separator white@40% with 8px gaps. State-driven tints:
+            Hand 3 → R/H tan; deck ≤ 8 → [N] LEFT tan. Card count moves out
+            of Zone H entirely (deleted from Zone H render below). */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '8px 12px', flexShrink: 0, height: 44,
+        padding: '8px 12px', flexShrink: 0, height: 44, gap: 8,
       }}>
         {!gameOver && !jackpotInfo && state.gamePhase === 'playing' ? (
           <motion.button onClick={() => setShowQuitDialog(true)} whileTap={{ scale: 0.9 }} transition={getTransition('snappy')} style={{
             width: 32, height: 32, borderRadius: 99, border: 'none',
             background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
-            fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 16, cursor: 'pointer', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>←</motion.button>
-        ) : <div style={{ width: 32 }} />}
+        ) : <div style={{ width: 32, flexShrink: 0 }} />}
 
-        <div style={{ fontWeight: 900, fontSize: 14, letterSpacing: '-0.02em', color: '#fff' }}>
-          STACKED<span style={{ color: JADE }}>!</span>
-        </div>
+        <HeaderSegments
+          mode={currentLevelId ? 'ADVENTURE' : 'CLASSIC'}
+          targetOrLevel={currentLevelId
+            ? `${Math.ceil(currentLevelId / 3)}-${((currentLevelId - 1) % 3) + 1}`
+            : String(target)}
+          round={state.currentRound}
+          hand={state.handNumber}
+          deckLeft={state.deck.length}
+        />
 
-        <div style={{
-          fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 500,
-          color: 'rgba(255,255,255,0.7)', letterSpacing: '0.12em',
-        }}>
-          {currentLevelId ? `ADVENTURE · ${Math.ceil(currentLevelId / 3)}-${((currentLevelId - 1) % 3) + 1}` : `CLASSIC · ${target}`}
-        </div>
+        <div style={{ width: 32, flexShrink: 0 }} />
       </div>
 
       {/* ═══ ZONE B — MESSAGE STRIP ═══ */}
@@ -288,16 +294,22 @@ export function GameView({
         </div>
       )}
 
-      {/* ═══ ZONES C+D — BOT ZONES ═══ */}
+      {/* ═══ ZONES C+D — BOT ZONES (Bundle B S2) ═══
+            Two-line layout. When both bots share a personality (Adventure
+            W1 Calvin+Calvin etc.), seats lock to "Name · 1" / "Name · 2"
+            for player-side disambiguation. Position-locked at game start
+            because settings don't shuffle mid-game. */}
       <div style={{ display: 'flex', gap: 8, padding: '0 8px', flexShrink: 0 }}>
         <BotZone
-          name={bot1.name} color={bot1.color} score={state.overallScores.bot1}
+          name={state.settings.bot1Personality === state.settings.bot2Personality ? `${bot1.name} · 1` : bot1.name}
+          color={bot1.color} score={state.overallScores.bot1}
           target={target} hand={bot1HandVisible} active={bot1Active}
           thinking={!!botViz && botViz.playerIndex === 1 && botViz.type === 'thinking'}
           escalated={bot1Escalated}
         />
         <BotZone
-          name={bot2.name} color={bot2.color} score={state.overallScores.bot2}
+          name={state.settings.bot1Personality === state.settings.bot2Personality ? `${bot2.name} · 2` : bot2.name}
+          color={bot2.color} score={state.overallScores.bot2}
           target={target} hand={bot2HandVisible} active={bot2Active}
           thinking={!!botViz && botViz.playerIndex === 2 && botViz.type === 'thinking'}
           escalated={bot2Escalated}
@@ -440,9 +452,8 @@ export function GameView({
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
             /{target}
           </span>
-          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
-            {visibleHand.length} cards
-          </span>
+          {/* Bundle B — card count moved to Zone A header; the "X cards" line
+              that used to live here was deleted per spec section 1. */}
         </motion.div>
 
         {/* Zone G — Your hand. Bundle A S2 glow same treatment as Zone H. */}
@@ -521,8 +532,8 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
   hand: readonly Card[]; active: boolean; thinking: boolean;
   escalated: boolean;
 }) {
-  // Bundle A S2 — active-turn glow: 3px border, 16px outer (50%↔70% breathe),
-  // 4px inset at 30%, 1.2s ease-in-out. Player color hex with 8-digit alpha.
+  // Bundle A S2 — active-turn glow (3px border + breathing 16px outer + 4px inset).
+  // Bundle B S2 — two-line layout: name (top) + score (middle) + face-down cards (bottom).
   return (
     <motion.div
       animate={active ? {
@@ -538,29 +549,41 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
         flex: 1, borderRadius: 10, padding: '8px 10px',
         background: 'rgba(255,255,255,0.03)',
         border: active ? `3px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
-        display: 'flex', flexDirection: 'column', gap: 6,
+        display: 'flex', flexDirection: 'column', gap: 4,
         transition: 'border 200ms',
+        minWidth: 0,
       }}>
-      {/* Name + score */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color, letterSpacing: '0.05em' }}>
-          {name}{thinking ? ' ...' : ''}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-          {/* Bundle A S4 — score-state escalation: white → tan once at 80% target. */}
-          <motion.span
-            animate={{ color: escalated ? TAN : '#fff' }}
-            transition={{ duration: 0.5, ease: 'easeIn' }}
-            style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 18 }}
-          >
-            {score}
-          </motion.span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>/{target}</span>
-        </div>
+      {/* Name line — Inter Medium 14px, bot color @ 100% (per spec section 4) */}
+      <span style={{
+        fontFamily: 'Inter, system-ui, sans-serif',
+        fontSize: 14, fontWeight: 500, color,
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {name}{thinking ? ' …' : ''}
+      </span>
+
+      {/* Score line — `[score] /[target]` format per spec section 4.
+            Score: Inter Black 22px, white@90% → tan@90% at 80% threshold (Bundle A S4).
+            Suffix: Inter Medium 12px, white@50%. */}
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+        <motion.span
+          animate={{ color: escalated ? 'rgba(232,197,119,0.9)' : 'rgba(255,255,255,0.9)' }}
+          transition={{ duration: 0.5, ease: 'easeIn' }}
+          style={{
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontWeight: 900, fontSize: 22, lineHeight: 1,
+          }}
+        >
+          {score}
+        </motion.span>
+        <span style={{
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.5)',
+        }}>/{target}</span>
       </div>
 
       {/* Face-down hand */}
-      <div style={{ display: 'flex', gap: -4 }}>
+      <div style={{ display: 'flex', gap: -4, marginTop: 2 }}>
         {hand.slice(0, 4).map((c, i) => (
           <div key={c.id} style={{ marginLeft: i > 0 ? -8 : 0 }}>
             <CardComponent card={c} faceDown small />
@@ -588,6 +611,69 @@ function Btn({ label, primary, disabled, big, onClick }: {
       fontSize: big ? 15 : 12, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif',
       cursor: disabled ? 'default' : 'pointer',
     }}>{label}</motion.button>
+  );
+}
+
+// Bundle B S1 — Header bar segments. 5 segments separated by mid-dots.
+//   MODE · TARGET/LEVEL · R[N] · H[N] · [N] LEFT
+// Mode + target/level are stable white@90% (never drop). R[N] / H[N] /
+// [N] LEFT are white@70% by default and tan@90% under their state cue
+// (Hand 3 for R/H; deck ≤ 8 for [N] LEFT). Min-width:0 + overflow:hidden
+// on the container give natural progressive truncation if width is tight;
+// strict priority drop (R → H → [N] LEFT first) is documented as a
+// follow-up since common mobile widths fit all five comfortably.
+function HeaderSegments({
+  mode, targetOrLevel, round, hand, deckLeft,
+}: {
+  mode: 'CLASSIC' | 'ADVENTURE';
+  targetOrLevel: string;
+  round: number;
+  hand: number;
+  deckLeft: number;
+}) {
+  const HAND_3_FORK = hand >= 3;
+  const DECK_LOW = deckLeft <= 8;
+  const stable = 'rgba(255,255,255,0.9)';
+  const secondary = 'rgba(255,255,255,0.7)';
+  const tan = 'rgba(232,197,119,0.9)'; // TAN #E8C577 @ 90%
+  const dotColor = 'rgba(255,255,255,0.4)';
+
+  const seg = (text: string, color: string, key: string, letterSpacing = 'normal') => (
+    <span key={key} style={{
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSize: 13, fontWeight: 500, color, letterSpacing, whiteSpace: 'nowrap',
+    }}>{text}</span>
+  );
+
+  const dot = (key: string) => (
+    <span key={key} aria-hidden style={{
+      fontFamily: 'Inter, system-ui, sans-serif',
+      fontSize: 13, color: dotColor, padding: '0 8px', whiteSpace: 'nowrap',
+    }}>·</span>
+  );
+
+  const segments = [
+    seg(mode, stable, 'mode', '0.04em'),
+    seg(targetOrLevel, stable, 'tl'),
+    seg(`R${round}`, HAND_3_FORK ? tan : secondary, 'r'),
+    seg(`H${hand}`, HAND_3_FORK ? tan : secondary, 'h'),
+    seg(`${deckLeft} LEFT`, DECK_LOW ? tan : secondary, 'left'),
+  ];
+
+  // Interleave separators between segments
+  const children: React.ReactNode[] = [];
+  segments.forEach((s, i) => {
+    if (i > 0) children.push(dot(`d${i}`));
+    children.push(s);
+  });
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flex: 1, minWidth: 0, overflow: 'hidden',
+    }}>
+      {children}
+    </div>
   );
 }
 

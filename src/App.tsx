@@ -172,18 +172,30 @@ function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => 
       backgroundImage: 'radial-gradient(circle at 30% 10%, rgba(6,95,70,0.10) 0%, transparent 50%), radial-gradient(circle at 80% 90%, rgba(232,197,119,0.05) 0%, transparent 50%)',
       overflow: 'hidden',
     }}>
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
-        <div style={{ fontWeight: 900, fontSize: 18, letterSpacing: '-0.02em' }}>
+      {/* Hero — STACKED! brand mark (Marcus Build 2 audit S2:
+            moved from top-left utility chrome to hero-center at ~3.5×
+            scale. Subtitle kept underneath as small functional context
+            rather than dropped — gives the player a verb for what's
+            below without competing with the brand mark visually). */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center',
+        gap: 6, flexShrink: 0, marginBottom: 28,
+      }}>
+        <div style={{
+          fontWeight: 900, fontSize: 64, letterSpacing: '-0.02em', lineHeight: 1,
+        }}>
           STACKED<span style={{ color: JADE }}>!</span>
         </div>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#7a8580', letterSpacing: '0.22em', fontWeight: 500 }}>
+        <div style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 10, color: '#7a8580', letterSpacing: '0.22em', fontWeight: 500,
+        }}>
           CHOOSE YOUR GAME
         </div>
       </div>
 
       {/* Hero cards */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, marginTop: 24, minHeight: 0 }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
         <ClassicHeroCard onPlay={onNewGame} />
         <AdventureHeroCard onPlay={onAdventure} returning={hasAdventureProgress} />
       </div>
@@ -256,7 +268,7 @@ function ClassicHeroCard({ onPlay }: { onPlay: () => void }) {
       <div style={{ position: 'absolute', right: 30, top: -20, fontSize: 120, color: 'rgba(126,209,179,0.03)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(10deg)' }}>{'\u2666\uFE0E'}</div>
       <div style={{ position: 'absolute', left: 40, top: -10, fontSize: 100, color: 'rgba(126,209,179,0.025)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(-8deg)' }}>{'\u2663\uFE0E'}</div>
 
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'relative', flex: 1 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', flex: 1 }}>
         <div style={{ flexShrink: 0, paddingRight: 8 }}>
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#7ed1b3', letterSpacing: '0.22em', fontWeight: 600 }}>QUICK MATCH · 5 MIN</div>
           <div style={{ fontWeight: 900, fontSize: 36, color: '#fff', marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>Classic</div>

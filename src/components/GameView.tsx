@@ -566,7 +566,7 @@ export function GameView({
           <motion.span
             animate={{ color: playerEscalated ? TAN : '#fff' }}
             transition={{ duration: 0.5, ease: 'easeIn' }}
-            style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 22 }}
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 18 }}
           >
             {state.overallScores.player}
           </motion.span>
@@ -692,7 +692,7 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
           transition={{ duration: 0.5, ease: 'easeIn' }}
           style={{
             fontFamily: 'Inter, system-ui, sans-serif',
-            fontWeight: 900, fontSize: 22, lineHeight: 1,
+            fontWeight: 900, fontSize: 18, lineHeight: 1,
           }}
         >
           {score}
@@ -735,20 +735,17 @@ function Btn({ label, primary, disabled, big, onClick }: {
   );
 }
 
-// Header polish (May 14 follow-up) — 4 segments separated by mid-dots:
-//   MODE · TARGET/LEVEL · R[N] · H[N]/[total]
-// [N] LEFT segment dropped per TC playtest override (board-border amber
-// glow already covers "hand ending soon"). H[N] now shows current/total
-// hands per round. Mode + target/level stable white@90% (never drop).
-// R[N] / H[N]/[total] white@70% by default, tan@90% during Hand 3 round
-// arc cue. Min-width:0 + overflow:hidden on the container give natural
+// Header bar segments. 4 segments separated by mid-dots:
+//   MODE · TARGET/LEVEL · R[N] · H[N]
+// Mode + target/level stable white@90% (never drop). R[N] / H[N]
+// white@70% by default, tan@90% during the Hand 3 round-arc cue.
+// Min-width:0 + overflow:hidden on the container give natural
 // truncation if width is tight.
 //
-// TOTAL_HANDS_PER_ROUND derivation: HAND_SIZE 4 × 3 players = 12 cards
-// per deal. Deck 52 − BOARD_SIZE 4 = 48 dealable cards. 48 / 12 = 4 hands
-// per round. Engine doesn't expose this as a constant; matches the
-// turnManager DEAL_NEW_HAND ↔ END_ROUND threshold (`deck.length >= 12`).
-const TOTAL_HANDS_PER_ROUND = 4;
+// Marcus Build 2 audit (May 15): H[N]/[total] reverted to bare H[N].
+// Display no longer bakes a hands-per-round structural assumption
+// into UI copy — survives engine variants (different hand size,
+// player count, deck composition, future game modes).
 
 function HeaderSegments({
   mode, targetOrLevel, round, hand,
@@ -782,7 +779,7 @@ function HeaderSegments({
     seg(mode, stable, 'mode', '0.04em'),
     seg(targetOrLevel, stable, 'tl'),
     seg(`R${round}`, HAND_3_FORK ? tan : secondary, 'r'),
-    seg(`H${hand}/${TOTAL_HANDS_PER_ROUND}`, HAND_3_FORK ? tan : secondary, 'h'),
+    seg(`H${hand}`, HAND_3_FORK ? tan : secondary, 'h'),
   ];
 
   // Interleave separators between segments

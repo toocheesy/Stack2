@@ -424,6 +424,7 @@ function GameWrapper({
         onQuit={onQuit}
         onHome={onHome}
         onPlayAgain={onPlayAgain}
+        suppressToasts={!!levelComplete}
       />
       {levelComplete && (
         <LevelCompleteOverlay

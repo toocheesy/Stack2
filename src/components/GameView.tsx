@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { Card, ComboSlot, Difficulty, GameState, PlayerIndex } from '../engine/types';
 import { getTransition } from '../config/motion';
@@ -24,6 +24,11 @@ interface Props {
   onQuit: () => void;
   onHome: () => void;
   onPlayAgain: () => void;
+  // Bundle C — when an Adventure overlay (LevelCompleteOverlay etc.) is
+  // showing from App.tsx, suppress the in-game toast layer. App passes
+  // !!levelComplete here so the toast logic doesn't need to know about
+  // overlays it can't directly observe.
+  suppressToasts?: boolean;
 }
 
 const SLOT_KEYS: ComboSlot[] = ['base', 'combo1', 'combo2', 'combo3'];
@@ -44,7 +49,7 @@ const BG = '#0A0A0A';
 const BOARD_GAP = 4;
 
 export function GameView({
-  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain,
+  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, suppressToasts = false,
 }: Props) {
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -198,18 +203,18 @@ export function GameView({
     };
   }, [state.combination, botCombo]);
 
-  // ── Message strip content ─────────────────────────
+  // ── Bundle C — Persistent strip content (LAST capture echo) ──
+  // Empty when no capture has happened yet; the header (Bundle B) carries
+  // round info so we don't need to repeat it here.
 
-  const messageContent = useMemo(() => {
-    if (lastCapture) {
-      const base = lastCapture.baseCard?.rank ?? '';
-      const areas = lastCapture.areas.map(a => a.map(c => c.rank).join('+')).join(' · ');
-      return { text: `LAST · ${base} = ${areas}`, color: 'rgba(255,255,255,0.6)' };
-    }
-    return { text: `R${state.currentRound} · ${state.deck.length} CARDS LEFT`, color: 'rgba(255,255,255,0.5)' };
-  }, [lastCapture, state.currentRound, state.deck.length]);
+  const persistentMessage = useMemo(() => {
+    if (!lastCapture) return null;
+    const base = lastCapture.baseCard?.rank ?? '';
+    const areas = lastCapture.areas.map(a => a.map(c => c.rank).join('+')).join(' · ');
+    return { prefix: 'LAST · ', equation: `${base} = ${areas}` };
+  }, [lastCapture]);
 
-  // ── Hint strip (Adventure W1+W2) ──────────────────
+  // ── Bundle C — Adventure hint copy (routed through toast layer below) ──
 
   const hintText = useMemo(() => {
     if (!state.settings.hintStripEnabled) return null;
@@ -220,6 +225,75 @@ export function GameView({
     if (selectedHandCard) return 'Tap a board card to capture, or tap the board to place';
     return 'Tap a card in your hand to start your turn';
   }, [state.settings.hintStripEnabled, state.gamePhase, isPlayerTurn, hasCombo, comboValid, selectedHandCard]);
+
+  // ── Bundle C — Toast layer state machine ──
+  // Three toast kinds:
+  //   - celebration: 2s, +pts · NICE COMBO, tan
+  //   - transition:  3s, R[N] · FRESH DECK, white
+  //   - hint:        persistent until cleared by player action / interrupt
+  // Priority: celebration > transition > hint > none. Higher preempts lower.
+  // Suppressed entirely whenever an overlay (RoundEnd/Jackpot/GameOver/
+  // LevelComplete) is showing — closes UX Review finding 9.
+
+  type TransientKind = 'celebration' | 'transition';
+  type Transient = { kind: TransientKind; text: string; color: string; expires: number };
+  const [transient, setTransient] = useState<Transient | null>(null);
+  const lastCaptureTsRef = useRef<number>(lastCapture?.timestamp ?? 0);
+  const lastSeenRoundRef = useRef<number>(state.currentRound);
+
+  const isOverlaySuppressing =
+    state.gamePhase !== 'playing' ||
+    !!jackpotInfo ||
+    !!gameOver ||
+    suppressToasts;
+
+  // Score Celebration on new capture timestamps.
+  useEffect(() => {
+    if (!lastCapture) return;
+    if (lastCapture.timestamp === lastCaptureTsRef.current) return;
+    lastCaptureTsRef.current = lastCapture.timestamp;
+    if (isOverlaySuppressing) return;
+    setTransient({
+      kind: 'celebration',
+      text: `+${lastCapture.points} · NICE COMBO`,
+      color: TAN,
+      expires: Date.now() + 2000,
+    });
+  }, [lastCapture, isOverlaySuppressing]);
+
+  // Round Transition on round increment (skip the initial round). Does not
+  // preempt an active Score Celebration (celebration is higher priority).
+  useEffect(() => {
+    if (state.currentRound === lastSeenRoundRef.current) return;
+    lastSeenRoundRef.current = state.currentRound;
+    if (state.currentRound <= 1 || isOverlaySuppressing) return;
+    setTransient((prev) => {
+      if (prev?.kind === 'celebration') return prev;
+      return {
+        kind: 'transition',
+        text: `R${state.currentRound} · FRESH DECK`,
+        color: '#fff',
+        expires: Date.now() + 3000,
+      };
+    });
+  }, [state.currentRound, isOverlaySuppressing]);
+
+  // Auto-clear expired transients.
+  useEffect(() => {
+    if (!transient) return;
+    const ms = Math.max(0, transient.expires - Date.now());
+    const t = setTimeout(() => setTransient(null), ms);
+    return () => clearTimeout(t);
+  }, [transient]);
+
+  // Resolve which toast wins (transient first, hint as fallback). null when
+  // suppressed or nothing to show.
+  const activeToast = useMemo<{ kind: TransientKind | 'hint'; text: string; color: string } | null>(() => {
+    if (isOverlaySuppressing) return null;
+    if (transient) return transient;
+    if (hintText) return { kind: 'hint', text: hintText, color: 'rgba(232,197,119,0.9)' };
+    return null;
+  }, [isOverlaySuppressing, transient, hintText]);
 
   // ── Render ─────────────────────────────────────────
 
@@ -262,37 +336,71 @@ export function GameView({
         <div style={{ width: 32, flexShrink: 0 }} />
       </div>
 
-      {/* ═══ ZONE B — MESSAGE STRIP ═══ */}
+      {/* ═══ ZONE B — MESSAGE STRIP (Bundle C: persistent + toast) ═══
+           Persistent layer is always rendered (transparent strip carrying
+           the LAST capture echo). Toast layer animates in/out over the top
+           with celebration/transition/hint content. */}
       <div style={{
-        padding: '4px 16px', textAlign: 'center', flexShrink: 0, height: 28,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        position: 'relative', flexShrink: 0, height: 32,
       }}>
-        <span style={{
-          fontFamily: "'JetBrains Mono', monospace", fontSize: 11, fontWeight: 500,
-          color: messageContent.color, letterSpacing: '0.05em',
+        {/* Persistent layer */}
+        <div style={{
+          position: 'absolute', inset: 0,
+          padding: '4px 16px', textAlign: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>
-          {messageContent.text}
-        </span>
-      </div>
-
-      {/* ═══ HINT STRIP (Adventure W1+W2 only) ═══ */}
-      {hintText && (
-        <div data-testid="hint-strip" style={{
-          padding: '4px 16px 6px', textAlign: 'center', flexShrink: 0,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-        }}>
-          <span style={{
-            fontFamily: 'Inter, system-ui, sans-serif', fontSize: 9, fontWeight: 700,
-            color: TAN, letterSpacing: '0.18em',
-          }}>HINT</span>
-          <span style={{
-            fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500,
-            color: 'rgba(232,197,119,0.75)',
-          }}>
-            {hintText}
-          </span>
+          {persistentMessage && (
+            <span style={{
+              fontFamily: 'Inter, system-ui, sans-serif',
+              fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.6)',
+              letterSpacing: '0.02em',
+            }}>
+              {persistentMessage.prefix}
+              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                {persistentMessage.equation}
+              </span>
+            </span>
+          )}
         </div>
-      )}
+
+        {/* Toast layer — slides over the persistent strip when active. */}
+        <AnimatePresence>
+          {activeToast && (
+            <motion.div
+              key={`${activeToast.kind}:${activeToast.text}`}
+              data-testid="toast-strip"
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.25, ease: activeToast.kind === 'celebration' || activeToast.kind === 'transition' ? 'easeOut' : 'easeOut' }}
+              style={{
+                position: 'absolute', inset: 0,
+                padding: '4px 16px', textAlign: 'center',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                gap: 6,
+                background: BG, // covers persistent strip while toast active
+              }}
+            >
+              {activeToast.kind === 'hint' && (
+                <span style={{
+                  fontFamily: 'Inter, system-ui, sans-serif',
+                  fontSize: 11, fontWeight: 700,
+                  color: TAN, letterSpacing: '0.18em',
+                }}>HINT</span>
+              )}
+              <span style={{
+                fontFamily: 'Inter, system-ui, sans-serif',
+                fontSize: activeToast.kind === 'hint' ? 13 : 14,
+                fontWeight: activeToast.kind === 'transition' ? 700 : 500,
+                color: activeToast.color,
+                letterSpacing: activeToast.kind === 'transition' ? '0.06em' : '0.02em',
+              }}>
+                {activeToast.text}
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* ═══ ZONES C+D — BOT ZONES (Bundle B S2) ═══
             Two-line layout. When both bots share a personality (Adventure

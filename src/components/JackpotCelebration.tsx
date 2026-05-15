@@ -22,22 +22,21 @@ interface Props {
 }
 
 export function JackpotCelebration({ info, bot1Personality, bot2Personality }: Props) {
-  let winnerName = 'You';
-  // YOU's accent across the app is C.amber (Zone H, hand zone glows). Keep
-  // jackpot winner color consistent when the human wins — was C.indigo
-  // (Phaser-era leftover) before the brand cleanup.
+  // Language rename L3 — asymmetric Take the Table popup formula:
+  //   Player: "TABLE TAKEN!" (active voice, no name — the event IS the celebration)
+  //   Bot:    "[BOT] TOOK THE TABLE!" (name-first, all-caps, parallels FIRST BLOOD — JINX)
+  // Subtitle ("X sweep(s) the board") dropped — redundant with new headline that already
+  // says "took the table." Bundle A's grammar ternary lives on in this comment as
+  // documentation if the subtitle ever returns.
+  const isPlayer = !info || info.winner === 0;
+  let botName = '';
   let winnerColor: string = C.amber;
-  if (info) {
-    if (info.winner === 1) {
-      const b = BOT_DISPLAY[bot1Personality];
-      winnerName = b.name;
-      winnerColor = b.color;
-    } else if (info.winner === 2) {
-      const b = BOT_DISPLAY[bot2Personality];
-      winnerName = b.name;
-      winnerColor = b.color;
-    }
+  if (info && !isPlayer) {
+    const b = info.winner === 1 ? BOT_DISPLAY[bot1Personality] : BOT_DISPLAY[bot2Personality];
+    botName = b.name;
+    winnerColor = b.color;
   }
+  const headline = isPlayer ? 'TABLE TAKEN!' : `${botName.toUpperCase()} TOOK THE TABLE!`;
 
   return (
     <AnimatePresence>
@@ -52,7 +51,7 @@ export function JackpotCelebration({ info, bot1Personality, bot2Personality }: P
             background: 'rgba(0,0,0,0.7)',
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
-            gap: 8, zIndex: 190,
+            gap: 10, zIndex: 190, padding: '0 24px', textAlign: 'center',
           }}
         >
           <motion.span
@@ -60,22 +59,15 @@ export function JackpotCelebration({ info, bot1Personality, bot2Personality }: P
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             style={{
-              fontSize: 32, fontWeight: 800,
+              fontSize: isPlayer ? 32 : 26, fontWeight: 800,
               fontFamily: 'Inter, sans-serif',
-              color: C.amber,
-              letterSpacing: 3, textTransform: 'uppercase',
+              color: isPlayer ? C.amber : winnerColor,
+              letterSpacing: 2, textTransform: 'uppercase',
+              lineHeight: 1.1,
             }}
           >
-            JACKPOT!
+            {headline}
           </motion.span>
-
-          <span style={{
-            fontSize: 15, fontWeight: 600,
-            fontFamily: 'Inter, sans-serif',
-            color: winnerColor,
-          }}>
-            {winnerName} {winnerName === 'You' ? 'sweep' : 'sweeps'} the board
-          </span>
 
           <span style={{
             fontSize: 22, fontWeight: 700,

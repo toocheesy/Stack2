@@ -6,7 +6,7 @@ import { useGameController } from './game/useGameController';
 import type { Difficulty, GameSettings } from './engine/types';
 import { loadGame, clearSavedGame } from './game/persistence';
 import { getLevel, TOTAL_LEVELS } from './engine/adventure/levelConfig';
-import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked, unlockJettInClassic, isFinalLevel } from './engine/adventure/progressManager';
+import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked, unlockJettInClassic, isFinalLevel, getRunStatus, clearProgress, type RunStatus } from './engine/adventure/progressManager';
 import { LevelCompleteOverlay } from './components/LevelCompleteOverlay';
 import { CardAtomTest } from './components/CardAtomTest';
 
@@ -160,9 +160,23 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 // ─── Title Screen (LOCKED) ──────────────────────────
 
 function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => void; onAdventure: () => void; onContinue?: () => void }) {
-  const hasAdventureProgress = (() => {
-    try { const r = localStorage.getItem('stacked_v2_adventure_progress'); return !!r; } catch { return false; }
-  })();
+  // Language rename — entry verb hierarchy: BEGIN / RESUME / NEW RUN.
+  const runStatus: RunStatus = getRunStatus();
+  const [showNewRunConfirm, setShowNewRunConfirm] = useState(false);
+
+  const onRunCardTap = () => {
+    if (runStatus === 'complete') {
+      setShowNewRunConfirm(true);
+    } else {
+      onAdventure();
+    }
+  };
+
+  const confirmNewRun = () => {
+    clearProgress();
+    setShowNewRunConfirm(false);
+    onAdventure();
+  };
 
   return (
     <div style={{
@@ -197,7 +211,7 @@ function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => 
       {/* Hero cards */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
         <ClassicHeroCard onPlay={onNewGame} />
-        <AdventureHeroCard onPlay={onAdventure} returning={hasAdventureProgress} />
+        <AdventureHeroCard onPlay={onRunCardTap} runStatus={runStatus} />
       </div>
 
       {/* Footer */}
@@ -206,6 +220,59 @@ function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => 
           <button onClick={onContinue} style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: JADE, background: 'transparent', border: 'none', cursor: 'pointer' }}>
             Continue saved game
           </button>
+        </div>
+      )}
+
+      {/* NEW RUN confirmation dialog — fires when the Run card is tapped
+          while runStatus === 'complete'. Wipes progress on confirm. */}
+      {showNewRunConfirm && (
+        <div
+          onClick={() => setShowNewRunConfirm(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 250, padding: 20,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: '#1a1a1a', borderRadius: 12, padding: 24,
+              maxWidth: 320, width: '100%',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
+            }}
+          >
+            <h3 style={{ fontWeight: 700, fontSize: 18, color: '#fff', margin: 0 }}>
+              Start a new Run?
+            </h3>
+            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', margin: 0 }}>
+              Your existing Run is complete. Starting a new Run wipes progress and stars. Jett stays unlocked in Classic.
+            </p>
+            <div style={{ display: 'flex', gap: 10, marginTop: 4, width: '100%' }}>
+              <button
+                onClick={() => setShowNewRunConfirm(false)}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 8,
+                  border: '1.5px solid rgba(255,255,255,0.4)', background: 'transparent',
+                  color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 600,
+                  fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                }}
+              >
+                CANCEL
+              </button>
+              <button
+                onClick={confirmNewRun}
+                style={{
+                  flex: 1, padding: '10px 16px', borderRadius: 8,
+                  border: 'none', background: TAN,
+                  color: HOME_BG, fontSize: 14, fontWeight: 700,
+                  fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                }}
+              >
+                START NEW RUN
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -300,7 +367,8 @@ function ClassicHeroCard({ onPlay }: { onPlay: () => void }) {
 
 // ─── Adventure Hero Card ────────────────────────────
 
-function AdventureHeroCard({ onPlay, returning }: { onPlay: () => void; returning: boolean }) {
+function AdventureHeroCard({ onPlay, runStatus }: { onPlay: () => void; runStatus: RunStatus }) {
+  const returning = runStatus === 'in-progress' || runStatus === 'complete';
   const nodes: [number, number][] = [
     [22,268],[78,250],[40,222],[110,208],[170,220],[130,178],
     [220,168],[200,130],[275,142],[245,100],[320,88],[355,48],
@@ -339,12 +407,12 @@ function AdventureHeroCard({ onPlay, returning }: { onPlay: () => void; returnin
         <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: TAN, letterSpacing: '0.22em', fontWeight: 600 }}>
           {returning ? 'CAMPAIGN · CH. 1' : 'CAMPAIGN · NEW'}
         </div>
-        <div style={{ fontWeight: 900, fontSize: 36, color: '#fff', marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>Adventure</div>
+        <div style={{ fontWeight: 900, fontSize: 36, color: '#fff', marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>The Run</div>
       </div>
 
       {!returning && (
         <div style={{ fontSize: 11, color: TAN, fontWeight: 500, position: 'relative', marginTop: 10 }}>
-          New here? Adventure starts with a tutorial.
+          New here? The Run starts with a tutorial.
         </div>
       )}
 
@@ -357,7 +425,7 @@ function AdventureHeroCard({ onPlay, returning }: { onPlay: () => void; returnin
           )}
         </div>
         <div style={{ fontWeight: 800, fontSize: 12, color: BROWN, background: TAN, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(232,197,119,0.25), inset 0 1px 0 rgba(255,255,255,0.18)' }}>
-          {returning ? 'RESUME' : 'BEGIN'} <span style={{ fontSize: 14 }}>→</span>
+          {runStatus === 'fresh' ? 'BEGIN' : runStatus === 'complete' ? 'NEW RUN' : 'RESUME'} <span style={{ fontSize: 14 }}>→</span>
         </div>
       </div>
     </div>

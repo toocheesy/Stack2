@@ -53,7 +53,7 @@ export function LevelCompleteOverlay({
               letterSpacing: 1,
             }}
           >
-            {won ? (isFinalLevel ? 'ADVENTURE COMPLETE' : `LEVEL ${levelId} COMPLETE`) : 'TRY AGAIN'}
+            {won ? (isFinalLevel ? 'THE RUN COMPLETE' : `LEVEL ${levelId} COMPLETE`) : 'TRY AGAIN'}
           </motion.h1>
 
           {/* Stars */}

@@ -141,7 +141,7 @@ export function ClassicSetup({ onStart, onBack }: Props) {
                     </span>
                   </div>
                   <span style={{ fontSize: 11, color: selected ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', fontStyle: 'italic', transition: 'color 200ms' }}>
-                    {locked ? 'Beat Adventure World 4 to unlock' : bot.flavor}
+                    {locked ? 'Beat The Run World 4 to unlock' : bot.flavor}
                   </span>
                 </div>
                 {locked && (

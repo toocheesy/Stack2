@@ -237,3 +237,26 @@ export function clearProgress(): void {
     // ignore
   }
 }
+
+// Language rename pass — entry-verb hierarchy for the home-screen Run card.
+// Three states derived from the in-storage progress:
+//   - 'fresh'        → no save in localStorage             → BEGIN
+//   - 'in-progress'  → save exists, < 12 levels completed  → RESUME
+//   - 'complete'     → save exists, all 12 levels with ≥1 star → NEW RUN
+export type RunStatus = 'fresh' | 'in-progress' | 'complete';
+
+export function getRunStatus(): RunStatus {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return 'fresh';
+    const parsed = JSON.parse(raw) as Partial<AdventureProgress>;
+    const stars = parsed.starsPerLevel ?? {};
+    let completed = 0;
+    for (let id = 1; id <= TOTAL_LEVELS; id++) {
+      if ((stars[id] ?? 0) > 0) completed++;
+    }
+    return completed >= TOTAL_LEVELS ? 'complete' : 'in-progress';
+  } catch {
+    return 'fresh';
+  }
+}

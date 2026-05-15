@@ -102,7 +102,7 @@ export function ChapterMap({ onBack, onSelectLevel }: Props) {
         }}>‹</button>
         <div style={{ textAlign: 'center' }}>
           <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: BROWN, letterSpacing: '0.22em', fontWeight: 600 }}>
-            ADVENTURE · {currentNode.worldName.toUpperCase()}
+            THE RUN · {currentNode.worldName.toUpperCase()}
           </div>
           <div style={{ fontWeight: 800, fontSize: 16, color: '#fff', marginTop: 2, letterSpacing: '-0.01em' }}>
             {currentNode.title}

@@ -337,7 +337,7 @@ export function GameView({
             STACKED<span style={{ color: JADE }}>!</span>
           </span>
           <HeaderSegments
-            mode={currentLevelId ? 'ADVENTURE' : 'CLASSIC'}
+            mode={currentLevelId ? 'THE RUN' : 'CLASSIC'}
             targetOrLevel={currentLevelId
               ? `${Math.ceil(currentLevelId / 3)}-${((currentLevelId - 1) % 3) + 1}`
               : String(target)}
@@ -622,7 +622,7 @@ export function GameView({
               onClick={(e) => e.stopPropagation()}
               style={{ background: '#1a1a1a', borderRadius: 12, padding: 24, maxWidth: 280, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
               <h3 style={{ fontWeight: 700, fontSize: 18, color: '#fff', margin: 0 }}>
-                {currentLevelId ? 'Return to Adventure Map?' : 'Quit Game?'}
+                {currentLevelId ? 'Return to The Run Map?' : 'Quit Game?'}
               </h3>
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', margin: 0 }}>
                 {currentLevelId
@@ -750,7 +750,7 @@ function Btn({ label, primary, disabled, big, onClick }: {
 function HeaderSegments({
   mode, targetOrLevel, round, hand,
 }: {
-  mode: 'CLASSIC' | 'ADVENTURE';
+  mode: 'CLASSIC' | 'THE RUN';
   targetOrLevel: string;
   round: number;
   hand: number;

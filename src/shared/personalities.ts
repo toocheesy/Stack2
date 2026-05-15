@@ -61,8 +61,8 @@ export const PERSONALITY_PROFILES: readonly PersonalityProfile[] = [
     difficulty: 'expert',
     label: 'Expert',
     flavor: 'Patient, relentless',
-    color: '#0D9488',
-    colorHex: 0x0d9488,
+    color: '#8B5CF6',
+    colorHex: 0x8b5cf6,
   },
   {
     key: 'mira',

@@ -1,11 +1,12 @@
 import { AnimatePresence, motion } from 'motion/react';
 import type { Difficulty } from '../engine/types';
 
+// Locked palette per Visual Paint Brief Section 7.
 const BOT_COLORS: Record<Difficulty, { fill: string; name: string }> = {
-  beginner:     { fill: '#60A5FA', name: 'Calvin' },
-  intermediate: { fill: '#A78BFA', name: 'Nina' },
-  advanced:     { fill: '#EF4444', name: 'Rex' },
-  expert:       { fill: '#FBBF24', name: 'Jett' },
+  beginner:     { fill: '#3B82F6', name: 'Calvin' },
+  intermediate: { fill: '#DBEAFE', name: 'Nina' },
+  advanced:     { fill: '#DC2626', name: 'Rex' },
+  expert:       { fill: '#8B5CF6', name: 'Jett' },
 };
 
 interface Props {

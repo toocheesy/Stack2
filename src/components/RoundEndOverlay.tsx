@@ -22,6 +22,9 @@ interface Props {
   bot1Personality: Difficulty;
   bot2Personality: Difficulty;
   onContinue: () => void;
+  // Bundle A — Adventure overlays use tan CTAs, Classic uses jade. Defaults
+  // to Classic if unset (safe fallback for any caller missing the prop).
+  adventureMode?: boolean;
 }
 
 function formatHighest(record: CaptureRecord | null): string | null {
@@ -33,7 +36,7 @@ function formatHighest(record: CaptureRecord | null): string | null {
 
 export function RoundEndOverlay({
   visible, roundNumber, roundStats, gameStats, targetScore,
-  bot1Personality, bot2Personality, onContinue,
+  bot1Personality, bot2Personality, onContinue, adventureMode = false,
 }: Props) {
   const [countdown, setCountdown] = useState(AUTO_ADVANCE_SEC);
   const onContinueRef = useRef(onContinue);
@@ -141,8 +144,10 @@ export function RoundEndOverlay({
             transition={getTransition('snappy')}
             style={{
               padding: '10px 28px', borderRadius: 6,
-              border: 'none', background: C.indigo,
-              color: C.card, fontSize: 14, fontWeight: 600,
+              border: 'none',
+              background: adventureMode ? C.tan : C.jade,
+              color: adventureMode ? C.bgNearBlack : C.card,
+              fontSize: 14, fontWeight: 700,
               fontFamily: 'Inter, sans-serif', cursor: 'pointer',
               marginTop: 4,
             }}

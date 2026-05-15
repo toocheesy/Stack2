@@ -1,9 +1,18 @@
 /** Central color tokens — single source of truth.
  *  Every component references these, never raw hex. */
 export const C = {
+  // Brand palette (locked May 1, 2026)
+  jade: '#065F46',
+  tan: '#E8C577',
+  brown: '#72571C',
+  bgNearBlack: '#0A0A0A',
+
   slateBg: '#1E1E2E',
   board: '#252538',
   card: '#FFFFFF',
+  // indigo / indigoHover — DEPRECATED. Phaser-era leftovers. Bundle A swaps
+  // overlay CTA usage to brand jade/tan; tokens kept temporarily for any
+  // residual reference. Schedule for removal.
   indigo: '#4F46E5',
   indigoHover: '#6366F1',
   amber: '#F59E0B',
@@ -17,13 +26,16 @@ export const C = {
   disabledText: '#5A5A70',
   ruleText: '#C0C0D0',
 
-  // Bot personality colors
-  botCalvin: '#60A5FA',
+  // Bot personality colors — locked palette per visual paint brief Section 7.
+  // Re-aligned May 14: botNina #A78BFA → #DBEAFE (resolved Game Over drift),
+  // botJett #FBBF24 → #8B5CF6 (Stacy May 6 inconsistency closed; teal #0D9488
+  // and golden #FBBF24 both retired). Calvin / Rex updated to locked palette.
+  botCalvin: '#3B82F6',
   botTalia: '#F472B6',
-  botNina: '#A78BFA',
+  botNina: '#DBEAFE',
   botMira: '#34D399',
-  botJett: '#FBBF24',
-  botRex: '#EF4444',
+  botJett: '#8B5CF6',
+  botRex: '#DC2626',
 
   // Suit colors
   suitRed: '#DC2626',

@@ -149,8 +149,8 @@ export function LevelCompleteOverlay({
                 transition={getTransition('snappy')}
                 style={{
                   width: '100%', height: 46, borderRadius: 8,
-                  border: 'none', background: C.indigo,
-                  color: C.card, fontSize: 15, fontWeight: 600,
+                  border: 'none', background: C.tan,
+                  color: C.bgNearBlack, fontSize: 15, fontWeight: 700,
                   fontFamily: 'Inter, sans-serif', cursor: 'pointer',
                 }}
               >
@@ -163,10 +163,10 @@ export function LevelCompleteOverlay({
               transition={getTransition('snappy')}
               style={{
                 width: '100%', height: 42, borderRadius: 8,
-                border: onNextLevel ? `1px solid ${C.divider}` : 'none',
-                background: onNextLevel ? 'transparent' : C.indigo,
-                color: onNextLevel ? C.textSecondary : C.card,
-                fontSize: 14, fontWeight: 600,
+                border: onNextLevel ? `1.5px solid rgba(255,255,255,0.4)` : 'none',
+                background: onNextLevel ? 'transparent' : C.tan,
+                color: onNextLevel ? 'rgba(255,255,255,0.9)' : C.bgNearBlack,
+                fontSize: 14, fontWeight: onNextLevel ? 600 : 700,
                 fontFamily: 'Inter, sans-serif', cursor: 'pointer',
               }}
             >
@@ -178,9 +178,9 @@ export function LevelCompleteOverlay({
               transition={getTransition('snappy')}
               style={{
                 width: '100%', height: 42, borderRadius: 8,
-                border: `1px solid ${C.divider}`,
+                border: `1.5px solid rgba(255,255,255,0.4)`,
                 background: 'transparent',
-                color: C.textSecondary, fontSize: 14, fontWeight: 600,
+                color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 600,
                 fontFamily: 'Inter, sans-serif', cursor: 'pointer',
               }}
             >

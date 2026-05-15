@@ -23,7 +23,10 @@ interface Props {
 
 export function JackpotCelebration({ info, bot1Personality, bot2Personality }: Props) {
   let winnerName = 'You';
-  let winnerColor: string = C.indigo;
+  // YOU's accent across the app is C.amber (Zone H, hand zone glows). Keep
+  // jackpot winner color consistent when the human wins — was C.indigo
+  // (Phaser-era leftover) before the brand cleanup.
+  let winnerColor: string = C.amber;
   if (info) {
     if (info.winner === 1) {
       const b = BOT_DISPLAY[bot1Personality];
@@ -71,7 +74,7 @@ export function JackpotCelebration({ info, bot1Personality, bot2Personality }: P
             fontFamily: 'Inter, sans-serif',
             color: winnerColor,
           }}>
-            {winnerName} sweeps the board
+            {winnerName} {winnerName === 'You' ? 'sweep' : 'sweeps'} the board
           </span>
 
           <span style={{

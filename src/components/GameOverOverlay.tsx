@@ -150,8 +150,10 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
             transition={getTransition('snappy')}
             style={{
               padding: '12px 28px', borderRadius: 6,
-              border: 'none', background: C.indigo,
-              color: C.card, fontSize: 15, fontWeight: 600,
+              border: 'none',
+              background: adventureMode ? C.tan : C.jade,
+              color: adventureMode ? C.bgNearBlack : C.card,
+              fontSize: 15, fontWeight: 700,
               fontFamily: 'Inter, sans-serif', cursor: 'pointer',
             }}
           >
@@ -163,9 +165,9 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
             transition={getTransition('snappy')}
             style={{
               padding: '12px 24px', borderRadius: 6,
-              border: `1px solid ${C.textSecondary}`,
+              border: `1.5px solid rgba(255,255,255,0.4)`,
               background: 'transparent',
-              color: C.textSecondary, fontSize: 15, fontWeight: 600,
+              color: 'rgba(255,255,255,0.9)', fontSize: 15, fontWeight: 600,
               fontFamily: 'Inter, sans-serif', cursor: 'pointer',
             }}
           >

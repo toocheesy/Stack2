@@ -35,7 +35,7 @@ const PLAYER_COLORS: Record<Difficulty, { color: string; name: string }> = {
   beginner:     { color: '#3B82F6', name: 'Calvin' },
   intermediate: { color: '#DBEAFE', name: 'Nina' },
   advanced:     { color: '#DC2626', name: 'Rex' },
-  expert:       { color: '#0D9488', name: 'Jett' },
+  expert:       { color: '#8B5CF6', name: 'Jett' },
 };
 
 const JADE = '#065F46';
@@ -81,6 +81,23 @@ export function GameView({
 
   const bot1HandVisible = botCombo?.playerIndex === 1 ? state.hands[1].filter(c => c.id !== botCombo.baseCard.id) : state.hands[1];
   const bot2HandVisible = botCombo?.playerIndex === 2 ? state.hands[2].filter(c => c.id !== botCombo.baseCard.id) : state.hands[2];
+
+  // Bundle A S2 — active-turn glow gates on gamePhase. Glow MUST clear when
+  // gamePhase moves to roundEnd / jackpot / gameOver so the overlay messaging
+  // doesn't compete with a leftover active-player highlight.
+  const inPlay = state.gamePhase === 'playing';
+  const playerActive = inPlay && state.currentPlayer === 0;
+  const bot1Active = inPlay && state.currentPlayer === 1;
+  const bot2Active = inPlay && state.currentPlayer === 2;
+
+  // Bundle A S4 — score-state escalation. Once a player crosses 80% of target,
+  // their score number transitions white → tan over ~500ms ease-in. Scores are
+  // monotonic within a round, so the boolean naturally resets when scores
+  // reset for the next round (round-boundary clear).
+  const escalateThreshold = target * 0.8;
+  const playerEscalated = state.overallScores.player >= escalateThreshold;
+  const bot1Escalated = state.overallScores.bot1 >= escalateThreshold;
+  const bot2Escalated = state.overallScores.bot2 >= escalateThreshold;
 
   // ── Hit testing ─────────────────────────────────────
 
@@ -275,13 +292,15 @@ export function GameView({
       <div style={{ display: 'flex', gap: 8, padding: '0 8px', flexShrink: 0 }}>
         <BotZone
           name={bot1.name} color={bot1.color} score={state.overallScores.bot1}
-          target={target} hand={bot1HandVisible} active={state.currentPlayer === 1}
+          target={target} hand={bot1HandVisible} active={bot1Active}
           thinking={!!botViz && botViz.playerIndex === 1 && botViz.type === 'thinking'}
+          escalated={bot1Escalated}
         />
         <BotZone
           name={bot2.name} color={bot2.color} score={state.overallScores.bot2}
-          target={target} hand={bot2HandVisible} active={state.currentPlayer === 2}
+          target={target} hand={bot2HandVisible} active={bot2Active}
           thinking={!!botViz && botViz.playerIndex === 2 && botViz.type === 'thinking'}
+          escalated={bot2Escalated}
         />
       </div>
 
@@ -295,8 +314,21 @@ export function GameView({
         position: 'relative', zIndex: 15, minHeight: 0, overflow: 'visible',
         transition: 'border 150ms',
       }}>
-        {visibleBoard.length === 0 && !botCombo && (
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)' }}>Board empty</span>
+        {/* Bundle A S5 — jackpot board tint. Tan #E8C577 @ 6% during the
+             jackpot hand (deck.length===0 + still playing). Coexists with the
+             deckEmpty amber border glow above; different signal: tint = "this
+             is the jackpot hand", glow = "this hand is ending soon." */}
+        <motion.div
+          initial={false}
+          animate={{ opacity: deckEmpty ? 0.06 : 0 }}
+          transition={{ duration: deckEmpty ? 0.6 : 0.4, ease: deckEmpty ? 'easeOut' : 'easeIn' }}
+          style={{
+            position: 'absolute', inset: 0, borderRadius: 12,
+            background: TAN, pointerEvents: 'none', zIndex: 0,
+          }}
+        />
+        {visibleBoard.length === 0 && !botCombo && inPlay && (
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', position: 'relative', zIndex: 1 }}>Board empty</span>
         )}
         {visibleBoard.map((card) => (
           <div key={card.id} style={{ transform: `scale(${boardCardScale})`, transformOrigin: 'center' }}>
@@ -378,37 +410,60 @@ export function GameView({
       <div style={{
         display: 'flex', padding: '0 8px 8px', gap: 8, flexShrink: 0,
       }}>
-        {/* Zone H — Player score block */}
-        <div style={{
-          width: 72, borderRadius: 10, padding: '8px 4px',
-          background: 'rgba(255,255,255,0.03)',
-          border: state.currentPlayer === 0 ? '2px solid #F59E0B' : '1px solid rgba(255,255,255,0.06)',
-          boxShadow: state.currentPlayer === 0 ? '0 0 12px rgba(245,158,11,0.25)' : 'none',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-          transition: 'border 200ms, box-shadow 200ms',
-        }}>
+        {/* Zone H — Player score block. Bundle A S2 active-turn glow:
+              3px tan border + breathing 16px outer + 4px inset. Phase-gated. */}
+        <motion.div
+          animate={playerActive ? {
+            boxShadow: [
+              `0 0 16px ${TAN}80, inset 0 0 4px ${TAN}4D`,
+              `0 0 16px ${TAN}B3, inset 0 0 4px ${TAN}4D`,
+            ],
+          } : { boxShadow: '0 0 0 0 transparent' }}
+          transition={playerActive
+            ? { duration: 1.2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }
+            : { duration: 0.2 }}
+          style={{
+            width: 72, borderRadius: 10, padding: '8px 4px',
+            background: 'rgba(255,255,255,0.03)',
+            border: playerActive ? `3px solid ${TAN}` : '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+            transition: 'border 200ms',
+          }}>
           <span style={{ fontSize: 9, fontWeight: 600, color: '#F59E0B', letterSpacing: '0.1em' }}>YOU</span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 22, color: '#fff' }}>
+          <motion.span
+            animate={{ color: playerEscalated ? TAN : '#fff' }}
+            transition={{ duration: 0.5, ease: 'easeIn' }}
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 22 }}
+          >
             {state.overallScores.player}
-          </span>
+          </motion.span>
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
             /{target}
           </span>
           <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.35)', marginTop: 2 }}>
             {visibleHand.length} cards
           </span>
-        </div>
+        </motion.div>
 
-        {/* Zone G — Your hand */}
-        <div style={{
-          flex: 1, borderRadius: 10, padding: '6px 4px',
-          background: 'rgba(255,255,255,0.03)',
-          border: state.currentPlayer === 0 ? '2px solid #F59E0B' : '1px solid rgba(255,255,255,0.06)',
-          boxShadow: state.currentPlayer === 0 ? '0 0 12px rgba(245,158,11,0.25)' : 'none',
-          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-          transition: 'border 200ms, box-shadow 200ms',
-          position: 'relative', zIndex: 20,
-        }}>
+        {/* Zone G — Your hand. Bundle A S2 glow same treatment as Zone H. */}
+        <motion.div
+          animate={playerActive ? {
+            boxShadow: [
+              `0 0 16px ${TAN}80, inset 0 0 4px ${TAN}4D`,
+              `0 0 16px ${TAN}B3, inset 0 0 4px ${TAN}4D`,
+            ],
+          } : { boxShadow: '0 0 0 0 transparent' }}
+          transition={playerActive
+            ? { duration: 1.2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }
+            : { duration: 0.2 }}
+          style={{
+            flex: 1, borderRadius: 10, padding: '6px 4px',
+            background: 'rgba(255,255,255,0.03)',
+            border: playerActive ? `3px solid ${TAN}` : '1px solid rgba(255,255,255,0.06)',
+            display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
+            transition: 'border 200ms',
+            position: 'relative', zIndex: 20,
+          }}>
           <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, fontWeight: 500, textTransform: 'uppercase' }}>YOUR HAND</span>
           <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
             {visibleHand.map((card) => (
@@ -422,7 +477,7 @@ export function GameView({
               />
             ))}
           </div>
-        </div>
+        </motion.div>
       </div>
 
       {/* ═══ QUIT DIALOG ═══ */}
@@ -452,7 +507,7 @@ export function GameView({
       </AnimatePresence>
 
       {/* ═══ OVERLAYS ═══ */}
-      <RoundEndOverlay visible={state.gamePhase === 'roundEnd'} roundNumber={state.currentRound} roundStats={state.roundStats} gameStats={state.gameStats} targetScore={target} bot1Personality={state.settings.bot1Personality} bot2Personality={state.settings.bot2Personality} onContinue={actions.continueRound} />
+      <RoundEndOverlay visible={state.gamePhase === 'roundEnd'} roundNumber={state.currentRound} roundStats={state.roundStats} gameStats={state.gameStats} targetScore={target} bot1Personality={state.settings.bot1Personality} bot2Personality={state.settings.bot2Personality} onContinue={actions.continueRound} adventureMode={!!currentLevelId} />
       <JackpotCelebration info={jackpotInfo} bot1Personality={state.settings.bot1Personality} bot2Personality={state.settings.bot2Personality} />
       <GameOverOverlay winner={gameOver as { winner: PlayerIndex; winnerName: string } | null} state={state} adventureMode={!!currentLevelId} onPlayAgain={onPlayAgain} onHome={onHome} />
     </div>
@@ -461,26 +516,45 @@ export function GameView({
 
 // ─── Bot Zone ───────────────────────────────────────
 
-function BotZone({ name, color, score, target, hand, active, thinking }: {
+function BotZone({ name, color, score, target, hand, active, thinking, escalated }: {
   name: string; color: string; score: number; target: number;
   hand: readonly Card[]; active: boolean; thinking: boolean;
+  escalated: boolean;
 }) {
+  // Bundle A S2 — active-turn glow: 3px border, 16px outer (50%↔70% breathe),
+  // 4px inset at 30%, 1.2s ease-in-out. Player color hex with 8-digit alpha.
   return (
-    <div style={{
-      flex: 1, borderRadius: 10, padding: '8px 10px',
-      background: 'rgba(255,255,255,0.03)',
-      border: active ? `2px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
-      boxShadow: active ? `0 0 12px ${color}44` : 'none',
-      display: 'flex', flexDirection: 'column', gap: 6,
-      transition: 'border 200ms, box-shadow 200ms',
-    }}>
+    <motion.div
+      animate={active ? {
+        boxShadow: [
+          `0 0 16px ${color}80, inset 0 0 4px ${color}4D`,
+          `0 0 16px ${color}B3, inset 0 0 4px ${color}4D`,
+        ],
+      } : { boxShadow: '0 0 0 0 transparent' }}
+      transition={active
+        ? { duration: 1.2, repeat: Infinity, repeatType: 'reverse', ease: 'easeInOut' }
+        : { duration: 0.2 }}
+      style={{
+        flex: 1, borderRadius: 10, padding: '8px 10px',
+        background: 'rgba(255,255,255,0.03)',
+        border: active ? `3px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
+        display: 'flex', flexDirection: 'column', gap: 6,
+        transition: 'border 200ms',
+      }}>
       {/* Name + score */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
         <span style={{ fontSize: 11, fontWeight: 700, color, letterSpacing: '0.05em' }}>
           {name}{thinking ? ' ...' : ''}
         </span>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 18, color: '#fff' }}>{score}</span>
+          {/* Bundle A S4 — score-state escalation: white → tan once at 80% target. */}
+          <motion.span
+            animate={{ color: escalated ? TAN : '#fff' }}
+            transition={{ duration: 0.5, ease: 'easeIn' }}
+            style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 18 }}
+          >
+            {score}
+          </motion.span>
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: 'rgba(255,255,255,0.35)' }}>/{target}</span>
         </div>
       </div>
@@ -494,7 +568,7 @@ function BotZone({ name, color, score, target, hand, active, thinking }: {
         ))}
         {hand.length === 0 && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>No cards</span>}
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -503,12 +577,14 @@ function BotZone({ name, color, score, target, hand, active, thinking }: {
 function Btn({ label, primary, disabled, big, onClick }: {
   label: string; primary?: boolean; disabled?: boolean; big?: boolean; onClick: () => void;
 }) {
+  // Bundle A S3 — secondary outlined spec: 1.5px white@40% border, white@90% text,
+  // transparent fill. Primary keeps jade for in-game CTAs (SUBMIT / RESUME).
   return (
     <motion.button onClick={onClick} disabled={disabled} whileTap={disabled ? undefined : { scale: 0.97 }} transition={getTransition('snappy')} style={{
       padding: big ? '10px 24px' : '5px 14px', borderRadius: 6,
-      border: primary ? 'none' : '1px solid rgba(255,255,255,0.3)',
+      border: primary ? 'none' : '1.5px solid rgba(255,255,255,0.4)',
       background: primary ? (disabled ? 'rgba(255,255,255,0.08)' : JADE) : 'transparent',
-      color: primary ? (disabled ? 'rgba(255,255,255,0.3)' : '#fff') : 'rgba(255,255,255,0.6)',
+      color: primary ? (disabled ? 'rgba(255,255,255,0.3)' : '#fff') : 'rgba(255,255,255,0.9)',
       fontSize: big ? 15 : 12, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif',
       cursor: disabled ? 'default' : 'pointer',
     }}>{label}</motion.button>

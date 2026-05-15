@@ -10,11 +10,14 @@ const TARGET_PRESETS = [100, 300, 500, 1000] as const;
 
 type BotId = 'calvin' | 'nina' | 'rex' | 'jett';
 
+// Bot color literals reference the central tokens in src/config/colors.ts.
+// Kept inline here for component locality; if the locked palette shifts in
+// the future, update colors.ts and these in lockstep.
 const BOTS: { id: BotId; name: string; color: string; textOnAvatar: string; difficulty: Difficulty; label: string; flavor: string }[] = [
   { id: 'calvin', name: 'Calvin', color: '#3B82F6', textOnAvatar: '#fff',    difficulty: 'beginner',     label: 'Easy',   flavor: 'Cautious, hesitant. Easy.' },
   { id: 'nina',   name: 'Nina',   color: '#DBEAFE', textOnAvatar: '#1E293B', difficulty: 'intermediate', label: 'Medium', flavor: 'Balanced, calculating. Medium.' },
   { id: 'rex',    name: 'Rex',    color: '#DC2626', textOnAvatar: '#fff',    difficulty: 'advanced',     label: 'Hard',   flavor: 'Aggressive, combo-greedy. Hard.' },
-  { id: 'jett',   name: 'Jett',   color: '#0D9488', textOnAvatar: '#fff',    difficulty: 'expert',       label: 'Expert', flavor: 'Patient, relentless. Expert.' },
+  { id: 'jett',   name: 'Jett',   color: '#8B5CF6', textOnAvatar: '#fff',    difficulty: 'expert',       label: 'Expert', flavor: 'Patient, relentless. Expert.' },
 ];
 
 interface Props {

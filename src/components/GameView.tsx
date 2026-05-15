@@ -305,11 +305,12 @@ export function GameView({
       fontFamily: 'Inter, system-ui, sans-serif',
     }}>
 
-      {/* ═══ ZONE A — HEADER BAR (Bundle B S1) ═══
-            5-segment format: MODE · TARGET/LEVEL · R[N] · H[N] · [N] LEFT.
-            Mid-dot separator white@40% with 8px gaps. State-driven tints:
-            Hand 3 → R/H tan; deck ≤ 8 → [N] LEFT tan. Card count moves out
-            of Zone H entirely (deleted from Zone H render below). */}
+      {/* ═══ ZONE A — HEADER BAR ═══
+            Header polish (May 14 follow-up) — 4-segment format with
+            restored STACKED! wordmark: MODE · TARGET/LEVEL · R[N] · H[N]/[total].
+            Layout: quit button left, [wordmark + segments] grouped center,
+            spacer right. Wordmark scales smaller than home screen (14px vs
+            18px) to fit alongside segments at 375px+ portrait. */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 12px', flexShrink: 0, height: 44, gap: 8,
@@ -323,15 +324,27 @@ export function GameView({
           }}>←</motion.button>
         ) : <div style={{ width: 32, flexShrink: 0 }} />}
 
-        <HeaderSegments
-          mode={currentLevelId ? 'ADVENTURE' : 'CLASSIC'}
-          targetOrLevel={currentLevelId
-            ? `${Math.ceil(currentLevelId / 3)}-${((currentLevelId - 1) % 3) + 1}`
-            : String(target)}
-          round={state.currentRound}
-          hand={state.handNumber}
-          deckLeft={state.deck.length}
-        />
+        {/* Centered group: STACKED! wordmark + game-state segments */}
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          gap: 10, flex: 1, minWidth: 0, overflow: 'hidden',
+        }}>
+          <span style={{
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontWeight: 900, fontSize: 14, letterSpacing: '-0.02em',
+            color: '#fff', flexShrink: 0,
+          }}>
+            STACKED<span style={{ color: JADE }}>!</span>
+          </span>
+          <HeaderSegments
+            mode={currentLevelId ? 'ADVENTURE' : 'CLASSIC'}
+            targetOrLevel={currentLevelId
+              ? `${Math.ceil(currentLevelId / 3)}-${((currentLevelId - 1) % 3) + 1}`
+              : String(target)}
+            round={state.currentRound}
+            hand={state.handNumber}
+          />
+        </div>
 
         <div style={{ width: 32, flexShrink: 0 }} />
       </div>
@@ -722,25 +735,30 @@ function Btn({ label, primary, disabled, big, onClick }: {
   );
 }
 
-// Bundle B S1 — Header bar segments. 5 segments separated by mid-dots.
-//   MODE · TARGET/LEVEL · R[N] · H[N] · [N] LEFT
-// Mode + target/level are stable white@90% (never drop). R[N] / H[N] /
-// [N] LEFT are white@70% by default and tan@90% under their state cue
-// (Hand 3 for R/H; deck ≤ 8 for [N] LEFT). Min-width:0 + overflow:hidden
-// on the container give natural progressive truncation if width is tight;
-// strict priority drop (R → H → [N] LEFT first) is documented as a
-// follow-up since common mobile widths fit all five comfortably.
+// Header polish (May 14 follow-up) — 4 segments separated by mid-dots:
+//   MODE · TARGET/LEVEL · R[N] · H[N]/[total]
+// [N] LEFT segment dropped per TC playtest override (board-border amber
+// glow already covers "hand ending soon"). H[N] now shows current/total
+// hands per round. Mode + target/level stable white@90% (never drop).
+// R[N] / H[N]/[total] white@70% by default, tan@90% during Hand 3 round
+// arc cue. Min-width:0 + overflow:hidden on the container give natural
+// truncation if width is tight.
+//
+// TOTAL_HANDS_PER_ROUND derivation: HAND_SIZE 4 × 3 players = 12 cards
+// per deal. Deck 52 − BOARD_SIZE 4 = 48 dealable cards. 48 / 12 = 4 hands
+// per round. Engine doesn't expose this as a constant; matches the
+// turnManager DEAL_NEW_HAND ↔ END_ROUND threshold (`deck.length >= 12`).
+const TOTAL_HANDS_PER_ROUND = 4;
+
 function HeaderSegments({
-  mode, targetOrLevel, round, hand, deckLeft,
+  mode, targetOrLevel, round, hand,
 }: {
   mode: 'CLASSIC' | 'ADVENTURE';
   targetOrLevel: string;
   round: number;
   hand: number;
-  deckLeft: number;
 }) {
   const HAND_3_FORK = hand >= 3;
-  const DECK_LOW = deckLeft <= 8;
   const stable = 'rgba(255,255,255,0.9)';
   const secondary = 'rgba(255,255,255,0.7)';
   const tan = 'rgba(232,197,119,0.9)'; // TAN #E8C577 @ 90%
@@ -764,8 +782,7 @@ function HeaderSegments({
     seg(mode, stable, 'mode', '0.04em'),
     seg(targetOrLevel, stable, 'tl'),
     seg(`R${round}`, HAND_3_FORK ? tan : secondary, 'r'),
-    seg(`H${hand}`, HAND_3_FORK ? tan : secondary, 'h'),
-    seg(`${deckLeft} LEFT`, DECK_LOW ? tan : secondary, 'left'),
+    seg(`H${hand}/${TOTAL_HANDS_PER_ROUND}`, HAND_3_FORK ? tan : secondary, 'h'),
   ];
 
   // Interleave separators between segments
@@ -778,7 +795,7 @@ function HeaderSegments({
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'center',
-      flex: 1, minWidth: 0, overflow: 'hidden',
+      minWidth: 0, overflow: 'hidden',
     }}>
       {children}
     </div>

@@ -114,6 +114,9 @@ export interface GameState {
   // cards left and they have just placed. Captures are locked out until
   // a new hand is dealt or a new round starts.
   dumpActive: boolean;
+  // Doctrine 5.4 — true during gamePhase === 'roundEnd' when the round-end
+  // was triggered by tied leaders at/above target (overtime continuation).
+  isOvertime: boolean;
 }
 
 export type CaptureType = 'pair' | 'sum';
@@ -170,6 +173,7 @@ export type TurnResult =
       scores: Scores;
       jackpotResult: JackpotResult | null;
       newDealer: PlayerIndex;
+      isOvertime: boolean; // doctrine 5.4 — true when round-end was a tie at/above target
     }
   | {
       type: 'END_GAME';

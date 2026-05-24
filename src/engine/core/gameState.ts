@@ -106,6 +106,7 @@ export function createInitialState(
     roundStats: [emptyRoundStats(), emptyRoundStats(), emptyRoundStats()],
     gameStats: [emptyGameStats(), emptyGameStats(), emptyGameStats()],
     dumpActive: false,
+    isOvertime: false,
   };
 }
 
@@ -282,5 +283,6 @@ export function startNewRound(
     gamePhase: 'playing' as const,
     roundStats: [emptyRoundStats(), emptyRoundStats(), emptyRoundStats()],
     dumpActive: false,
+    isOvertime: false,
   };
 }

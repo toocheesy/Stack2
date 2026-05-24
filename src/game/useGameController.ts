@@ -167,7 +167,7 @@ export function useGameController(seed: number, settings: GameSettings) {
           await wait(500);
           if (!mountedRef.current) return;
         }
-        setAndPersist({ ...stateRef.current, gamePhase: 'roundEnd' as const });
+        setAndPersist({ ...stateRef.current, gamePhase: 'roundEnd' as const, isOvertime: result.isOvertime });
         break;
       }
       case 'END_GAME': {

@@ -11,7 +11,8 @@ import { determineTurnResult } from '../turnManager';
 import { createPRNG } from '../../utils/prng';
 import { createIdGenerator } from '../../utils/uuid';
 import { EventBus } from '../../events';
-import { findWinner, resolveRoundEnd } from '../../roundManager';
+import { resolveRoundEnd } from '../../roundManager';
+import { PLAYER_NAMES } from '../../types';
 import type { Card, GameSettings, GameState, PlayerIndex, ValidatedCapture } from '../../types';
 import { RANK_VALUES } from '../../types';
 
@@ -256,20 +257,78 @@ describe('game over at round boundary only', () => {
   });
 });
 
-// ─── Tiebreaker ─────────────────────────────────────
+// ─── Overtime tie-breaker (doctrine 5.4) ────────────
 
-describe('tiebreaker', () => {
-  it('lastCapturer wins when scores are tied at target', () => {
-    let s = makeState();
-    s = addScore(s, 0, 300);
-    s = addScore(s, 1, 300);
-    s = { ...s, lastCapturer: 1 as PlayerIndex, board: [], deck: [], hands: [[], [], []] as [Card[], Card[], Card[]] };
-    expect(findWinner(s)).toBe(1);
+describe('overtime tie-breaker (doctrine 5.4)', () => {
+  function endOfRoundState(scores: [number, number, number], targetScore = 300): GameState {
+    let s = createInitialState(
+      { ...settings, targetScore },
+      createPRNG(42),
+      createIdGenerator(createPRNG(43)),
+    );
+    s = addScore(s, 0, scores[0]);
+    s = addScore(s, 1, scores[1]);
+    s = addScore(s, 2, scores[2]);
+    return {
+      ...s,
+      hands: [[], [], []] as [Card[], Card[], Card[]],
+      deck: [],
+      board: [],
+      lastCapturer: null,
+    };
+  }
+
+  it('END_GAME when sole leader is strictly highest at/above target', () => {
+    const r = determineTurnResult(endOfRoundState([310, 200, 150]));
+    expect(r.type).toBe('END_GAME');
+    if (r.type === 'END_GAME') {
+      expect(r.winner).toBe(0);
+      expect(r.winnerName).toBe(PLAYER_NAMES[0]);
+    }
   });
 
-  it('returns null when nobody has reached target', () => {
-    const s = makeState();
-    expect(findWinner(s)).toBeNull();
+  it('END_GAME picks strictly highest when multiple players are above target', () => {
+    const r = determineTurnResult(endOfRoundState([320, 305, 100]));
+    expect(r.type).toBe('END_GAME');
+    if (r.type === 'END_GAME') expect(r.winner).toBe(0);
+  });
+
+  it('END_ROUND with isOvertime=true when two players tied at max at/above target', () => {
+    const r = determineTurnResult(endOfRoundState([300, 300, 200]));
+    expect(r.type).toBe('END_ROUND');
+    if (r.type === 'END_ROUND') expect(r.isOvertime).toBe(true);
+  });
+
+  it('END_ROUND with isOvertime=false when nobody is at/above target', () => {
+    const r = determineTurnResult(endOfRoundState([200, 200, 200]));
+    expect(r.type).toBe('END_ROUND');
+    if (r.type === 'END_ROUND') expect(r.isOvertime).toBe(false);
+  });
+
+  it('recursion — tied overtime that ties AGAIN triggers another overtime; resolves on sole leader', () => {
+    let r = determineTurnResult(endOfRoundState([300, 300, 200]));
+    expect(r.type).toBe('END_ROUND');
+    if (r.type === 'END_ROUND') expect(r.isOvertime).toBe(true);
+
+    // Next round ended still tied — another overtime.
+    r = determineTurnResult(endOfRoundState([320, 320, 250]));
+    expect(r.type).toBe('END_ROUND');
+    if (r.type === 'END_ROUND') expect(r.isOvertime).toBe(true);
+
+    // Round after that — sole leader emerges. Game ends.
+    r = determineTurnResult(endOfRoundState([340, 320, 250]));
+    expect(r.type).toBe('END_GAME');
+    if (r.type === 'END_GAME') expect(r.winner).toBe(0);
+  });
+
+  it('non-default targetScore (500) — tied at 500 triggers overtime; sole at 600 ends game', () => {
+    const tied = determineTurnResult(endOfRoundState([500, 500, 200], 500));
+    expect(tied.type).toBe('END_ROUND');
+    if (tied.type === 'END_ROUND') expect(tied.isOvertime).toBe(true);
+
+    const sole = determineTurnResult(endOfRoundState([600, 500, 200], 500));
+    expect(sole.type).toBe('END_GAME');
+    if (sole.type === 'END_GAME') expect(sole.winner).toBe(0);
   });
 });
 

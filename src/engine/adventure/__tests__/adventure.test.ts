@@ -82,10 +82,10 @@ describe('level config', () => {
   });
 
   it('getWorldName returns the named worlds', () => {
-    expect(getWorldName(1)).toBe('The Basics');
-    expect(getWorldName(2)).toBe('Sharper Play');
-    expect(getWorldName(3)).toBe('The Hunter');
-    expect(getWorldName(4)).toBe('The Endgame');
+    expect(getWorldName(1)).toBe('The Base');
+    expect(getWorldName(2)).toBe('The Build');
+    expect(getWorldName(3)).toBe('The Heights');
+    expect(getWorldName(4)).toBe('The Summit');
   });
 
   it('target scores match the locked design', () => {

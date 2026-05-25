@@ -70,6 +70,16 @@ export function armAutoplayUnlock(): void {
     if (state.musicEnabled) {
       state.music.play().catch(() => { /* still blocked */ });
     }
+    // Prime the SFX element inside the user gesture too. iOS Safari requires
+    // every audio element to be touched via .play() during a user gesture
+    // before later async .play() calls (e.g. playTakeTheTable firing inside
+    // the controller's awaited jackpot wait) will succeed. Without this the
+    // sting silently fails — .play() rejects and the catch swallows it.
+    const p = state.sfx.play();
+    if (p && typeof p.then === 'function') {
+      p.then(() => { state.sfx.pause(); state.sfx.currentTime = 0; })
+       .catch(() => { /* prime failed; SFX may still work on browsers without strict gesture rules */ });
+    }
     document.removeEventListener('pointerdown', unlock);
     document.removeEventListener('keydown', unlock);
   };

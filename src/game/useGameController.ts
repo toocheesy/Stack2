@@ -30,6 +30,7 @@ import {
 import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../engine/ai/botDecision';
 import { evaluateAllActions } from '../engine/ai/evaluator';
 import { saveGame, loadGame, clearSavedGame } from './persistence';
+import { playTakeTheTable } from '../audio/audioPlayer';
 
 type CardSource = 'hand' | 'board';
 
@@ -159,6 +160,7 @@ export function useGameController(seed: number, settings: GameSettings) {
         }
         setAndPersist(afterJackpot);
         if (jackpotResult) {
+          playTakeTheTable();
           setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
           await wait(2500);
           if (!mountedRef.current) return;
@@ -182,6 +184,7 @@ export function useGameController(seed: number, settings: GameSettings) {
         }
         setAndPersist(afterJackpot);
         if (jackpotResult) {
+          playTakeTheTable();
           setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
           await wait(2500);
           if (!mountedRef.current) return;

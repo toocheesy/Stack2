@@ -52,6 +52,7 @@ function state(overrides: Partial<GameState>): GameState {
       { totalScore: 0, highestCapture: null },
     ],
     dumpActive: false,
+    isOvertime: false,
     ...overrides,
   };
 }

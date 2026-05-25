@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { GameView } from './components/GameView';
 import { ClassicSetup } from './components/ClassicSetup';
 import { ChapterMap } from './components/ChapterMap';
@@ -9,6 +9,9 @@ import { getLevel, TOTAL_LEVELS } from './engine/adventure/levelConfig';
 import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked, unlockJettInClassic, isFinalLevel, getRunStatus, clearProgress, type RunStatus } from './engine/adventure/progressManager';
 import { LevelCompleteOverlay } from './components/LevelCompleteOverlay';
 import { CardAtomTest } from './components/CardAtomTest';
+import { SettingsScreen } from './components/SettingsScreen';
+import { useAudio } from './audio/useAudio';
+import { armAutoplayUnlock } from './audio/audioPlayer';
 
 type Screen = 'home' | 'setup' | 'worldMap' | 'game' | 'cardtest';
 
@@ -23,6 +26,14 @@ function App() {
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1_000_000));
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [currentLevelId, setCurrentLevelId] = useState<number | null>(null);
+  const [audioSettings, updateAudio] = useAudio();
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  useEffect(() => {
+    armAutoplayUnlock();
+    // Drop the orphan useSettings hook's dead localStorage key on any returning user.
+    try { localStorage.removeItem('stacked.settings.v1'); } catch { /* ignore */ }
+  }, []);
 
   const goToSetup = useCallback(() => {
     setScreen('setup');
@@ -77,12 +88,11 @@ function App() {
     setSettings(settingsForLevel(nextId));
   }, [currentLevelId, settingsForLevel]);
 
+  let view: ReactNode;
   if (screen === 'cardtest') {
-    return <CardAtomTest />;
-  }
-
-  if (screen === 'worldMap') {
-    return (
+    view = <CardAtomTest />;
+  } else if (screen === 'worldMap') {
+    view = (
       <ChapterMap
         onBack={() => setScreen('home')}
         onSelectLevel={(id) => {
@@ -95,19 +105,15 @@ function App() {
         }}
       />
     );
-  }
-
-  if (screen === 'setup') {
-    return (
+  } else if (screen === 'setup') {
+    view = (
       <ClassicSetup
         onStart={startWithSettings}
         onBack={goHome}
       />
     );
-  }
-
-  if (screen === 'game') {
-    return (
+  } else if (screen === 'game') {
+    view = (
       <GameWrapper
         key={seed}
         seed={seed}
@@ -119,15 +125,28 @@ function App() {
         onNextLevel={nextLevel}
       />
     );
+  } else {
+    const hasSave = !!loadGame();
+    view = (
+      <TitleScreen
+        onNewGame={goToSetup}
+        onAdventure={() => setScreen('worldMap')}
+        onContinue={hasSave ? continueGame : undefined}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+    );
   }
 
-  const hasSave = !!loadGame();
   return (
-    <TitleScreen
-      onNewGame={goToSetup}
-      onAdventure={() => setScreen('worldMap')}
-      onContinue={hasSave ? continueGame : undefined}
-    />
+    <>
+      {view}
+      <SettingsScreen
+        visible={settingsOpen}
+        settings={audioSettings}
+        onChange={updateAudio}
+        onClose={() => setSettingsOpen(false)}
+      />
+    </>
   );
 }
 
@@ -159,7 +178,7 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 
 // ─── Title Screen (LOCKED) ──────────────────────────
 
-function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => void; onAdventure: () => void; onContinue?: () => void }) {
+function TitleScreen({ onNewGame, onAdventure, onContinue, onOpenSettings }: { onNewGame: () => void; onAdventure: () => void; onContinue?: () => void; onOpenSettings: () => void }) {
   // Language rename — entry verb hierarchy: BEGIN / RESUME / NEW RUN.
   const runStatus: RunStatus = getRunStatus();
   const [showNewRunConfirm, setShowNewRunConfirm] = useState(false);
@@ -215,13 +234,16 @@ function TitleScreen({ onNewGame, onAdventure, onContinue }: { onNewGame: () => 
       </div>
 
       {/* Footer */}
-      {onContinue && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16, flexShrink: 0 }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, marginTop: 16, flexShrink: 0 }}>
+        {onContinue && (
           <button onClick={onContinue} style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: JADE, background: 'transparent', border: 'none', cursor: 'pointer' }}>
             Continue saved game
           </button>
-        </div>
-      )}
+        )}
+        <button onClick={onOpenSettings} style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.5)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+          Settings
+        </button>
+      </div>
 
       {/* NEW RUN confirmation dialog — fires when the Run card is tapped
           while runStatus === 'complete'. Wipes progress on confirm. */}

@@ -47,9 +47,14 @@ const NODES: NodeData[] = LEVELS.map((lvl, i) => ({
 interface Props {
   onBack: () => void;
   onSelectLevel: (levelId: number) => void;
+  // Per-Mode Split — when a mid-level Run match is in localStorage,
+  // App passes the level id here and ChapterMap surfaces a Resume callout
+  // above the bottom level card. onResumeRun is the handler.
+  savedRunLevelId?: number | null;
+  onResumeRun?: (levelId: number) => void;
 }
 
-export function ChapterMap({ onBack, onSelectLevel }: Props) {
+export function ChapterMap({ onBack, onSelectLevel, savedRunLevelId, onResumeRun }: Props) {
   const [progress, setProgress] = useState<AdventureProgress>(getInitialProgress);
   useEffect(() => { setProgress(loadProgress()); }, []);
 
@@ -147,6 +152,39 @@ export function ChapterMap({ onBack, onSelectLevel }: Props) {
           );
         })}
       </div>
+
+      {/* Mid-match Resume callout (Per-Mode Split, May 24). Surfaces a saved
+          in-progress Run level above the bottom (active-progress) level card. */}
+      {savedRunLevelId != null && onResumeRun && (() => {
+        const savedLevel = NODES.find((n) => n.id === savedRunLevelId);
+        if (!savedLevel) return null;
+        return (
+          <div
+            onClick={() => onResumeRun(savedRunLevelId)}
+            style={{
+              margin: '0 20px 12px', padding: '10px 16px',
+              background: 'rgba(245,158,11,0.12)', borderRadius: 12,
+              border: '1px solid rgba(245,158,11,0.45)',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              cursor: 'pointer', gap: 12,
+              position: 'relative', zIndex: 2,
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <span style={{
+                fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#F59E0B',
+                letterSpacing: '0.18em', fontWeight: 600,
+              }}>
+                IN PROGRESS
+              </span>
+              <span style={{ fontWeight: 700, fontSize: 13, color: '#fff', marginTop: 2 }}>
+                Resume {savedLevel.displayId} · {savedLevel.title}
+              </span>
+            </div>
+            <span style={{ color: '#F59E0B', fontSize: 18, fontWeight: 700 }}>→</span>
+          </div>
+        );
+      })()}
 
       {/* Bottom level card */}
       <div style={{

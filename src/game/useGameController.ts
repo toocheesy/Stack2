@@ -71,7 +71,7 @@ function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export function useGameController(seed: number, settings: GameSettings) {
+export function useGameController(seed: number, settings: GameSettings, currentLevelId: number | null) {
   const prngRef = useRef<PRNG>(null!);
   const idGenRef = useRef<IdGenerator>(null!);
   const trackerRef = useRef<CardTrackerState>(null!);
@@ -95,10 +95,16 @@ export function useGameController(seed: number, settings: GameSettings) {
     return initial;
   });
 
+  // Per-mode split: latest currentLevelId flows through a ref so every
+  // setAndPersist call writes the right discriminator (null = Classic,
+  // number = Run level id). Future-proofs if level id changes mid-mount.
+  const currentLevelIdRef = useRef(currentLevelId);
+  currentLevelIdRef.current = currentLevelId;
+
   const setAndPersist = useCallback((s: GameState) => {
     setState(s);
     stateRef.current = s;
-    saveGame(s, trackerRef.current);
+    saveGame(s, trackerRef.current, currentLevelIdRef.current);
   }, []);
   const [botViz, setBotViz] = useState<BotVizStep | null>(null);
   const [gameOver, setGameOver] = useState<{

@@ -71,14 +71,14 @@ describe('persistence — saveGame / loadGame', () => {
 
   it('saveGame + loadGame round-trip preserves game state including dumpActive', () => {
     const s = fullState({ dumpActive: true });
-    saveGame(s, freshTracker(s));
+    saveGame(s, freshTracker(s), null);
     const loaded = loadGame();
     expect(loaded).not.toBeNull();
     expect(loaded!.game.dumpActive).toBe(true);
   });
 
   it('clearSavedGame wipes the slot', () => {
-    saveGame(fullState(), freshTracker());
+    saveGame(fullState(), freshTracker(), null);
     clearSavedGame();
     expect(loadGame()).toBeNull();
   });
@@ -88,7 +88,7 @@ describe('persistence — saveGame / loadGame', () => {
   it('round-trips tracker counters (totalSeen, deckRemaining, gamePhase)', () => {
     const s = fullState();
     const tracker = freshTracker(s);
-    saveGame(s, tracker);
+    saveGame(s, tracker, null);
     const loaded = loadGame();
     expect(loaded).not.toBeNull();
     expect(loaded!.tracker.totalSeen).toBe(tracker.totalSeen);
@@ -101,7 +101,7 @@ describe('persistence — saveGame / loadGame', () => {
     let tracker = createGameTracker(s.board);
     const extra = { id: 'placed-1', rank: '7' as const, suit: 'clubs' as const, value: 7 };
     tracker = recordPlacement(tracker, extra);
-    saveGame(s, tracker);
+    saveGame(s, tracker, null);
     const loaded = loadGame();
     expect(loaded).not.toBeNull();
     expect(loaded!.tracker.seenCards.has(extra.id)).toBe(true);
@@ -117,7 +117,7 @@ describe('persistence — saveGame / loadGame', () => {
       { id: 'c2', rank: '5' as const, suit: 'clubs' as const, value: 5 },
     ];
     tracker = recordCapture(tracker, 1, captured);
-    saveGame(s, tracker);
+    saveGame(s, tracker, null);
     const loaded = loadGame();
     expect(loaded).not.toBeNull();
     expect(loaded!.tracker.valueCounts['5']).toBe(tracker.valueCounts['5']);
@@ -165,5 +165,47 @@ describe('persistence — saveGame / loadGame', () => {
   it('rejects corrupt JSON', () => {
     localStorage.setItem(STORAGE_KEY, '{not json');
     expect(loadGame()).toBeNull();
+  });
+
+  // ─── Per-Mode Split — schema v3 currentLevelId ───────
+
+  it('v3: saveGame writes currentLevelId and loadGame returns it (Run level)', () => {
+    const s = fullState();
+    saveGame(s, freshTracker(s), 5);
+    const loaded = loadGame();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.currentLevelId).toBe(5);
+  });
+
+  it('v3: saveGame with null currentLevelId round-trips as null (Classic)', () => {
+    const s = fullState();
+    saveGame(s, freshTracker(s), null);
+    const loaded = loadGame();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.currentLevelId).toBeNull();
+  });
+
+  it('v2 → v3 migration: v2 snapshot (no currentLevelId field) loads with null', () => {
+    // Hand-construct a v2-shape snapshot directly to localStorage. Mirrors the
+    // pre-v3 wire format (no currentLevelId field). Migration should default
+    // it to null without wiping the save.
+    const s = fullState();
+    const wireTracker = {
+      seenCardsEntries: [['b1', 'board']],
+      valueCounts: { A: 0, '2': 1, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10': 0, J: 0, Q: 0, K: 0 },
+      playerCaptures: [[], [], []],
+      deckRemaining: 0,
+      totalSeen: 1,
+      gamePhase: 'early',
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      version: 2,
+      game: s,
+      tracker: wireTracker,
+    }));
+    const loaded = loadGame();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.currentLevelId).toBeNull();
+    expect(loaded!.game.board.length).toBe(1);
   });
 });

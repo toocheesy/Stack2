@@ -4,7 +4,7 @@ import { createGameTracker } from '../engine/ai/cardTracker';
 import type { Rank, Card } from '../engine/types';
 
 const STORAGE_KEY = 'stacked-v2-game';
-const SCHEMA_VERSION = 2;
+const SCHEMA_VERSION = 3;
 
 // ─── Wire format ────────────────────────────────────
 //
@@ -26,6 +26,10 @@ interface PersistedSnapshot {
   version: number;
   game: GameState;
   tracker: PersistedTracker;
+  // v3 — per-mode discriminator. null = Classic match; number = Run level id.
+  // Lets the home-screen route resume to the right frame (Classic = into match,
+  // Run = via chapter map). Pre-v3 saves load with currentLevelId: null.
+  currentLevelId: number | null;
 }
 
 function toWire(tracker: CardTrackerState): PersistedTracker {
@@ -55,14 +59,20 @@ function fromWire(wire: PersistedTracker): CardTrackerState {
 export interface LoadedSave {
   game: GameState;
   tracker: CardTrackerState;
+  currentLevelId: number | null;
 }
 
-export function saveGame(state: GameState, tracker: CardTrackerState): void {
+export function saveGame(
+  state: GameState,
+  tracker: CardTrackerState,
+  currentLevelId: number | null,
+): void {
   try {
     const snapshot: PersistedSnapshot = {
       version: SCHEMA_VERSION,
       game: state,
       tracker: toWire(tracker),
+      currentLevelId,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
   } catch {
@@ -85,7 +95,11 @@ export function loadGame(): LoadedSave | null {
         : createGameTracker(game.board);
       // Same dumpActive default as before for pre-B1-fix saves at the GameState layer.
       const gameWithDefaults: GameState = { ...game, dumpActive: game.dumpActive ?? false };
-      return { game: gameWithDefaults, tracker };
+      // v3 default: pre-v3 (v2 or legacy) saves had no currentLevelId — treat as Classic.
+      const currentLevelId = typeof parsed.currentLevelId === 'number'
+        ? parsed.currentLevelId
+        : null;
+      return { game: gameWithDefaults, tracker, currentLevelId };
     }
 
     // Legacy schema (pre-Sibling-1): bare GameState JSON. Rebuild a
@@ -100,6 +114,7 @@ export function loadGame(): LoadedSave | null {
     return {
       game: gameWithDefaults,
       tracker: createGameTracker(gameWithDefaults.board),
+      currentLevelId: null,
     };
   } catch {
     clearSavedGame();

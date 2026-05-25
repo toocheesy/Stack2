@@ -29,6 +29,13 @@ function App() {
   const [audioSettings, updateAudio] = useAudio();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // Per-mode saved-game split: read the snapshot once per render and derive
+  // the per-card affordances from currentLevelId. null = Classic save (show
+  // Classic Continue); number = Run save (surfaced via ChapterMap callout).
+  const savedSnapshot = loadGame();
+  const savedIsClassic = !!savedSnapshot && savedSnapshot.currentLevelId === null;
+  const savedRunLevelId: number | null = savedSnapshot?.currentLevelId ?? null;
+
   useEffect(() => {
     armAutoplayUnlock();
     // Drop the orphan useSettings hook's dead localStorage key on any returning user.
@@ -58,9 +65,20 @@ function App() {
     };
   }, []);
 
-  const continueGame = useCallback(() => {
+  // Per-mode resume — Classic Continue affordance on the Classic card.
+  // useGameController loads the snapshot on mount and uses it as initial state;
+  // setting currentLevelId here ensures GameWrapper renders the right frame.
+  const continueClassic = useCallback(() => {
+    setCurrentLevelId(null);
     setScreen('game');
   }, []);
+
+  // Per-mode resume — ChapterMap "Resume Level N" callout dispatches here.
+  const continueRunFromMap = useCallback((levelId: number) => {
+    setCurrentLevelId(levelId);
+    setSettings(settingsForLevel(levelId));
+    setScreen('game');
+  }, [settingsForLevel]);
 
   const goHome = useCallback(() => {
     clearSavedGame();
@@ -103,6 +121,8 @@ function App() {
           setSettings(settingsForLevel(id));
           setScreen('game');
         }}
+        savedRunLevelId={savedRunLevelId}
+        onResumeRun={continueRunFromMap}
       />
     );
   } else if (screen === 'setup') {
@@ -127,12 +147,11 @@ function App() {
       />
     );
   } else {
-    const hasSave = !!loadGame();
     view = (
       <TitleScreen
         onNewGame={goToSetup}
         onAdventure={() => setScreen('worldMap')}
-        onContinue={hasSave ? continueGame : undefined}
+        onContinueClassic={savedIsClassic ? continueClassic : undefined}
         onOpenSettings={() => setSettingsOpen(true)}
       />
     );
@@ -179,7 +198,7 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 
 // ─── Title Screen (LOCKED) ──────────────────────────
 
-function TitleScreen({ onNewGame, onAdventure, onContinue, onOpenSettings }: { onNewGame: () => void; onAdventure: () => void; onContinue?: () => void; onOpenSettings: () => void }) {
+function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings }: { onNewGame: () => void; onAdventure: () => void; onContinueClassic?: () => void; onOpenSettings: () => void }) {
   // Language rename — entry verb hierarchy: BEGIN / RESUME / NEW RUN.
   const runStatus: RunStatus = getRunStatus();
   const [showNewRunConfirm, setShowNewRunConfirm] = useState(false);
@@ -228,21 +247,12 @@ function TitleScreen({ onNewGame, onAdventure, onContinue, onOpenSettings }: { o
         </div>
       </div>
 
-      {/* Hero cards */}
+      {/* Hero cards — Continue lives on the Classic card now (Per-Mode Split,
+          May 24). Global footer Continue link is gone. */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
-        <ClassicHeroCard onPlay={onNewGame} />
+        <ClassicHeroCard onPlay={onNewGame} onContinue={onContinueClassic} />
         <AdventureHeroCard onPlay={onRunCardTap} runStatus={runStatus} />
       </div>
-
-      {/* Footer — Continue link only; Settings moved to top-right gear
-          (Settings Gear ticket, May 24) so it stops cramping the Classic card. */}
-      {onContinue && (
-        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16, flexShrink: 0 }}>
-          <button onClick={onContinue} style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: JADE, background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            Continue saved game
-          </button>
-        </div>
-      )}
 
       {/* Top-right gear — opens Settings modal. Absolute-positioned so
           it sits outside the card flow and can't squeeze the layout. */}
@@ -352,7 +362,7 @@ function MiniCardBack({ w }: { w: number }) {
 
 // ─── Classic Hero Card (LOCKED V5 stagger) ──────────
 
-function ClassicHeroCard({ onPlay }: { onPlay: () => void }) {
+function ClassicHeroCard({ onPlay, onContinue }: { onPlay: () => void; onContinue?: () => void }) {
   const W = 88;
   const STEP = W * 0.5;
   const totalSpan = STEP + W * 1.08;
@@ -392,12 +402,27 @@ function ClassicHeroCard({ onPlay }: { onPlay: () => void }) {
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: 14 }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 400, lineHeight: 1.4, maxWidth: '60%' }}>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 400, lineHeight: 1.4, maxWidth: onContinue ? '50%' : '60%' }}>
           Capture · Combo · Win.<br/>
           <span style={{ color: 'rgba(255,255,255,0.4)' }}>Best of three rounds.</span>
         </div>
-        <div style={{ fontWeight: 800, fontSize: 12, color: TAN, background: JADE, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(6,95,70,0.45), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
-          PLAY <span style={{ fontSize: 14 }}>→</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          {onContinue && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onContinue(); }}
+              style={{
+                fontWeight: 700, fontSize: 11, color: TAN, background: 'transparent',
+                padding: '8px 14px', borderRadius: 99, letterSpacing: '0.06em',
+                border: `1px solid ${TAN}66`, cursor: 'pointer',
+                fontFamily: 'Inter, sans-serif',
+              }}
+            >
+              CONTINUE
+            </button>
+          )}
+          <div style={{ fontWeight: 800, fontSize: 12, color: TAN, background: JADE, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(6,95,70,0.45), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+            PLAY <span style={{ fontSize: 14 }}>→</span>
+          </div>
         </div>
       </div>
     </div>
@@ -457,7 +482,9 @@ function AdventureHeroCard({ onPlay, runStatus }: { onPlay: () => void; runStatu
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: returning ? 14 : 8 }}>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.4 }}>
-          {returning ? (
+          {runStatus === 'complete' ? (
+            <><span style={{ color: TAN, fontWeight: 600 }}>Run complete</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>Start a fresh run</span></>
+          ) : runStatus === 'in-progress' ? (
             <><span style={{ color: TAN, fontWeight: 600 }}>Resume your run</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>{TOTAL_LEVELS} levels · 4 worlds</span></>
           ) : (
             <><span style={{ color: TAN, fontWeight: 600 }}>{TOTAL_LEVELS} levels</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>4 worlds to conquer</span></>
@@ -500,7 +527,7 @@ function GameWrapper({
   onOpenSettings: () => void;
 }) {
   const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, actions } =
-    useGameController(seed, settings);
+    useGameController(seed, settings, currentLevelId);
 
   const levelComplete = useMemo(() => {
     if (!currentLevelId || !gameOver) return null;

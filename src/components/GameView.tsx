@@ -24,6 +24,7 @@ interface Props {
   onQuit: () => void;
   onHome: () => void;
   onPlayAgain: () => void;
+  onOpenSettings: () => void;
   // Bundle C — when an Adventure overlay (LevelCompleteOverlay etc.) is
   // showing from App.tsx, suppress the in-game toast layer. App passes
   // !!levelComplete here so the toast logic doesn't need to know about
@@ -49,7 +50,7 @@ const BG = '#0A0A0A';
 const BOARD_GAP = 4;
 
 export function GameView({
-  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, suppressToasts = false,
+  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, onOpenSettings, suppressToasts = false,
 }: Props) {
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -346,7 +347,23 @@ export function GameView({
           />
         </div>
 
-        <div style={{ width: 32, flexShrink: 0 }} />
+        {/* Settings Gear ticket: top-bar gear opens the App-level Settings
+            modal mid-game. Game state stays untouched behind the overlay. */}
+        <motion.button
+          onClick={onOpenSettings}
+          aria-label="Settings"
+          whileTap={{ scale: 0.9 }}
+          transition={getTransition('snappy')}
+          style={{
+            width: 32, height: 32, borderRadius: 99, border: 'none',
+            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+            fontSize: 16, cursor: 'pointer', flexShrink: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 0, lineHeight: 1,
+          }}
+        >
+          <span style={{ fontVariantEmoji: 'text' as React.CSSProperties['fontVariantEmoji'] }}>{'⚙︎'}</span>
+        </motion.button>
       </div>
 
       {/* ═══ ZONE B — MESSAGE STRIP (Bundle C: persistent + toast) ═══

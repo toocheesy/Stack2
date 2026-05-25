@@ -34,21 +34,21 @@ export function SettingsScreen({ visible, settings, onChange, onClose }: Props) 
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#1a1a1a', borderRadius: 12, padding: 24,
-              maxWidth: 340, width: '100%',
-              display: 'flex', flexDirection: 'column', gap: 16,
+              background: '#1a1a1a', borderRadius: 12, padding: 18,
+              maxWidth: 280, width: '100%',
+              display: 'flex', flexDirection: 'column', gap: 10,
               border: `1px solid ${DIVIDER}`,
               boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
             }}
           >
             <h2 style={{
-              fontFamily: 'Inter, sans-serif', fontWeight: 800, fontSize: 18,
-              color: '#fff', letterSpacing: 1, margin: 0, textAlign: 'center',
+              fontFamily: 'Inter, sans-serif', fontWeight: 800, fontSize: 15,
+              color: '#fff', letterSpacing: 0.5, margin: 0, textAlign: 'center',
             }}>
               SETTINGS
             </h2>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               <ToggleRow
                 label="Music"
                 on={settings.musicOn}
@@ -66,11 +66,11 @@ export function SettingsScreen({ visible, settings, onChange, onClose }: Props) 
               whileTap={{ scale: 0.97 }}
               transition={getTransition('snappy')}
               style={{
-                width: '100%', height: 42, borderRadius: 8,
+                width: '100%', height: 36, borderRadius: 8,
                 border: 'none', background: TAN,
-                color: BG, fontSize: 14, fontWeight: 700,
+                color: BG, fontSize: 13, fontWeight: 700,
                 fontFamily: 'Inter, sans-serif', cursor: 'pointer',
-                marginTop: 4, letterSpacing: 0.5,
+                letterSpacing: 0.5,
               }}
             >
               DONE
@@ -86,10 +86,10 @@ function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onTogg
   return (
     <div style={{
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '12px 4px',
+      padding: '8px 4px',
     }}>
       <span style={{
-        fontFamily: 'Inter, sans-serif', fontSize: 15, fontWeight: 500,
+        fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,
         color: 'rgba(255,255,255,0.9)',
       }}>
         {label}
@@ -99,7 +99,7 @@ function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onTogg
         aria-pressed={on}
         aria-label={`${label} ${on ? 'on' : 'off'}`}
         style={{
-          width: 48, height: 28, borderRadius: 99,
+          width: 42, height: 24, borderRadius: 99,
           border: 'none', cursor: 'pointer',
           background: on ? JADE : 'rgba(255,255,255,0.15)',
           position: 'relative', transition: 'background 0.18s ease',
@@ -107,8 +107,8 @@ function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onTogg
         }}
       >
         <span style={{
-          position: 'absolute', top: 3, left: on ? 23 : 3,
-          width: 22, height: 22, borderRadius: 99,
+          position: 'absolute', top: 3, left: on ? 21 : 3,
+          width: 18, height: 18, borderRadius: 99,
           background: on ? TAN : 'rgba(255,255,255,0.6)',
           transition: 'left 0.18s ease, background 0.18s ease',
         }} />

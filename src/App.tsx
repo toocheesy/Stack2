@@ -123,6 +123,7 @@ function App() {
         onHome={currentLevelId ? goToWorldMap : goHome}
         onPlayAgain={playAgain}
         onNextLevel={nextLevel}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
     );
   } else {
@@ -233,17 +234,33 @@ function TitleScreen({ onNewGame, onAdventure, onContinue, onOpenSettings }: { o
         <AdventureHeroCard onPlay={onRunCardTap} runStatus={runStatus} />
       </div>
 
-      {/* Footer */}
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 18, marginTop: 16, flexShrink: 0 }}>
-        {onContinue && (
+      {/* Footer — Continue link only; Settings moved to top-right gear
+          (Settings Gear ticket, May 24) so it stops cramping the Classic card. */}
+      {onContinue && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 16, flexShrink: 0 }}>
           <button onClick={onContinue} style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: JADE, background: 'transparent', border: 'none', cursor: 'pointer' }}>
             Continue saved game
           </button>
-        )}
-        <button onClick={onOpenSettings} style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.5)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-          Settings
-        </button>
-      </div>
+        </div>
+      )}
+
+      {/* Top-right gear — opens Settings modal. Absolute-positioned so
+          it sits outside the card flow and can't squeeze the layout. */}
+      <button
+        onClick={onOpenSettings}
+        aria-label="Settings"
+        style={{
+          position: 'absolute', top: 16, right: 16,
+          width: 36, height: 36, borderRadius: 99,
+          border: 'none', cursor: 'pointer',
+          background: 'rgba(255,255,255,0.06)',
+          color: 'rgba(255,255,255,0.7)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 18, lineHeight: 1, padding: 0,
+        }}
+      >
+        <span style={{ fontVariantEmoji: 'text' as React.CSSProperties['fontVariantEmoji'] }}>{'⚙︎'}</span>
+      </button>
 
       {/* NEW RUN confirmation dialog — fires when the Run card is tapped
           while runStatus === 'complete'. Wipes progress on confirm. */}
@@ -471,6 +488,7 @@ function GameWrapper({
   onHome,
   onPlayAgain,
   onNextLevel,
+  onOpenSettings,
 }: {
   seed: number;
   settings: GameSettings;
@@ -479,6 +497,7 @@ function GameWrapper({
   onHome: () => void;
   onPlayAgain: () => void;
   onNextLevel: () => void;
+  onOpenSettings: () => void;
 }) {
   const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, actions } =
     useGameController(seed, settings);
@@ -526,6 +545,7 @@ function GameWrapper({
         onQuit={onQuit}
         onHome={onHome}
         onPlayAgain={onPlayAgain}
+        onOpenSettings={onOpenSettings}
         suppressToasts={!!levelComplete}
       />
       {levelComplete && (

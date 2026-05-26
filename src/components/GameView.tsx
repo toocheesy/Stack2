@@ -55,7 +55,11 @@ export function GameView({
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [selectedHandCard, setSelectedHandCard] = useState<string | null>(null);
+  // tap-bug fix (May 25): drag-only model. The previous tap-to-select flow
+  // (selectedHandCard state + handleBoardTap/handleHandTap/handleSlotTap/
+  // handleBoardAreaTap) was retired entirely — tapping a table card was
+  // routing it into the next open combo slot, which was nonsense. Drag is
+  // now the only path into the builder; taps on cards do nothing.
   const [hoveredSlot, setHoveredSlot] = useState<ComboSlot | null>(null);
   const [hoveredBoard, setHoveredBoard] = useState(false);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
@@ -137,7 +141,6 @@ export function GameView({
   const handleDragStart = useCallback((cardId: string, source: CardSource) => {
     setDraggingCardId(cardId);
     setDraggingSource(source);
-    setSelectedHandCard(null);
   }, []);
 
   const handleDragEnd = useCallback((cardId: string, source: CardSource, point: { x: number; y: number }) => {
@@ -146,35 +149,13 @@ export function GameView({
     const t = findDropTarget(point);
     if (!t) return;
     if (t.type === 'slot') actions.addToCombo(cardId, source, t.slot);
-    else if (t.type === 'board' && source === 'hand') { actions.placeCard(cardId); setSelectedHandCard(null); }
+    else if (t.type === 'board' && source === 'hand') actions.placeCard(cardId);
   }, [isPlayerTurn, findDropTarget, actions]);
-
-  const handleHandTap = useCallback((cardId: string) => {
-    if (!isPlayerTurn) return;
-    setSelectedHandCard((prev) => (prev === cardId ? null : cardId));
-  }, [isPlayerTurn]);
-
-  const handleBoardTap = useCallback((cardId: string) => {
-    if (!isPlayerTurn) return;
-    if (!state.combination.base) actions.addToCombo(cardId, 'board', 'base');
-    else { const slot = nextEmptySlot(state.combination); if (slot) actions.addToCombo(cardId, 'board', slot); }
-  }, [isPlayerTurn, state.combination, actions]);
-
-  const handleSlotTap = useCallback((slot: ComboSlot) => {
-    if (!isPlayerTurn) return;
-    if (selectedHandCard) { actions.addToCombo(selectedHandCard, 'hand', slot); setSelectedHandCard(null); }
-  }, [isPlayerTurn, selectedHandCard, actions]);
 
   const handleStagedCardTap = useCallback((cardId: string) => {
     if (!isPlayerTurn) return;
     actions.removeFromCombo(cardId);
   }, [isPlayerTurn, actions]);
-
-  const handleBoardAreaTap = useCallback(() => {
-    if (!isPlayerTurn || !selectedHandCard) return;
-    actions.placeCard(selectedHandCard);
-    setSelectedHandCard(null);
-  }, [isPlayerTurn, selectedHandCard, actions]);
 
   const handleSubmit = useCallback(() => {
     const err = actions.submitCombo();
@@ -223,9 +204,8 @@ export function GameView({
     if (!isPlayerTurn) return 'Watch the bots play their turn';
     if (hasCombo && !comboValid) return 'Combo groups must sum (or match) the base card value';
     if (hasCombo && comboValid) return 'Tap SUBMIT to capture, or RESET to clear';
-    if (selectedHandCard) return 'Tap a board card to capture, or tap the board to place';
-    return 'Tap a card in your hand to start your turn';
-  }, [state.settings.hintStripEnabled, state.gamePhase, isPlayerTurn, hasCombo, comboValid, selectedHandCard]);
+    return 'Drag a card to start your turn';
+  }, [state.settings.hintStripEnabled, state.gamePhase, isPlayerTurn, hasCombo, comboValid]);
 
   // ── Bundle C — Toast layer state machine ──
   // Three toast kinds:
@@ -455,7 +435,7 @@ export function GameView({
       </div>
 
       {/* ═══ ZONE E — GAME BOARD ═══ */}
-      <div ref={boardRef} onClick={handleBoardAreaTap} style={{
+      <div ref={boardRef} style={{
         flex: 1, margin: '8px 8px 0', borderRadius: 12, padding: '8px 6px',
         background: 'rgba(255,255,255,0.03)',
         border: hoveredBoard ? '1px solid rgba(16,185,129,0.5)' : deckEmpty ? `1px solid ${TAN}55` : '1px solid rgba(255,255,255,0.06)',
@@ -485,7 +465,6 @@ export function GameView({
             <CardComponent card={card}
               draggable={isPlayerTurn}
               isDragging={draggingCardId === card.id}
-              onTap={() => handleBoardTap(card.id)}
               onDragMove={(pt) => { handleDragStart(card.id, 'board'); handleDragMove(pt, 'board'); }}
               onDragEnd={(pt) => handleDragEnd(card.id, 'board', pt)}
             />
@@ -517,7 +496,6 @@ export function GameView({
                 <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 500, letterSpacing: 1, textTransform: 'uppercase' }}>{SLOT_LABELS[key]}</span>
                 <div
                   ref={(el) => { slotRefs.current[i] = el; }}
-                  onClick={(e) => { e.stopPropagation(); handleSlotTap(key); }}
                   style={{
                     width: '100%', aspectRatio: '2.5/3.5', borderRadius: 6,
                     border: isHovered ? `2px solid ${JADE}` : isBase ? (filled ? `2px solid ${JADE}` : `1px solid ${JADE}`) : (filled ? `2px solid ${JADE}` : '1px dashed rgba(255,255,255,0.12)'),
@@ -617,10 +595,8 @@ export function GameView({
           <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
             {visibleHand.map((card) => (
               <CardComponent key={card.id} card={card}
-                selected={selectedHandCard === card.id}
                 draggable={isPlayerTurn}
                 isDragging={draggingCardId === card.id}
-                onTap={() => handleHandTap(card.id)}
                 onDragMove={(pt) => { handleDragStart(card.id, 'hand'); handleDragMove(pt, 'hand'); }}
                 onDragEnd={(pt) => handleDragEnd(card.id, 'hand', pt)}
               />
@@ -816,9 +792,3 @@ function HeaderSegments({
   );
 }
 
-function nextEmptySlot(combo: GameState['combination']): Exclude<ComboSlot, 'base'> | null {
-  if (combo.combo1.length === 0) return 'combo1';
-  if (combo.combo2.length === 0) return 'combo2';
-  if (combo.combo3.length === 0) return 'combo3';
-  return null;
-}

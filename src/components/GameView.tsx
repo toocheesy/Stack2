@@ -9,8 +9,7 @@ import { JackpotCelebration, type JackpotDisplay } from './JackpotCelebration';
 import { GameOverOverlay } from './GameOverOverlay';
 import { validateFullCombo } from '../engine/core/captureValidator';
 import { TutorialOverlay, type TutorialMark } from './TutorialOverlay';
-import { useTutorial } from '../tutorial/useTutorial';
-import { loadTutorialSeen } from '../tutorial/tutorialStorage';
+import type { TutorialApi } from '../tutorial/useTutorial';
 
 type CardSource = 'hand' | 'board';
 
@@ -28,9 +27,10 @@ interface Props {
   onHome: () => void;
   onPlayAgain: () => void;
   onOpenSettings: () => void;
-  // The Run tutorial — bumped by App when Settings "Replay tutorial" tapped.
-  // Auto-fire on first W1L1 entry is internal to this component.
-  tutorialReplayToken: number;
+  // The Run tutorial — state lives in GameWrapper so useGameController
+  // can see tutorialActive from its first render (freeze ticket). GameView
+  // just renders the overlay and consults visible for ghost SUBMIT/RESET.
+  tutorial: TutorialApi;
   // Bundle C — when an Adventure overlay (LevelCompleteOverlay etc.) is
   // showing from App.tsx, suppress the in-game toast layer. App passes
   // !!levelComplete here so the toast logic doesn't need to know about
@@ -56,7 +56,7 @@ const BG = '#0A0A0A';
 const BOARD_GAP = 4;
 
 export function GameView({
-  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, onOpenSettings, tutorialReplayToken, suppressToasts = false,
+  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, onOpenSettings, tutorial, suppressToasts = false,
 }: Props) {
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
@@ -68,24 +68,6 @@ export function GameView({
   const submitWrapRef = useRef<HTMLDivElement | null>(null);
   const resetWrapRef = useRef<HTMLDivElement | null>(null);
   const handZoneRef = useRef<HTMLDivElement | null>(null);
-
-  const tutorial = useTutorial(8);
-
-  // Auto-fire on first W1L1 entry. Mount-only check; once seen=true,
-  // subsequent mounts skip naturally.
-  useEffect(() => {
-    if (currentLevelId === 1 && !loadTutorialSeen()) {
-      tutorial.open();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Replay-from-Settings: App bumps the token; we re-open the tutorial.
-  // Token starts at 0 (no-op on the initial mount).
-  useEffect(() => {
-    if (tutorialReplayToken > 0) tutorial.open();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tutorialReplayToken]);
 
   // Ghost-render SUBMIT/RESET while the tutorial is up so marks 4 and 5
   // have something visible to spotlight (the real buttons only render

@@ -12,6 +12,8 @@ import { CardAtomTest } from './components/CardAtomTest';
 import { SettingsScreen } from './components/SettingsScreen';
 import { useAudio } from './audio/useAudio';
 import { armAutoplayUnlock } from './audio/audioPlayer';
+import { useTutorial } from './tutorial/useTutorial';
+import { loadTutorialSeen } from './tutorial/tutorialStorage';
 
 type Screen = 'home' | 'setup' | 'worldMap' | 'game' | 'cardtest';
 
@@ -539,8 +541,23 @@ function GameWrapper({
   onOpenSettings: () => void;
   tutorialReplayToken: number;
 }) {
+  // Tutorial state lives here (not in GameView) so useGameController can see
+  // tutorialActive from its first render — required for the freeze ticket so
+  // the bot-turn mount effect knows to gate. Initial visible is computed
+  // synchronously from loadTutorialSeen() to avoid an effect round-trip race.
+  const tutorialShouldAutoOpen = currentLevelId === 1 && !loadTutorialSeen();
+  const tutorial = useTutorial(8, tutorialShouldAutoOpen);
+
+  // Replay-from-Settings: App bumps the token; reopen the overlay.
+  // Token starts at 0 (no-op on initial mount). Lives here so the auto-fire
+  // and replay paths sit beside each other.
+  useEffect(() => {
+    if (tutorialReplayToken > 0) tutorial.open();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tutorialReplayToken]);
+
   const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, actions } =
-    useGameController(seed, settings, currentLevelId);
+    useGameController(seed, settings, currentLevelId, tutorial.visible);
 
   const levelComplete = useMemo(() => {
     if (!currentLevelId || !gameOver) return null;
@@ -586,7 +603,7 @@ function GameWrapper({
         onHome={onHome}
         onPlayAgain={onPlayAgain}
         onOpenSettings={onOpenSettings}
-        tutorialReplayToken={tutorialReplayToken}
+        tutorial={tutorial}
         suppressToasts={!!levelComplete}
       />
       {levelComplete && (

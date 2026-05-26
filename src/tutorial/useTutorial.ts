@@ -13,8 +13,12 @@ export interface TutorialApi {
   jumpTo(step: number): void;
 }
 
-export function useTutorial(totalSteps: number): TutorialApi {
-  const [visible, setVisible] = useState(false);
+export function useTutorial(totalSteps: number, initialVisible = false): TutorialApi {
+  // initialVisible: lets the caller (GameWrapper) start the overlay open
+  // synchronously on first W1L1 entry. Avoids the effect round-trip that
+  // would let useGameController's mount fire a bot turn before the overlay
+  // visually opens (effect-ordering race fixed by the freeze track).
+  const [visible, setVisible] = useState(initialVisible);
   const [currentStep, setStep] = useState(0);
 
   const open = useCallback(() => {

@@ -71,12 +71,20 @@ function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-export function useGameController(seed: number, settings: GameSettings, currentLevelId: number | null) {
+export function useGameController(seed: number, settings: GameSettings, currentLevelId: number | null, tutorialActive: boolean = false) {
   const prngRef = useRef<PRNG>(null!);
   const idGenRef = useRef<IdGenerator>(null!);
   const trackerRef = useRef<CardTrackerState>(null!);
   const botBusyRef = useRef(false);
   const mountedRef = useRef(true);
+  // Tutorial freeze (May 26) — runBotTurn and its in-flight checkpoints
+  // read this ref every loop iteration. Bot suppression is binary: while
+  // tutorialActive, no bot turn starts and in-flight turns gate-out at
+  // the next await boundary (clean cleanup, no state mutation past the
+  // last setAndPersist). Resume effect (deps [tutorialActive]) re-fires
+  // runBotTurn when the player dismisses.
+  const tutorialActiveRef = useRef(tutorialActive);
+  tutorialActiveRef.current = tutorialActive;
 
   if (prngRef.current === null) {
     prngRef.current = createPRNG(seed);
@@ -211,7 +219,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   // ─── Bot turn execution ───────────────────────────
 
   async function runBotTurn(current: GameState): Promise<void> {
-    if (!mountedRef.current || botBusyRef.current) return;
+    if (!mountedRef.current || botBusyRef.current || tutorialActiveRef.current) return;
     const player = current.currentPlayer;
     if (player === 0) return;
     if (current.hands[player].length === 0) {
@@ -231,6 +239,12 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     const delay = getBotThinkingDelay(difficulty, prngRef.current);
     await wait(delay);
     if (!mountedRef.current) return;
+    // Freeze gate after thinking delay — tutorial opened mid-think.
+    if (tutorialActiveRef.current) {
+      setBotViz(null);
+      botBusyRef.current = false;
+      return;
+    }
 
     // ── AI diagnostic logging ──
     const profile = getPersonalityProfile(difficulty);
@@ -281,6 +295,12 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       await wait(2000);
       if (!mountedRef.current) return;
       setBotCombo(null);
+      // Freeze gate after bot-combo display — tutorial opened mid-show.
+      if (tutorialActiveRef.current) {
+        setBotViz(null);
+        botBusyRef.current = false;
+        return;
+      }
 
       const vc: ValidatedCapture = {
         allCapturedCards: decision.captureDetails.capturedCards,
@@ -316,21 +336,33 @@ export function useGameController(seed: number, settings: GameSettings, currentL
 
     await wait(500);
     if (!mountedRef.current) return;
+    // Freeze gate before recursive advance — tutorial opened after bot's
+    // move resolved. State is already persisted; just stop the chain.
+    // Resume effect picks up the next turn from this exact state.
+    if (tutorialActiveRef.current) return;
     await advanceRef.current(next);
   }
 
-  // ─── Initial bot turn on mount ────────────────────
-
+  // Mount/unmount tracker — separate from the bot trigger so the lifecycle
+  // flag is set/cleared exactly once.
   useEffect(() => {
     mountedRef.current = true;
-    if (state.currentPlayer !== 0 && !botBusyRef.current && !gameOver) {
-      void runBotTurn(state);
-    }
     return () => {
       mountedRef.current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ─── Bot turn trigger: mount + tutorial-close resume ───
+  // Single effect covers (a) initial mount when tutorial isn't blocking,
+  // (b) resumption when the tutorial closes mid-game. The tutorial gate
+  // inside runBotTurn handles the mid-turn freeze (in-flight bot turn
+  // cleans up at next await boundary).
+  useEffect(() => {
+    if (!tutorialActive && stateRef.current.currentPlayer !== 0 && !botBusyRef.current && !gameOver) {
+      void runBotTurn(stateRef.current);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tutorialActive]);
 
   // ─── Player actions ───────────────────────────────
 

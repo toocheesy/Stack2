@@ -12,9 +12,10 @@ interface Props {
   settings: AudioSettings;
   onChange: (patch: Partial<AudioSettings>) => void;
   onClose: () => void;
+  onReplayTutorial: () => void;
 }
 
-export function SettingsScreen({ visible, settings, onChange, onClose }: Props) {
+export function SettingsScreen({ visible, settings, onChange, onClose, onReplayTutorial }: Props) {
   return (
     <AnimatePresence>
       {visible && (
@@ -60,6 +61,19 @@ export function SettingsScreen({ visible, settings, onChange, onClose }: Props) 
                 onToggle={(on) => onChange({ sfxOn: on })}
               />
             </div>
+
+            <button
+              onClick={onReplayTutorial}
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                background: 'transparent', border: `1px solid ${TAN}66`,
+                color: TAN, fontSize: 12, fontWeight: 600,
+                fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                letterSpacing: '0.04em', marginTop: 2,
+              }}
+            >
+              Replay tutorial
+            </button>
 
             <motion.button
               onClick={onClose}

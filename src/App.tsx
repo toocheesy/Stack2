@@ -29,6 +29,15 @@ function App() {
   const [audioSettings, updateAudio] = useAudio();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
+  // The Run tutorial — Settings "Replay tutorial" bumps this counter.
+  // GameView watches the dep and re-opens the overlay (token >0 gate avoids
+  // firing on the initial mount where token === 0).
+  const [tutorialReplayToken, setTutorialReplayToken] = useState(0);
+  const replayTutorial = useCallback(() => {
+    setTutorialReplayToken((t) => t + 1);
+    setSettingsOpen(false);
+  }, []);
+
   // Per-mode saved-game split: read the snapshot once per render and derive
   // the per-card affordances from currentLevelId. null = Classic save (show
   // Classic Continue); number = Run save (surfaced via ChapterMap callout).
@@ -144,6 +153,7 @@ function App() {
         onPlayAgain={playAgain}
         onNextLevel={nextLevel}
         onOpenSettings={() => setSettingsOpen(true)}
+        tutorialReplayToken={tutorialReplayToken}
       />
     );
   } else {
@@ -165,6 +175,7 @@ function App() {
         settings={audioSettings}
         onChange={updateAudio}
         onClose={() => setSettingsOpen(false)}
+        onReplayTutorial={replayTutorial}
       />
     </>
   );
@@ -516,6 +527,7 @@ function GameWrapper({
   onPlayAgain,
   onNextLevel,
   onOpenSettings,
+  tutorialReplayToken,
 }: {
   seed: number;
   settings: GameSettings;
@@ -525,6 +537,7 @@ function GameWrapper({
   onPlayAgain: () => void;
   onNextLevel: () => void;
   onOpenSettings: () => void;
+  tutorialReplayToken: number;
 }) {
   const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, actions } =
     useGameController(seed, settings, currentLevelId);
@@ -573,6 +586,7 @@ function GameWrapper({
         onHome={onHome}
         onPlayAgain={onPlayAgain}
         onOpenSettings={onOpenSettings}
+        tutorialReplayToken={tutorialReplayToken}
         suppressToasts={!!levelComplete}
       />
       {levelComplete && (

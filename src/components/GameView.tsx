@@ -8,6 +8,9 @@ import { RoundEndOverlay } from './RoundEndOverlay';
 import { JackpotCelebration, type JackpotDisplay } from './JackpotCelebration';
 import { GameOverOverlay } from './GameOverOverlay';
 import { validateFullCombo } from '../engine/core/captureValidator';
+import { TutorialOverlay, type TutorialMark } from './TutorialOverlay';
+import { useTutorial } from '../tutorial/useTutorial';
+import { loadTutorialSeen } from '../tutorial/tutorialStorage';
 
 type CardSource = 'hand' | 'board';
 
@@ -25,6 +28,9 @@ interface Props {
   onHome: () => void;
   onPlayAgain: () => void;
   onOpenSettings: () => void;
+  // The Run tutorial — bumped by App when Settings "Replay tutorial" tapped.
+  // Auto-fire on first W1L1 entry is internal to this component.
+  tutorialReplayToken: number;
   // Bundle C — when an Adventure overlay (LevelCompleteOverlay etc.) is
   // showing from App.tsx, suppress the in-game toast layer. App passes
   // !!levelComplete here so the toast logic doesn't need to know about
@@ -50,10 +56,41 @@ const BG = '#0A0A0A';
 const BOARD_GAP = 4;
 
 export function GameView({
-  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, onOpenSettings, suppressToasts = false,
+  state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, onOpenSettings, tutorialReplayToken, suppressToasts = false,
 }: Props) {
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
   const boardRef = useRef<HTMLDivElement | null>(null);
+  // Tutorial zone refs (boardRef above doubles as the Table mark).
+  const headerRef = useRef<HTMLDivElement | null>(null);
+  const msgStripRef = useRef<HTMLDivElement | null>(null);
+  const botZonesRef = useRef<HTMLDivElement | null>(null);
+  const comboBuilderRef = useRef<HTMLDivElement | null>(null);
+  const submitWrapRef = useRef<HTMLDivElement | null>(null);
+  const resetWrapRef = useRef<HTMLDivElement | null>(null);
+  const handZoneRef = useRef<HTMLDivElement | null>(null);
+
+  const tutorial = useTutorial(8);
+
+  // Auto-fire on first W1L1 entry. Mount-only check; once seen=true,
+  // subsequent mounts skip naturally.
+  useEffect(() => {
+    if (currentLevelId === 1 && !loadTutorialSeen()) {
+      tutorial.open();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Replay-from-Settings: App bumps the token; we re-open the tutorial.
+  // Token starts at 0 (no-op on the initial mount).
+  useEffect(() => {
+    if (tutorialReplayToken > 0) tutorial.open();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tutorialReplayToken]);
+
+  // Ghost-render SUBMIT/RESET while the tutorial is up so marks 4 and 5
+  // have something visible to spotlight (the real buttons only render
+  // when the player has built a combo).
+  const tutorialShowGhostActions = tutorial.visible;
   const [error, setError] = useState<string | null>(null);
   // tap-bug fix (May 25): drag-only model. The previous tap-to-select flow
   // (selectedHandCard state + handleBoardTap/handleHandTap/handleSlotTap/
@@ -292,7 +329,7 @@ export function GameView({
             Layout: quit button left, [wordmark + segments] grouped center,
             spacer right. Wordmark scales smaller than home screen (14px vs
             18px) to fit alongside segments at 375px+ portrait. */}
-      <div style={{
+      <div ref={headerRef} style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
         padding: '8px 12px', flexShrink: 0, height: 44, gap: 8,
       }}>
@@ -350,7 +387,7 @@ export function GameView({
            Persistent layer is always rendered (transparent strip carrying
            the LAST capture echo). Toast layer animates in/out over the top
            with celebration/transition/hint content. */}
-      <div style={{
+      <div ref={msgStripRef} style={{
         position: 'relative', flexShrink: 0, height: 32,
       }}>
         {/* Persistent layer */}
@@ -417,7 +454,7 @@ export function GameView({
             W1 Calvin+Calvin etc.), seats lock to "Name · 1" / "Name · 2"
             for player-side disambiguation. Position-locked at game start
             because settings don't shuffle mid-game. */}
-      <div style={{ display: 'flex', gap: 8, padding: '0 8px', flexShrink: 0 }}>
+      <div ref={botZonesRef} style={{ display: 'flex', gap: 8, padding: '0 8px', flexShrink: 0 }}>
         <BotZone
           name={state.settings.bot1Personality === state.settings.bot2Personality ? `${bot1.name} · 1` : bot1.name}
           color={bot1.color} score={state.overallScores.bot1}
@@ -480,7 +517,7 @@ export function GameView({
       </div>
 
       {/* ═══ ZONE F — COMBO STRIP ═══ */}
-      <div style={{
+      <div ref={comboBuilderRef} style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         gap: 6, padding: '6px 8px', flexShrink: 0,
       }}>
@@ -517,10 +554,22 @@ export function GameView({
             );
           })}
         </div>
-        {isPlayerTurn && hasCombo && !botCombo && (
+        {(tutorialShowGhostActions || (isPlayerTurn && hasCombo && !botCombo)) && (
           <div style={{ display: 'flex', gap: 6 }}>
-            <Btn label="SUBMIT" primary disabled={!comboValid || state.dumpActive} onClick={handleSubmit} />
-            <Btn label="RESET" onClick={actions.resetCombo} />
+            <div ref={submitWrapRef}>
+              <Btn
+                label="SUBMIT" primary
+                disabled={tutorialShowGhostActions || !comboValid || state.dumpActive}
+                onClick={tutorialShowGhostActions ? () => {} : handleSubmit}
+              />
+            </div>
+            <div ref={resetWrapRef}>
+              <Btn
+                label="RESET"
+                disabled={tutorialShowGhostActions}
+                onClick={tutorialShowGhostActions ? () => {} : actions.resetCombo}
+              />
+            </div>
           </div>
         )}
         {isPlayerTurn && state.dumpActive && (
@@ -535,7 +584,7 @@ export function GameView({
       </div>
 
       {/* ═══ ZONES G+H — PLAYER HAND + SCORE ═══ */}
-      <div style={{
+      <div ref={handZoneRef} style={{
         display: 'flex', padding: '0 8px 8px', gap: 8, flexShrink: 0,
       }}>
         {/* Zone H — Player score block. Bundle A S2 active-turn glow:
@@ -635,8 +684,52 @@ export function GameView({
       <RoundEndOverlay visible={state.gamePhase === 'roundEnd'} roundNumber={state.currentRound} roundStats={state.roundStats} gameStats={state.gameStats} targetScore={target} bot1Personality={state.settings.bot1Personality} bot2Personality={state.settings.bot2Personality} onContinue={actions.continueRound} adventureMode={!!currentLevelId} />
       <JackpotCelebration info={jackpotInfo} bot1Personality={state.settings.bot1Personality} bot2Personality={state.settings.bot2Personality} />
       <GameOverOverlay winner={gameOver as { winner: PlayerIndex; winnerName: string } | null} state={state} adventureMode={!!currentLevelId} onPlayAgain={onPlayAgain} onHome={onHome} />
+
+      {/* The Run tutorial — 8-mark coach overlay. Auto-fires on first W1L1
+          entry, replayable from Settings. Pure presentation; engine untouched. */}
+      <TutorialOverlay
+        visible={tutorial.visible}
+        currentStep={tutorial.currentStep}
+        totalSteps={tutorial.totalSteps}
+        marks={TUTORIAL_MARKS({
+          handZoneRef, boardRef, comboBuilderRef, resetWrapRef,
+          submitWrapRef, botZonesRef, msgStripRef, headerRef,
+        })}
+        onNext={tutorial.next}
+        onPrev={tutorial.prev}
+        onSkip={tutorial.dismiss}
+        onJump={tutorial.jumpTo}
+      />
     </div>
   );
+}
+
+// ─── Tutorial marks (verbatim copy + zone refs) ─────────
+// Teaching order: bottom (your stuff) → middle (workspace) → controls →
+// upper middle (opponents) → top (context). Per Decision Log May 25.
+
+interface TutorialMarkRefs {
+  handZoneRef: React.RefObject<HTMLDivElement | null>;
+  boardRef: React.RefObject<HTMLDivElement | null>;
+  comboBuilderRef: React.RefObject<HTMLDivElement | null>;
+  resetWrapRef: React.RefObject<HTMLDivElement | null>;
+  submitWrapRef: React.RefObject<HTMLDivElement | null>;
+  botZonesRef: React.RefObject<HTMLDivElement | null>;
+  msgStripRef: React.RefObject<HTMLDivElement | null>;
+  headerRef: React.RefObject<HTMLDivElement | null>;
+}
+
+function TUTORIAL_MARKS(refs: TutorialMarkRefs): TutorialMark[] {
+  return [
+    { title: 'Your hand', copy: 'Your hand and your score. Drag a card into the builder to begin.', ref: refs.handZoneRef },
+    { title: 'The table', copy: 'Shared cards. You score by capturing these.', ref: refs.boardRef },
+    { title: 'Combo builder', copy: 'Drag a base card here — from your hand or the table — then add cards that add up to it, or match it.', ref: refs.comboBuilderRef },
+    { title: 'Reset', copy: 'Dragged the wrong card? Reset sends everything in the builder back where it came from.', ref: refs.resetWrapRef, pill: true },
+    { title: 'Submit', copy: 'Hit submit to capture, and your turn keeps going. To place instead, drag a card onto the table — that ends your turn.', ref: refs.submitWrapRef, pill: true },
+    { title: 'The bots', copy: 'Two bots are after the same cards. Watch what they leave behind.', ref: refs.botZonesRef },
+    { title: 'Message strip', copy: 'Hints and the last move land here.', ref: refs.msgStripRef },
+    { title: 'Header', copy: "Where you are: your world and level, and the round and hand you're on.", ref: refs.headerRef },
+  ];
 }
 
 // ─── Bot Zone ───────────────────────────────────────

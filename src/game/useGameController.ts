@@ -364,6 +364,21 @@ export function useGameController(seed: number, settings: GameSettings, currentL
             (g) => g.card.id === cardId,
           );
         if (already) return;
+        // Slot type-lock (capture-legality fix, May 25): each non-base slot
+        // represents ONE relationship to the base — either a pair/match or a
+        // sum, never both. Engine math already rejects mixed slots at SUBMIT,
+        // but the staging gate let users build them. Lock the slot to its
+        // first card's role: if the first card matches the base rank, only
+        // accept further match-rank cards; otherwise only accept further
+        // non-match-rank cards. Refuse the off-type drop silently. Cross-slot
+        // apex plays (slot 1 match + slot 2 sum) and the face-card pair-only
+        // rule are unaffected — this gate is per-slot.
+        const existing = combo[slot];
+        if (existing.length > 0) {
+          const firstIsMatch = existing[0].card.rank === combo.base.rank;
+          const newIsMatch = card.rank === combo.base.rank;
+          if (firstIsMatch !== newIsMatch) return;
+        }
         const idx =
           source === 'hand'
             ? s.hands[0].findIndex((c) => c.id === cardId)

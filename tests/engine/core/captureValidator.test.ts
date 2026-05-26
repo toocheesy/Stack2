@@ -97,6 +97,20 @@ describe('validateComboSlot', () => {
     expect(v.captureType).toBe('sum');
   });
 
+  it('rejects mixed slot: match card + sum cards in same slot (capture-legality)', () => {
+    // Slot mixing the base-rank match card with sum cards. Per Stacked's
+    // sacred per-slot rule each slot represents ONE relationship to the
+    // base — pair OR sum, never both. Engine rejects via pure math
+    // (adding the match card pushes the sum past the base, since no
+    // card has value 0). Locks in the math so a future "permissive"
+    // refactor of validateComboSlot can't silently regress capture-legality.
+    const base = card('7');
+    const slot = [group(card('7', 'clubs')), group(card('3')), group(card('4'))];
+    const v = validateComboSlot(slot, base);
+    expect(v.isValid).toBe(false);
+    expect(v.captureType).toBeNull();
+  });
+
   it('face card base: only pairs allowed', () => {
     const base = card('K');
     const pair = validateComboSlot([group(card('K'))], base);

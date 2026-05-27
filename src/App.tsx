@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { GameView } from './components/GameView';
 import { ClassicSetup } from './components/ClassicSetup';
 import { ChapterMap } from './components/ChapterMap';
@@ -14,6 +14,7 @@ import { useAudio } from './audio/useAudio';
 import { armAutoplayUnlock } from './audio/audioPlayer';
 import { useTutorial } from './tutorial/useTutorial';
 import { loadTutorialSeen } from './tutorial/tutorialStorage';
+import { trackGameStart, trackTutorialComplete, trackGameEnd, trackRunComplete } from './analytics/track';
 
 type Screen = 'home' | 'setup' | 'worldMap' | 'game' | 'cardtest';
 
@@ -556,8 +557,46 @@ function GameWrapper({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tutorialReplayToken]);
 
-  const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, actions } =
+  const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, wasResumed, actions } =
     useGameController(seed, settings, currentLevelId, tutorial.visible);
+
+  // Analytics — game_start fires once per GameWrapper mount. seed change
+  // remounts via key={seed} so a new game gets a new event. wasResumed
+  // comes from useGameController's loadGame() result, single source of truth.
+  const analyticsGameStartedAtRef = useRef(Date.now());
+  useEffect(() => {
+    trackGameStart({
+      mode: currentLevelId === null ? 'classic' : 'run',
+      level_id: currentLevelId ?? undefined,
+      resumed: wasResumed,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Analytics — tutorial duration. Reset timer on each open (replay support).
+  // lastTutorialStepRef tracks the highest step reached because close()
+  // resets currentStep to 0 in the same commit as visible=false, so we
+  // can't read it from tutorial.currentStep after close fires.
+  const tutorialOpenedAtRef = useRef<number | null>(null);
+  const lastTutorialStepRef = useRef(0);
+  useEffect(() => {
+    if (tutorial.visible) lastTutorialStepRef.current = tutorial.currentStep;
+  }, [tutorial.currentStep, tutorial.visible]);
+  useEffect(() => {
+    if (tutorial.visible) {
+      tutorialOpenedAtRef.current = Date.now();
+      return;
+    }
+    // visible flipped to false. Only fire if it was previously open.
+    if (tutorialOpenedAtRef.current === null) return;
+    const stepReached = lastTutorialStepRef.current + 1; // 1-based for analytics
+    trackTutorialComplete({
+      step_reached: stepReached,
+      method: stepReached >= tutorial.totalSteps ? 'complete' : 'dismiss',
+      duration_ms: Date.now() - tutorialOpenedAtRef.current,
+    });
+    tutorialOpenedAtRef.current = null;
+  }, [tutorial.visible, tutorial.totalSteps]);
 
   const levelComplete = useMemo(() => {
     if (!currentLevelId || !gameOver) return null;
@@ -586,6 +625,29 @@ function GameWrapper({
       unlockJettInClassic();
     }
   }, [currentLevelId, gameOver, levelComplete]);
+
+  // Analytics — game_end fires once when gameOver flips truthy. Declared
+  // AFTER the recordLevelCompletion effect so run_complete reads the freshly-
+  // saved totalStars. Single ref guards against double-fire on React re-runs.
+  const gameEndFiredRef = useRef(false);
+  useEffect(() => {
+    if (!gameOver || gameEndFiredRef.current) return;
+    gameEndFiredRef.current = true;
+    const playerScore = state.overallScores.player;
+    const mode = currentLevelId === null ? 'classic' : 'run';
+    trackGameEnd({
+      mode,
+      won: levelComplete ? levelComplete.won : gameOver.winner === 0,
+      score: playerScore,
+      duration_ms: Date.now() - analyticsGameStartedAtRef.current,
+      level_id: currentLevelId ?? undefined,
+      stars: levelComplete?.stars,
+      margin: levelComplete?.margin,
+    });
+    if (levelComplete?.won && levelComplete.isFinalLevel) {
+      trackRunComplete({ total_stars: loadProgress().totalStars });
+    }
+  }, [gameOver, levelComplete, state.overallScores, currentLevelId]);
 
   return (
     <>

@@ -31,6 +31,7 @@ import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../
 import { evaluateAllActions } from '../engine/ai/evaluator';
 import { saveGame, loadGame, clearSavedGame } from './persistence';
 import { playTakeTheTable } from '../audio/audioPlayer';
+import { trackFirstCapture } from '../analytics/track';
 
 type CardSource = 'hand' | 'board';
 
@@ -92,10 +93,16 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     trackerRef.current = createCardTracker();
   }
 
+  // Analytics: set during state init so game_start can emit resumed:true
+  // and first_capture is suppressed on resumed games (player isn't making
+  // their literal first capture — they're picking up a game in progress).
+  const wasResumedRef = useRef(false);
+
   const [state, setState] = useState<GameState>(() => {
     const saved = loadGame();
     if (saved) {
       trackerRef.current = saved.tracker;
+      wasResumedRef.current = true;
       return saved.game;
     }
     const initial = createInitialState(settings, prngRef.current, idGenRef.current);
@@ -108,6 +115,10 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   // number = Run level id). Future-proofs if level id changes mid-mount.
   const currentLevelIdRef = useRef(currentLevelId);
   currentLevelIdRef.current = currentLevelId;
+
+  // Analytics: time the player's first capture from mount.
+  const gameStartedAtRef = useRef(Date.now());
+  const firstCaptureFiredRef = useRef(false);
 
   const setAndPersist = useCallback((s: GameState) => {
     setState(s);
@@ -440,6 +451,15 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       totalPoints: validation.totalPoints,
     };
     const next = executeCapture(s, vc);
+    if (!firstCaptureFiredRef.current && !wasResumedRef.current) {
+      firstCaptureFiredRef.current = true;
+      const levelId = currentLevelIdRef.current;
+      trackFirstCapture({
+        mode: levelId === null ? 'classic' : 'run',
+        level_id: levelId ?? undefined,
+        time_to_first_capture_ms: Date.now() - gameStartedAtRef.current,
+      });
+    }
     trackerRef.current = recordCapture(
       trackerRef.current,
       0,
@@ -521,6 +541,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     lastCapture,
     jackpotInfo,
     gameOver,
+    wasResumed: wasResumedRef.current,
     actions: {
       addToCombo,
       removeFromCombo: doRemoveFromCombo,

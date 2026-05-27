@@ -7,6 +7,30 @@ import '@fontsource/inter/700.css'
 import '@fontsource/jetbrains-mono/700.css'
 import './index.css'
 import App from './App.tsx'
+import { trackPwaInstalled } from './analytics/track'
+
+// PWA install telemetry. Android/Desktop fire `appinstalled` directly. iOS
+// A2HS does not — we infer it from a first-ever standalone display-mode
+// launch and write a localStorage flag to avoid re-firing on every open.
+(function wirePwaInstallTelemetry() {
+  try {
+    const FIRED_KEY = 'stacked_v2_pwa_install_fired';
+    const alreadyFired = localStorage.getItem(FIRED_KEY) === 'true';
+
+    if (!alreadyFired && window.matchMedia('(display-mode: standalone)').matches) {
+      trackPwaInstalled({ source: 'standalone_first_run' });
+      localStorage.setItem(FIRED_KEY, 'true');
+    }
+
+    window.addEventListener('appinstalled', () => {
+      if (localStorage.getItem(FIRED_KEY) === 'true') return;
+      trackPwaInstalled({ source: 'appinstalled' });
+      localStorage.setItem(FIRED_KEY, 'true');
+    });
+  } catch {
+    // matchMedia/localStorage unavailable — analytics gracefully no-op
+  }
+})();
 
 // Dev-only URL helpers for phone playtest. Visit `?unlock` to unlock every
 // Adventure level (3 stars each) + Jett in Classic. Visit `?reset` to wipe

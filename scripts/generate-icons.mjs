@@ -21,14 +21,19 @@ const SIZES = [
   { name: 'icon-512.png', size: 512 },
   { name: 'icon-maskable-512.png', size: 512 },
   { name: 'apple-touch-icon-180.png', size: 180 },
+  // Browser-tab favicons — flatten to tan to enforce "no alpha" per the
+  // brand spec (master is fully opaque so flatten is effectively a no-op,
+  // but the flatten call documents the no-alpha contract for downstream
+  // tooling and asserts it on regeneration).
+  { name: 'favicon-32.png', size: 32, flatten: true },
+  { name: 'favicon-16.png', size: 16, flatten: true },
 ];
 
-for (const { name, size } of SIZES) {
+for (const { name, size, flatten } of SIZES) {
   const out = resolve(OUT_DIR, name);
-  await sharp(MASTER)
-    .resize(size, size, { fit: 'cover' })
-    .png({ compressionLevel: 9 })
-    .toFile(out);
+  let pipeline = sharp(MASTER).resize(size, size, { fit: 'cover' });
+  if (flatten) pipeline = pipeline.flatten({ background: '#E8C577' });
+  await pipeline.png({ compressionLevel: 9 }).toFile(out);
   console.log(`  ${name} (${size}×${size})`);
 }
 console.log('Icon set written to public/icons/');

@@ -12,7 +12,7 @@ export default defineConfig({
       // injectRegister 'auto' adds the SW registration script to index.html
       // automatically — no manual main.tsx change needed.
       injectRegister: 'auto',
-      includeAssets: ['favicon.svg', 'og-share.png'],
+      includeAssets: ['og-share.png', 'icons/favicon-32.png', 'icons/favicon-16.png'],
       manifest: {
         name: 'STACKED',
         short_name: 'STACKED',

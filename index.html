@@ -4,7 +4,34 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>stacked-v2</title>
+    <title>STACKED — Strategic Card Combat</title>
+
+    <!-- Open Graph (Facebook, LinkedIn, iMessage, etc.) — og:image MUST be
+         absolute on the final domain; OG scrapers don't resolve relative URLs. -->
+    <meta property="og:title" content="STACKED" />
+    <meta property="og:description" content="A card game of stacks and consequences." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://stackedthegame.com" />
+    <meta property="og:image" content="https://stackedthegame.com/og-share.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="STACKED" />
+    <meta name="twitter:description" content="A card game of stacks and consequences." />
+    <meta name="twitter:image" content="https://stackedthegame.com/og-share.png" />
+
+    <!-- Google Analytics 4 — reuses existing G-50VG5774NJ property so
+         metrics stay continuous through the relaunch. SPA: the gtag config
+         page_view is enough for launch. No npm dep needed. -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-50VG5774NJ"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-50VG5774NJ');
+    </script>
   </head>
   <body>
     <div id="root"></div>

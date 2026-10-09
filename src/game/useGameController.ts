@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
+  Combination,
   ComboSlot,
   GameSettings,
   GameState,
   PlayerIndex,
-  ValidatedCapture,
 } from '../engine/types';
 import {
   createInitialState,
@@ -15,7 +15,7 @@ import {
   applyJackpot,
   startNewRound,
 } from '../engine/core/gameState';
-import { validateFullCombo } from '../engine/core/captureValidator';
+import { botCaptureToCombination, validateFullCombo } from '../engine/core/captureValidator';
 import { determineTurnResult } from '../engine/core/turnManager';
 import { createPRNG, type PRNG } from '../engine/utils/prng';
 import { createIdGenerator, type IdGenerator } from '../engine/utils/uuid';
@@ -295,8 +295,28 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       `score=${decision.score.total.toFixed(1)} | ${decision.reasoning}`,
     );
 
-    let next: GameState;
+    // Bot captures go through the same capture check as the player's.
+    // A refused capture falls through to the place branch below.
+    let botCombo: Combination | null = null;
     if (decision.action === 'capture' && decision.captureDetails) {
+      const combo = botCaptureToCombination(
+        decision.handCard,
+        decision.captureDetails.slots,
+        current.board,
+      );
+      const validation = validateFullCombo(current, combo);
+      if (validation.isValid) {
+        botCombo = combo;
+      } else if (import.meta.env.DEV) {
+        console.warn(
+          `[BOT ${player}] capture refused by validateFullCombo`,
+          { base: decision.handCard, slots: decision.captureDetails.slots, errors: validation.errors },
+        );
+      }
+    }
+
+    let next: GameState;
+    if (botCombo && decision.captureDetails) {
       // Show bot's combo in the slots for the player to read
       const botBase = decision.handCard;
       const botComboCards = decision.captureDetails.capturedCards.filter(
@@ -313,11 +333,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         return;
       }
 
-      const vc: ValidatedCapture = {
-        allCapturedCards: decision.captureDetails.capturedCards,
-        totalPoints: decision.captureDetails.totalPoints,
-      };
-      next = executeCapture(current, vc);
+      next = executeCapture(current, botCombo);
       trackerRef.current = recordCapture(
         trackerRef.current,
         player,
@@ -446,11 +462,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     const validation = validateFullCombo(s);
     if (!validation.isValid) return validation.errors[0] ?? 'Invalid combo';
 
-    const vc: ValidatedCapture = {
-      allCapturedCards: validation.allCapturedCards,
-      totalPoints: validation.totalPoints,
-    };
-    const next = executeCapture(s, vc);
+    const next = executeCapture(s, s.combination);
     if (!firstCaptureFiredRef.current && !wasResumedRef.current) {
       firstCaptureFiredRef.current = true;
       const levelId = currentLevelIdRef.current;

@@ -1,6 +1,7 @@
 import type {
   Card,
   CaptureRecord,
+  Combination,
   GamePlayerStats,
   GameSettings,
   GameState,
@@ -8,12 +9,12 @@ import type {
   PlayerIndex,
   RoundStats,
   Scores,
-  ValidatedCapture,
 } from '../types';
 import { PLAYER_NAMES, SCORE_KEYS } from '../types';
 import type { PRNG } from '../utils/prng';
 import type { IdGenerator } from '../utils/uuid';
 import { createDeck, shuffleDeck } from '../utils/deck';
+import { validateFullCombo } from './captureValidator';
 import { calculateCardsPoints } from './scoring';
 
 const HAND_SIZE = 4;
@@ -171,9 +172,15 @@ function removeCardsById(cards: readonly Card[], ids: Set<string>): Card[] {
 
 export function executeCapture(
   state: GameState,
-  validatedCapture: ValidatedCapture,
+  combination: Combination,
 ): GameState {
-  const ids = new Set(validatedCapture.allCapturedCards.map((c) => c.id));
+  const validation = validateFullCombo(state, combination);
+  if (!validation.isValid) {
+    throw new Error(`executeCapture: ${validation.errors[0] ?? 'Invalid combo'}`);
+  }
+  const { allCapturedCards, totalPoints } = validation;
+
+  const ids = new Set(allCapturedCards.map((c) => c.id));
   const hands: [Card[], Card[], Card[]] = [
     state.hands[0],
     state.hands[1],
@@ -182,13 +189,13 @@ export function executeCapture(
   hands[state.currentPlayer] = removeCardsById(hands[state.currentPlayer], ids);
   const board = removeCardsById(state.board, ids);
 
-  let result = addScore(state, state.currentPlayer, validatedCapture.totalPoints);
+  let result = addScore(state, state.currentPlayer, totalPoints);
 
-  const baseCard = state.combination.base ?? validatedCapture.allCapturedCards[0];
+  const baseCard = combination.base ?? allCapturedCards[0];
   if (baseCard) {
     result = maybeUpdateHighest(result, state.currentPlayer, {
-      points: validatedCapture.totalPoints,
-      cards: validatedCapture.allCapturedCards,
+      points: totalPoints,
+      cards: allCapturedCards,
       baseCard,
     });
   }

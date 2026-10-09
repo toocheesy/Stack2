@@ -135,11 +135,6 @@ export interface ComboValidation {
   errors: string[];
 }
 
-export interface ValidatedCapture {
-  allCapturedCards: Card[];
-  totalPoints: number;
-}
-
 export interface JackpotResult {
   player: PlayerIndex;
   points: number;

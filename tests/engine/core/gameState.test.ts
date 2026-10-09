@@ -15,9 +15,8 @@ import type {
   GameSettings,
   GameState,
   Rank,
-  ValidatedCapture,
 } from '../../../src/engine/types';
-import { RANK_VALUES } from '../../../src/engine/types';
+import { RANK_VALUES, SCORE_KEYS } from '../../../src/engine/types';
 import { createPRNG } from '../../../src/engine/utils/prng';
 import { createIdGenerator } from '../../../src/engine/utils/uuid';
 
@@ -161,25 +160,56 @@ describe('resetCombination', () => {
 
 describe('executeCapture', () => {
   it('removes captured cards, scores, sets lastAction=capture, lastCapturer=current', () => {
-    const s = makeState();
-    const handCard = s.hands[s.currentPlayer][0];
-    const boardCard = s.board[0];
-    const vc: ValidatedCapture = {
-      allCapturedCards: [handCard, boardCard],
-      totalPoints: 10,
+    const base = makeState();
+    const handCard = card('7');
+    const boardCard = card('7');
+    const hands: [Card[], Card[], Card[]] = [base.hands[0], base.hands[1], base.hands[2]];
+    hands[base.currentPlayer] = [handCard, ...base.hands[base.currentPlayer]];
+    const s: GameState = { ...base, hands, board: [boardCard, ...base.board] };
+    const combination = {
+      base: handCard,
+      combo1: [{ card: boardCard, source: 'board' as const, originalIndex: 0 }],
+      combo2: [],
+      combo3: [],
     };
     const original = s;
-    const after = executeCapture(s, vc);
+    const after = executeCapture(s, combination);
     expect(after.hands[s.currentPlayer].some((c) => c.id === handCard.id)).toBe(
       false,
     );
     expect(after.board.some((c) => c.id === boardCard.id)).toBe(false);
+    expect(after.scores[SCORE_KEYS[s.currentPlayer]]).toBe(10);
     expect(after.lastAction).toBe('capture');
     expect(after.lastCapturer).toBe(s.currentPlayer);
     expect(after).not.toBe(original);
     expect(original.hands[s.currentPlayer].some((c) => c.id === handCard.id)).toBe(
       true,
     );
+  });
+
+  it('throws on the live example (L3): base 10 from hand, combo2 both from hand', () => {
+    const base = makeState();
+    const ten = card('10');
+    const b6 = card('6');
+    const b4 = card('4');
+    const h5a = card('5');
+    const h5b = card('5');
+    const hands: [Card[], Card[], Card[]] = [base.hands[0], base.hands[1], base.hands[2]];
+    hands[base.currentPlayer] = [ten, h5a, h5b];
+    const s: GameState = { ...base, hands, board: [b6, b4] };
+    const combination = {
+      base: ten,
+      combo1: [
+        { card: b6, source: 'board' as const, originalIndex: 0 },
+        { card: b4, source: 'board' as const, originalIndex: 1 },
+      ],
+      combo2: [
+        { card: h5a, source: 'hand' as const, originalIndex: 1 },
+        { card: h5b, source: 'hand' as const, originalIndex: 2 },
+      ],
+      combo3: [],
+    };
+    expect(() => executeCapture(s, combination)).toThrow('Every slot needs a board card');
   });
 });
 

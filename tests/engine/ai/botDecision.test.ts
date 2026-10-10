@@ -149,37 +149,17 @@ describe('decideBotAction', () => {
     }
   });
 
-  // ─── Doctrine 2.7 — Forced-Placement Dump ────────────
+  // ─── RULES.md L8 — the last player holding cards may still capture ──
 
-  it('returns a place action when dumpActive (capture available but locked out)', () => {
-    // Bot holds an Ace; board has another Ace — a pair capture is the
-    // top-scoring action under normal play. With dumpActive=true, the
-    // bot must place instead.
+  it('a bot that is the last player with a capture available can choose capture', () => {
+    // Bot holds an Ace; board has another Ace; every other hand is empty.
+    // Over a sweep of seeds the bot chooses the obvious pair at least once.
     const hand1 = card('A');
     const hand2 = card('5');
     const boardA = card('A', 'clubs');
     const s = state({
       hands: [[hand1, hand2], [], []],
       board: [boardA, card('7')],
-      dumpActive: true,
-    });
-    const t = createCardTracker();
-    for (let seed = 0; seed < 10; seed++) {
-      const d = decideBotAction(s, 0, 'intermediate', t, createPRNG(seed));
-      expect(d.action).toBe('place');
-    }
-  });
-
-  it('without dumpActive the same setup permits capture', () => {
-    // Sanity check: without the dump flag, the bot should at least
-    // sometimes choose capture given the obvious pair on the board.
-    const hand1 = card('A');
-    const hand2 = card('5');
-    const boardA = card('A', 'clubs');
-    const s = state({
-      hands: [[hand1, hand2], [], []],
-      board: [boardA, card('7')],
-      dumpActive: false,
     });
     const t = createCardTracker();
     let captured = 0;

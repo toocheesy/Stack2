@@ -7,6 +7,7 @@ import {
   executeCapture,
   nextPlayer,
   placeCard,
+  placeRestOfHand,
   resetCombination,
   startNewRound,
 } from '../../../src/engine/core/gameState';
@@ -229,6 +230,76 @@ describe('placeCard', () => {
   it('throws if card not in current hand', () => {
     const s = makeState();
     expect(() => placeCard(s, 'bogus')).toThrow();
+  });
+
+  // RULES.md L8 — the last player holding cards places one, the game places the rest.
+  function lastPlayerState(): { s: GameState; a: Card; b: Card; c: Card } {
+    const base = makeState(3);
+    const a = card('2');
+    const b = card('7');
+    const c = card('K');
+    const hands: [Card[], Card[], Card[]] = [[], [], []];
+    hands[base.currentPlayer] = [a, b, c];
+    return { s: { ...base, hands, lastCapturer: 1, scores: { player: 5, bot1: 10, bot2: 15 } }, a, b, c };
+  }
+
+  it('L8: every other hand empty, placer holds 3 → all 3 on the board, chosen first then hand order; hand empty', () => {
+    const { s, a, b, c } = lastPlayerState();
+    const after = placeCard(s, b.id);
+    expect(after.hands[s.currentPlayer]).toEqual([]);
+    expect(after.board.slice(s.board.length).map((x) => x.id)).toEqual([b.id, a.id, c.id]);
+    expect(after.lastAction).toBe('place');
+  });
+
+  it('another hand still has cards → only the chosen card is placed', () => {
+    const { s, a, b, c } = lastPlayerState();
+    const other = ((s.currentPlayer + 1) % 3) as 0 | 1 | 2;
+    const hands: [Card[], Card[], Card[]] = [s.hands[0], s.hands[1], s.hands[2]];
+    hands[other] = [card('9')];
+    const after = placeCard({ ...s, hands }, b.id);
+    expect(after.hands[s.currentPlayer].map((x) => x.id)).toEqual([a.id, c.id]);
+    expect(after.board.slice(s.board.length).map((x) => x.id)).toEqual([b.id]);
+  });
+
+  it('L8: lastCapturer, scores and roundStats are unchanged by an L8 place', () => {
+    const { s, b } = lastPlayerState();
+    const after = placeCard(s, b.id);
+    expect(after.lastCapturer).toBe(s.lastCapturer);
+    expect(after.scores).toEqual(s.scores);
+    expect(after.roundStats).toEqual(s.roundStats);
+  });
+
+  it('L8: every card is in exactly one place before and after', () => {
+    const { s, b } = lastPlayerState();
+    const zones = (st: GameState) => [...st.deck, ...st.board, ...st.hands.flat()].map((x) => x.id);
+    const before = zones(s);
+    const after = zones(placeCard(s, b.id));
+    expect(new Set(before).size).toBe(before.length);
+    expect(new Set(after).size).toBe(after.length);
+    expect(after.slice().sort()).toEqual(before.slice().sort());
+  });
+});
+
+describe('placeRestOfHand', () => {
+  it('moves the rest of the hand to the end of the board in hand order', () => {
+    const base = makeState(3);
+    const a = card('2');
+    const b = card('7');
+    const hands: [Card[], Card[], Card[]] = [[], [], []];
+    hands[base.currentPlayer] = [a, b];
+    const s: GameState = { ...base, hands };
+    const after = placeRestOfHand(s);
+    expect(after.hands[s.currentPlayer]).toEqual([]);
+    expect(after.board.slice(s.board.length).map((x) => x.id)).toEqual([a.id, b.id]);
+    expect(after.lastAction).toBe('place');
+    expect(after.combination.base).toBeNull();
+  });
+
+  it('an empty hand returns the state unchanged', () => {
+    const base = makeState(3);
+    const hands: [Card[], Card[], Card[]] = [[], [], []];
+    const s: GameState = { ...base, hands };
+    expect(placeRestOfHand(s)).toBe(s);
   });
 });
 

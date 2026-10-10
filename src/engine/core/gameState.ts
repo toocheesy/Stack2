@@ -223,10 +223,34 @@ export function placeCard(state: GameState, cardId: string): GameState {
   ];
   hands[state.currentPlayer] = hand.filter((c) => c.id !== cardId);
   const board = state.board.concat(card);
-  return {
+  const placed: GameState = {
     ...state,
     hands,
     board,
+    lastAction: 'place',
+    combination: emptyCombination(),
+  };
+  // RULES.md L8: when every other player is out of cards, a place also
+  // puts the rest of the placer's hand on the board.
+  const othersEmpty = hands.every((h, i) => i === state.currentPlayer || h.length === 0);
+  return othersEmpty ? placeRestOfHand(placed) : placed;
+}
+
+// RULES.md L8: moves every card still in the current player's hand to the
+// end of the board, in hand order. Scores, lastCapturer and stats are untouched.
+export function placeRestOfHand(state: GameState): GameState {
+  const hand = state.hands[state.currentPlayer];
+  if (hand.length === 0) return state;
+  const hands: [Card[], Card[], Card[]] = [
+    state.hands[0],
+    state.hands[1],
+    state.hands[2],
+  ];
+  hands[state.currentPlayer] = [];
+  return {
+    ...state,
+    hands,
+    board: state.board.concat(hand),
     lastAction: 'place',
     combination: emptyCombination(),
   };

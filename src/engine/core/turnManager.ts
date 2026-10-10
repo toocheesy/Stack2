@@ -55,12 +55,6 @@ export function determineTurnResult(state: GameState): TurnResult {
     if (next !== null) {
       return { type: 'CONTINUE_TURN', nextPlayer: next };
     }
-    if (skipCurrent && state.hands[state.currentPlayer].length > 0) {
-      // Doctrine 2.7 — Forced-Placement Dump trigger: current player just
-      // placed, others are empty, current still has cards. Capture window
-      // shuts. Subsequent turns are forced placements.
-      return { type: 'CONTINUE_TURN', nextPlayer: state.currentPlayer, dumpActive: true };
-    }
   }
 
   if (state.deck.length >= 12) {

@@ -11,6 +11,7 @@ import {
   dealNewHand,
   executeCapture,
   placeCard,
+  placeRestOfHand,
   resetCombination,
   applyJackpot,
   startNewRound,
@@ -30,7 +31,6 @@ import {
 import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../engine/ai/botDecision';
 import { evaluateAllActions } from '../engine/ai/evaluator';
 import { saveGame, loadGame, clearSavedGame } from './persistence';
-import { playTakeTheTable } from '../audio/audioPlayer';
 import { trackFirstCapture } from '../analytics/track';
 
 type CardSource = 'hand' | 'board';
@@ -97,12 +97,24 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   // and first_capture is suppressed on resumed games (player isn't making
   // their literal first capture — they're picking up a game in progress).
   const wasResumedRef = useRef(false);
+  // Set when a loaded save needs play moved on at mount (see below); the
+  // bot-turn effect consumes it once the tutorial isn't open.
+  const pendingAdvanceRef = useRef(false);
 
   const [state, setState] = useState<GameState>(() => {
     const saved = loadGame();
     if (saved) {
       trackerRef.current = saved.tracker;
       wasResumedRef.current = true;
+      if (saved.game.dumpActive) {
+        // A save made under the old place-only lock, before RULES.md L8 was
+        // in the game: the game places the rest of that hand now.
+        for (const c of saved.game.hands[saved.game.currentPlayer]) {
+          trackerRef.current = recordPlacement(trackerRef.current, c);
+        }
+        pendingAdvanceRef.current = true;
+        return { ...placeRestOfHand(saved.game), dumpActive: false };
+      }
       return saved.game;
     }
     const initial = createInitialState(settings, prngRef.current, idGenRef.current);
@@ -185,7 +197,6 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         }
         setAndPersist(afterJackpot);
         if (jackpotResult) {
-          playTakeTheTable();
           setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
           await wait(2500);
           if (!mountedRef.current) return;
@@ -209,7 +220,6 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         }
         setAndPersist(afterJackpot);
         if (jackpotResult) {
-          playTakeTheTable();
           setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
           await wait(2500);
           if (!mountedRef.current) return;
@@ -350,11 +360,14 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         timestamp: Date.now(),
       });
     } else {
+      const handBefore = current.hands[player];
       next = placeCard(current, decision.handCard.id);
-      trackerRef.current = recordPlacement(
-        trackerRef.current,
-        decision.handCard,
-      );
+      // The chosen card plus any the game placed with it (RULES.md L8).
+      for (const c of handBefore) {
+        if (!next.hands[player].some((h) => h.id === c.id)) {
+          trackerRef.current = recordPlacement(trackerRef.current, c);
+        }
+      }
     }
 
     setAndPersist(next);
@@ -385,6 +398,11 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   // inside runBotTurn handles the mid-turn freeze (in-flight bot turn
   // cleans up at next await boundary).
   useEffect(() => {
+    if (!tutorialActive && pendingAdvanceRef.current) {
+      pendingAdvanceRef.current = false;
+      void advanceRef.current(stateRef.current);
+      return;
+    }
     if (!tutorialActive && stateRef.current.currentPlayer !== 0 && !botBusyRef.current && !gameOver) {
       void runBotTurn(stateRef.current);
     }
@@ -457,7 +475,6 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     if (botBusyRef.current) return 'Not your turn';
     const s = stateRef.current;
     if (s.currentPlayer !== 0) return 'Not your turn';
-    if (s.dumpActive) return 'Place only — last cards';
 
     const validation = validateFullCombo(s);
     if (!validation.isValid) return validation.errors[0] ?? 'Invalid combo';
@@ -505,9 +522,15 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     const card = s.hands[0].find((c) => c.id === cardId);
     if (!card) return;
 
+    const handBefore = s.hands[0];
     let next = resetCombination(s);
     next = placeCard(next, cardId);
-    trackerRef.current = recordPlacement(trackerRef.current, card);
+    // The chosen card plus any the game placed with it (RULES.md L8).
+    for (const c of handBefore) {
+      if (!next.hands[0].some((h) => h.id === c.id)) {
+        trackerRef.current = recordPlacement(trackerRef.current, c);
+      }
+    }
     setAndPersist(next);
     void advanceRef.current(next);
   }, [setAndPersist]);

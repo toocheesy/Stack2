@@ -1,21 +1,17 @@
 import { AnimatePresence, motion } from 'motion/react';
-import type { AudioSettings } from '../audio/settingsStorage';
 import { getTransition } from '../config/motion';
 
-const JADE = '#065F46';
 const TAN = '#E8C577';
 const BG = '#0A0A0A';
 const DIVIDER = 'rgba(255,255,255,0.12)';
 
 interface Props {
   visible: boolean;
-  settings: AudioSettings;
-  onChange: (patch: Partial<AudioSettings>) => void;
   onClose: () => void;
   onReplayTutorial: () => void;
 }
 
-export function SettingsScreen({ visible, settings, onChange, onClose, onReplayTutorial }: Props) {
+export function SettingsScreen({ visible, onClose, onReplayTutorial }: Props) {
   return (
     <AnimatePresence>
       {visible && (
@@ -49,19 +45,6 @@ export function SettingsScreen({ visible, settings, onChange, onClose, onReplayT
               SETTINGS
             </h2>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <ToggleRow
-                label="Music"
-                on={settings.musicOn}
-                onToggle={(on) => onChange({ musicOn: on })}
-              />
-              <ToggleRow
-                label="SFX"
-                on={settings.sfxOn}
-                onToggle={(on) => onChange({ sfxOn: on })}
-              />
-            </div>
-
             <button
               onClick={onReplayTutorial}
               style={{
@@ -93,40 +76,5 @@ export function SettingsScreen({ visible, settings, onChange, onClose, onReplayT
         </motion.div>
       )}
     </AnimatePresence>
-  );
-}
-
-function ToggleRow({ label, on, onToggle }: { label: string; on: boolean; onToggle: (on: boolean) => void }) {
-  return (
-    <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-      padding: '8px 4px',
-    }}>
-      <span style={{
-        fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 500,
-        color: 'rgba(255,255,255,0.9)',
-      }}>
-        {label}
-      </span>
-      <button
-        onClick={() => onToggle(!on)}
-        aria-pressed={on}
-        aria-label={`${label} ${on ? 'on' : 'off'}`}
-        style={{
-          width: 42, height: 24, borderRadius: 99,
-          border: 'none', cursor: 'pointer',
-          background: on ? JADE : 'rgba(255,255,255,0.15)',
-          position: 'relative', transition: 'background 0.18s ease',
-          padding: 0,
-        }}
-      >
-        <span style={{
-          position: 'absolute', top: 3, left: on ? 21 : 3,
-          width: 18, height: 18, borderRadius: 99,
-          background: on ? TAN : 'rgba(255,255,255,0.6)',
-          transition: 'left 0.18s ease, background 0.18s ease',
-        }} />
-      </button>
-    </div>
   );
 }

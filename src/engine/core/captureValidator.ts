@@ -2,6 +2,7 @@ import type {
   Card,
   CaptureGroup,
   CaptureOption,
+  Combination,
   ComboSlot,
   ComboValidation,
   GameState,
@@ -76,9 +77,11 @@ function findCardSource(
   return null;
 }
 
-export function validateFullCombo(state: GameState): ComboValidation {
+export function validateFullCombo(
+  state: GameState,
+  combination: Combination = state.combination,
+): ComboValidation {
   const errors: string[] = [];
-  const { combination } = state;
   const base = combination.base;
 
   if (!base) {
@@ -94,13 +97,11 @@ export function validateFullCombo(state: GameState): ComboValidation {
   const slots: ComboSlot[] = ['combo1', 'combo2', 'combo3'];
   const slotValidations: SlotValidation[] = [];
   const allCapturedCards: Card[] = [base];
-  let hasHandCard = false;
-  let hasBoardCard = false;
+  // RULES.md L15: a card may be used only once in a capture.
+  const seenIds = new Set<string>([base.id]);
 
   const baseSource = findCardSource(state, base.id);
-  if (baseSource === 'hand') hasHandCard = true;
-  else if (baseSource === 'board') hasBoardCard = true;
-  else errors.push('Base card is not in current hand or board');
+  if (baseSource === null) errors.push('Base card is not in current hand or board');
 
   let occupiedSlotCount = 0;
   for (const slot of slots) {
@@ -114,19 +115,39 @@ export function validateFullCombo(state: GameState): ComboValidation {
       errors.push(`${slot}: ${validation.details}`);
       continue;
     }
+    // RULES.md L3: every filled slot needs at least one card from the
+    // opposite source to the base. Source is the card's real location,
+    // not its label.
+    let hasOppositeSource = false;
     for (const g of groups) {
+      if (seenIds.has(g.card.id)) {
+        errors.push(`${slot}: card ${g.card.id} is used more than once`);
+        continue;
+      }
+      seenIds.add(g.card.id);
+      const realSource = findCardSource(state, g.card.id);
+      if (realSource === null) {
+        errors.push(`${slot}: card ${g.card.id} is not in current hand or board`);
+        continue;
+      }
+      if (realSource !== g.source) {
+        errors.push(`${slot}: card ${g.card.id} is labelled ${g.source} but is in ${realSource}`);
+        continue;
+      }
       allCapturedCards.push(g.card);
-      if (g.source === 'hand') hasHandCard = true;
-      else hasBoardCard = true;
+      if (realSource !== baseSource) hasOppositeSource = true;
+    }
+    if (baseSource !== null && !hasOppositeSource) {
+      errors.push(
+        baseSource === 'hand'
+          ? 'Every slot needs a board card'
+          : 'Every slot needs a hand card',
+      );
     }
   }
 
   if (occupiedSlotCount === 0) {
     errors.push('At least one combo slot must have cards');
-  }
-
-  if (!hasHandCard || !hasBoardCard) {
-    errors.push('Capture must include at least one hand card and one board card');
   }
 
   const totalPoints = calculateCardsPoints(allCapturedCards);
@@ -137,6 +158,30 @@ export function validateFullCombo(state: GameState): ComboValidation {
     allCapturedCards,
     totalPoints,
     errors,
+  };
+}
+
+/**
+ * Turns a bot's capture into a Combination so it can go through
+ * validateFullCombo like the player's: base = the hand card, combo1..3 =
+ * the slots in order, every slot card labelled from the board.
+ */
+export function botCaptureToCombination(
+  handCard: Card,
+  slots: readonly MultiSlotCaptureSlot[],
+  board: readonly Card[],
+): Combination {
+  const toGroups = (cards: readonly Card[]): CaptureGroup[] =>
+    cards.map((card) => ({
+      card,
+      source: 'board',
+      originalIndex: board.findIndex((b) => b.id === card.id),
+    }));
+  return {
+    base: handCard,
+    combo1: slots[0] ? toGroups(slots[0].cards) : [],
+    combo2: slots[1] ? toGroups(slots[1].cards) : [],
+    combo3: slots[2] ? toGroups(slots[2].cards) : [],
   };
 }
 

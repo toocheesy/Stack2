@@ -13,7 +13,7 @@ import { createIdGenerator } from '../../utils/uuid';
 import { EventBus } from '../../events';
 import { resolveRoundEnd } from '../../roundManager';
 import { PLAYER_NAMES } from '../../types';
-import type { Card, GameSettings, GameState, PlayerIndex, ValidatedCapture } from '../../types';
+import type { Card, GameSettings, GameState, PlayerIndex } from '../../types';
 import { RANK_VALUES } from '../../types';
 
 const settings: GameSettings = {
@@ -120,8 +120,7 @@ describe('executeCapture stat tracking', () => {
         combo3: [],
       },
     };
-    const vc: ValidatedCapture = { allCapturedCards: [h6, b6], totalPoints: 10 };
-    const result = executeCapture(s, vc);
+    const result = executeCapture(s, s.combination);
 
     expect(result.roundStats[0].highestCapture).not.toBeNull();
     expect(result.roundStats[0].highestCapture!.points).toBe(10);
@@ -146,7 +145,7 @@ describe('executeCapture stat tracking', () => {
         combo3: [],
       },
     };
-    s = executeCapture(s, { allCapturedCards: [a1, a2], totalPoints: 30 });
+    s = executeCapture(s, s.combination);
     expect(s.roundStats[0].highestCapture!.points).toBe(30);
 
     // Second capture: 10 pts — must not overwrite
@@ -163,7 +162,7 @@ describe('executeCapture stat tracking', () => {
         combo3: [],
       },
     };
-    s = executeCapture(s, { allCapturedCards: [c3, c3b], totalPoints: 10 });
+    s = executeCapture(s, s.combination);
     expect(s.roundStats[0].highestCapture!.points).toBe(30); // unchanged
   });
 });

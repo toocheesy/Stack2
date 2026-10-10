@@ -210,7 +210,7 @@ describe('validateFullCombo', () => {
     expect(v.allCapturedCards).toHaveLength(4);
   });
 
-  it('rejects when no hand card in combo', () => {
+  it('L3: base from the board, slot holding only board cards → "Every slot needs a hand card"', () => {
     const base = card('5', 'hearts');
     const b5 = card('5', 'clubs');
     const state = minimalState({
@@ -225,9 +225,10 @@ describe('validateFullCombo', () => {
     });
     const v = validateFullCombo(state);
     expect(v.isValid).toBe(false);
+    expect(v.errors[0]).toBe('Every slot needs a hand card');
   });
 
-  it('rejects when no board card in combo', () => {
+  it('L3: base from the hand, slot holding only hand cards → "Every slot needs a board card"', () => {
     const base = card('5', 'hearts');
     const h5 = card('5', 'clubs');
     const state = minimalState({
@@ -241,6 +242,155 @@ describe('validateFullCombo', () => {
     });
     const v = validateFullCombo(state);
     expect(v.isValid).toBe(false);
+    expect(v.errors[0]).toBe('Every slot needs a board card');
+  });
+
+  it('L3: the live example — base 10 from hand, combo1 from board, combo2 both from hand → refused', () => {
+    const base = card('10', 'hearts');
+    const b6 = card('6', 'hearts');
+    const b4 = card('4', 'diamonds');
+    const h5d = card('5', 'diamonds');
+    const h5s = card('5', 'spades');
+    const state = minimalState({
+      hands: [[base, h5d, h5s], [], []],
+      board: [b6, b4],
+      combination: {
+        base,
+        combo1: [group(b6, 'board'), group(b4, 'board')],
+        combo2: [group(h5d, 'hand'), group(h5s, 'hand')],
+        combo3: [],
+      },
+    });
+    const v = validateFullCombo(state);
+    expect(v.isValid).toBe(false);
+    expect(v.errors[0]).toBe('Every slot needs a board card');
+  });
+
+  it('L3: legal capture with base from the board, every slot has a hand card → accepted', () => {
+    const base = card('7', 'hearts');
+    const h7 = card('7', 'clubs');
+    const h3 = card('3', 'hearts');
+    const b4 = card('4', 'spades');
+    const state = minimalState({
+      hands: [[h7, h3], [], []],
+      board: [base, b4],
+      combination: {
+        base,
+        combo1: [group(h7, 'hand')],
+        combo2: [group(h3, 'hand'), group(b4, 'board')],
+        combo3: [],
+      },
+    });
+    const v = validateFullCombo(state);
+    expect(v.isValid).toBe(true);
+    expect(v.allCapturedCards).toHaveLength(4);
+    expect(v.totalPoints).toBe(20);
+  });
+
+  it('L15: the base repeated in a slot → refused', () => {
+    const base = card('5', 'hearts');
+    const b5 = card('5', 'clubs');
+    const state = minimalState({
+      hands: [[base], [], []],
+      board: [b5],
+      combination: {
+        base,
+        combo1: [group(b5, 'board'), group(base, 'hand')],
+        combo2: [],
+        combo3: [],
+      },
+    });
+    const v = validateFullCombo(state);
+    expect(v.isValid).toBe(false);
+  });
+
+  it('L15: one card in two slots → refused', () => {
+    const base = card('5', 'hearts');
+    const b5 = card('5', 'clubs');
+    const state = minimalState({
+      hands: [[base], [], []],
+      board: [b5],
+      combination: {
+        base,
+        combo1: [group(b5, 'board')],
+        combo2: [group(b5, 'board')],
+        combo3: [],
+      },
+    });
+    const v = validateFullCombo(state);
+    expect(v.isValid).toBe(false);
+  });
+
+  it('refuses a slot card from another player\'s hand labelled "board"', () => {
+    const base = card('5', 'hearts');
+    const other5 = card('5', 'clubs');
+    const state = minimalState({
+      hands: [[base], [other5], []],
+      board: [],
+      combination: {
+        base,
+        combo1: [group(other5, 'board')],
+        combo2: [],
+        combo3: [],
+      },
+    });
+    const v = validateFullCombo(state);
+    expect(v.isValid).toBe(false);
+  });
+
+  it('refuses a slot card really on the board but labelled "hand"', () => {
+    const base = card('5', 'hearts');
+    const b5 = card('5', 'clubs');
+    const state = minimalState({
+      hands: [[base], [], []],
+      board: [b5],
+      combination: {
+        base,
+        combo1: [group(b5, 'hand')],
+        combo2: [],
+        combo3: [],
+      },
+    });
+    const v = validateFullCombo(state);
+    expect(v.isValid).toBe(false);
+  });
+
+  it('refuses a slot card really in the hand but labelled "board"', () => {
+    const base = card('5', 'hearts');
+    const h5 = card('5', 'clubs');
+    const b5 = card('5', 'spades');
+    const state = minimalState({
+      hands: [[base, h5], [], []],
+      board: [b5],
+      combination: {
+        base,
+        combo1: [group(b5, 'board'), group(h5, 'board')],
+        combo2: [],
+        combo3: [],
+      },
+    });
+    const v = validateFullCombo(state);
+    expect(v.isValid).toBe(false);
+  });
+
+  it('checks the combination passed in, not state.combination', () => {
+    const base = card('7', 'hearts');
+    const b7 = card('7', 'clubs');
+    const state = minimalState({
+      hands: [[base], [], []],
+      board: [b7],
+      // state.combination is empty: on its own it is refused
+      combination: { base: null, combo1: [], combo2: [], combo3: [] },
+    });
+    expect(validateFullCombo(state).isValid).toBe(false);
+    const passed = validateFullCombo(state, {
+      base,
+      combo1: [group(b7, 'board')],
+      combo2: [],
+      combo3: [],
+    });
+    expect(passed.isValid).toBe(true);
+    expect(passed.totalPoints).toBe(10);
   });
 
   it('rejects invalid sum in a slot', () => {

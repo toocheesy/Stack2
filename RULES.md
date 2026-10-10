@@ -6,7 +6,6 @@
   Not in the game yet: S-003.
 - **L2.** One combo per slot, unlimited matches per slot, and never a match and a sum in one slot.
 - **L3.** Per slot: every filled combo slot needs at least one card from the opposite source to the base (base from hand, every slot needs a board card; base from board, every slot needs a hand card).
-  Not in the game yet: S-002.
 - **L4.** Face cards (K/Q/J) make pairs only, never sums. The 10 is not a face card - it sums.
 - **L5.** Aces count as 1 in sums.
 - **L6.** Every card in a capture scores at its value in the scoring table, base included.
@@ -20,7 +19,6 @@
 - **L13.** On your turn you must capture or place; there is no pass.
 - **L14.** Any card in the hand may be placed; nothing restricts which card, and nothing forces a capture when one is available.
 - **L15.** A card may be used only once in a capture.
-  Not in the game yet: S-002.
 - **L16.** At round end, Take the Table is scored before the game-end check.
 
 ## Scoring table

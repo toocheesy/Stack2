@@ -10,8 +10,6 @@ import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getL
 import { LevelCompleteOverlay } from './components/LevelCompleteOverlay';
 import { CardAtomTest } from './components/CardAtomTest';
 import { SettingsScreen } from './components/SettingsScreen';
-import { useAudio } from './audio/useAudio';
-import { armAutoplayUnlock } from './audio/audioPlayer';
 import { useTutorial } from './tutorial/useTutorial';
 import { loadTutorialSeen } from './tutorial/tutorialStorage';
 import { trackGameStart, trackTutorialComplete, trackGameEnd, trackRunComplete } from './analytics/track';
@@ -29,7 +27,6 @@ function App() {
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1_000_000));
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [currentLevelId, setCurrentLevelId] = useState<number | null>(null);
-  const [audioSettings, updateAudio] = useAudio();
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   // The Run tutorial — Settings "Replay tutorial" bumps this counter.
@@ -49,9 +46,10 @@ function App() {
   const savedRunLevelId: number | null = savedSnapshot?.currentLevelId ?? null;
 
   useEffect(() => {
-    armAutoplayUnlock();
     // Drop the orphan useSettings hook's dead localStorage key on any returning user.
     try { localStorage.removeItem('stacked.settings.v1'); } catch { /* ignore */ }
+    // Sound is gone (S-023): clear returning players' stored sound setting.
+    try { localStorage.removeItem('stacked.audio.v1'); } catch { /* ignore */ }
   }, []);
 
   const goToSetup = useCallback(() => {
@@ -175,8 +173,6 @@ function App() {
       {view}
       <SettingsScreen
         visible={settingsOpen}
-        settings={audioSettings}
-        onChange={updateAudio}
         onClose={() => setSettingsOpen(false)}
         onReplayTutorial={replayTutorial}
       />

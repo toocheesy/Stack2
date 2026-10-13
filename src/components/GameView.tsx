@@ -541,7 +541,7 @@ export function GameView({
             <div ref={submitWrapRef}>
               <Btn
                 label="SUBMIT" primary
-                disabled={tutorialShowGhostActions || !comboValid || state.dumpActive}
+                disabled={tutorialShowGhostActions || !comboValid}
                 onClick={tutorialShowGhostActions ? () => {} : handleSubmit}
               />
             </div>
@@ -554,15 +554,7 @@ export function GameView({
             </div>
           </div>
         )}
-        {isPlayerTurn && state.dumpActive && (
-          <span style={{
-            fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11, fontWeight: 500,
-            color: TAN, letterSpacing: '0.04em',
-          }}>
-            Last cards — place only
-          </span>
-        )}
-        {error && <span style={{ fontSize: 11, color: '#EF4444' }}>{error}</span>}
+        {error &&<span style={{ fontSize: 11, color: '#EF4444' }}>{error}</span>}
       </div>
 
       {/* ═══ ZONES G+H — PLAYER HAND + SCORE ═══ */}

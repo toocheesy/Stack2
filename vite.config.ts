@@ -35,23 +35,6 @@ export default defineConfig({
         // it here the SW would eager-download exactly the file we deferred,
         // undoing the perf win.
         globPatterns: ['**/*.{js,css,html,svg,woff,woff2}'],
-        globIgnores: ['**/music-loop-*.mp3', '**/music-loop.mp3'],
-        // Runtime-cache the music file on demand. NetworkFirst so a fresh
-        // network response is preferred when available; falls back to cache
-        // for offline replays. SFX (take-the-table) is small enough that
-        // the precache picks it up via the default mp3 glob? — no, we
-        // excluded mp3 from globPatterns. Runtime-cache both audio files
-        // via origin-relative mp3 matching.
-        runtimeCaching: [
-          {
-            urlPattern: /\/assets\/.*\.mp3$/,
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'stacked-audio',
-              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 30 },
-            },
-          },
-        ],
         // Smaller precache footprint — default max is 2 MB per file, which
         // would have caught the music anyway, but we exclude it explicitly.
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,

@@ -3,6 +3,7 @@ import {
   determineTurnResult,
   findNextPlayerWithCards,
 } from '../../../src/engine/core/turnManager';
+import { placeCard } from '../../../src/engine/core/gameState';
 import type {
   Card,
   GameState,
@@ -133,18 +134,32 @@ describe('determineTurnResult', () => {
     else throw new Error('expected CONTINUE_TURN');
   });
 
-  // ─── Doctrine 2.7 — Forced-Placement Dump trigger ──────────
+  // ─── RULES.md L8 and L1 — the last player holding cards ──────────
 
-  it('lone player + just placed → CONTINUE_TURN with dumpActive=true', () => {
+  it('L8: the last player places, the game places the rest, deck >= 12 → DEAL_NEW_HAND', () => {
+    const deck: Card[] = [];
+    for (let i = 0; i < 12; i++) deck.push(card('2'));
+    const two = card('2');
     const s = state({
       currentPlayer: 0,
-      hands: [[card('2'), card('5')], [], []],
-      lastAction: 'place',
+      hands: [[two, card('5')], [], []],
+      deck,
+    });
+    const placed = placeCard(s, two.id);
+    expect(placed.hands[0]).toEqual([]);
+    const r = determineTurnResult(placed);
+    expect(r.type).toBe('DEAL_NEW_HAND');
+  });
+
+  it('L1: the last player has just captured and still holds cards → CONTINUE_TURN, same player', () => {
+    const s = state({
+      currentPlayer: 2,
+      hands: [[], [], [card('2'), card('5')]],
+      lastAction: 'capture',
     });
     const r = determineTurnResult(s);
     if (r.type !== 'CONTINUE_TURN') throw new Error('expected CONTINUE_TURN');
-    expect(r.nextPlayer).toBe(0);
-    expect(r.dumpActive).toBe(true);
+    expect(r.nextPlayer).toBe(2);
   });
 
   it('normal CONTINUE_TURN does not signal dumpActive', () => {

@@ -338,25 +338,6 @@ export function decideBotAction(
     throw new Error('decideBotAction: no actions available (empty hand?)');
   }
 
-  // Doctrine 2.7 — Forced-Placement Dump: captures locked out for the
-  // last player holding cards. Filter to placements only and skip the
-  // capture-specific ranking layers below.
-  if (state.dumpActive) {
-    const placeActions = actions.filter((a) => a.action === 'place');
-    if (placeActions.length > 0) {
-      let chosen = placeActions[0];
-      // PI ≤ 2: same architectural sub-rule as the non-dump path.
-      if (profile.placementIntelligence <= 2) {
-        const highest = highestNumberCard(state.hands[playerIndex]);
-        if (highest) {
-          const swap = placeActions.find((a) => a.handCard.id === highest.id);
-          if (swap) chosen = swap;
-        }
-      }
-      return toBotDecision(chosen);
-    }
-  }
-
   if (profile.preferSumsOnTie) {
     actions = applyNinaSumPreference(actions);
   }

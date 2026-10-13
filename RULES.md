@@ -3,7 +3,6 @@
 ## Laws
 
 - **L1.** CAPTURE continues the turn for as long as the capturer still holds cards; PLACE ends it.
-  Not in the game yet: S-003.
 - **L2.** One combo per slot, unlimited matches per slot, and never a match and a sum in one slot.
 - **L3.** Per slot: every filled combo slot needs at least one card from the opposite source to the base (base from hand, every slot needs a board card; base from board, every slot needs a hand card).
 - **L4.** Face cards (K/Q/J) make pairs only, never sums. The 10 is not a face card - it sums.
@@ -11,7 +10,6 @@
 - **L6.** Every card in a capture scores at its value in the scoring table, base included.
 - **L7.** Hand size 4. Each round opens with 4 cards to each player and 4 to the board. When all hands are empty, the next hand deals 4 to each player and none to the board. Four hands per round.
 - **L8.** When every other player is out of cards, the last player's turn works as normal: capture as many times as they can, or place. Once they place a card, the game places the rest of their hand on the board, and the hand ends.
-  Not in the game yet: S-003.
 - **L9.** A round ends when every hand and the deck are empty.
 - **L10.** Take the Table - at round end, the last player to capture in that round takes every card left on the board, scored at their values in the scoring table. If nobody captured that round, nobody takes the table.
 - **L11.** A game ends at the end of a round when at least one player is at or above the target score and the top score belongs to one player alone; that player wins. If the top score is tied, an overtime round is played.

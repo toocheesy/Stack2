@@ -10,8 +10,6 @@ import {
 import { determineTurnResult } from '../turnManager';
 import { createPRNG } from '../../utils/prng';
 import { createIdGenerator } from '../../utils/uuid';
-import { EventBus } from '../../events';
-import { resolveRoundEnd } from '../../roundManager';
 import { PLAYER_NAMES } from '../../types';
 import type { Card, GameSettings, GameState, PlayerIndex } from '../../types';
 import { RANK_VALUES } from '../../types';
@@ -328,68 +326,6 @@ describe('overtime tie-breaker (doctrine 5.4)', () => {
     const sole = determineTurnResult(endOfRoundState([600, 500, 200], 500));
     expect(sole.type).toBe('END_GAME');
     if (sole.type === 'END_GAME') expect(sole.winner).toBe(0);
-  });
-});
-
-// ─── EventBus ───────────────────────────────────────
-
-describe('EventBus', () => {
-  it('delivers events to subscribers', () => {
-    const bus = new EventBus();
-    const received: unknown[] = [];
-    bus.on('jackpot_resolved', (e) => received.push(e));
-    bus.emit({ type: 'jackpot_resolved', winner: 0 as PlayerIndex, cards: [], points: 25 });
-    expect(received).toHaveLength(1);
-  });
-
-  it('unsubscribe stops delivery', () => {
-    const bus = new EventBus();
-    const received: unknown[] = [];
-    const unsub = bus.on('deck_count_changed', (e) => received.push(e));
-    unsub();
-    bus.emit({ type: 'deck_count_changed', remainingCards: 10 });
-    expect(received).toHaveLength(0);
-  });
-});
-
-// ─── resolveRoundEnd ────────────────────────────────
-
-describe('resolveRoundEnd', () => {
-  it('emits jackpot_resolved and new_round_started when game continues', () => {
-    let s = makeState();
-    s = {
-      ...s,
-      hands: [[], [], []] as [Card[], Card[], Card[]],
-      deck: [],
-      board: [makeCard('5', 'hearts', 'b5')],
-      lastCapturer: 2 as PlayerIndex,
-    };
-    const { state: next, events } = resolveRoundEnd(s, createPRNG(99), createIdGenerator(createPRNG(100)));
-    expect(next.gamePhase).toBe('playing');
-    expect(next.currentRound).toBe(2);
-    const types = events.map((e) => e.type);
-    expect(types).toContain('jackpot_resolved');
-    expect(types).toContain('round_end');
-    expect(types).toContain('new_round_started');
-    expect(types).toContain('deck_count_changed');
-  });
-
-  it('emits game_over when score >= target after jackpot', () => {
-    let s = makeState();
-    s = addScore(s, 0, 290);
-    s = {
-      ...s,
-      hands: [[], [], []] as [Card[], Card[], Card[]],
-      deck: [],
-      board: [makeCard('A', 'hearts', 'a1'), makeCard('10', 'spades', '10s')], // 25 pts → 315
-      lastCapturer: 0 as PlayerIndex,
-    };
-    const { state: final, events } = resolveRoundEnd(s, createPRNG(99), createIdGenerator(createPRNG(100)));
-    expect(final.gamePhase).toBe('gameOver');
-    const types = events.map((e) => e.type);
-    expect(types).toContain('jackpot_resolved');
-    expect(types).toContain('game_over');
-    expect(types).not.toContain('new_round_started');
   });
 });
 

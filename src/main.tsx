@@ -7,7 +7,10 @@ import '@fontsource/inter/700.css'
 import '@fontsource/jetbrains-mono/700.css'
 import './index.css'
 import App from './App.tsx'
-import { trackPwaInstalled } from './analytics/track'
+import { initAnalytics, trackPwaInstalled } from './analytics/track'
+
+// Load the GA4 tag (live site only) before anything below can send an event (S-005).
+initAnalytics();
 
 // PWA install telemetry. Android/Desktop fire `appinstalled` directly. iOS
 // A2HS does not — we infer it from a first-ever standalone display-mode

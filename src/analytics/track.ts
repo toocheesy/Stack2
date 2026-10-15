@@ -2,13 +2,40 @@
 // param shapes so renames don't drift across the codebase — renaming a GA4
 // event after launch breaks data continuity in the funnel.
 //
-// gtag is loaded synchronously in index.html as `window.gtag`. The guard
-// keeps unit tests, SSR, and the rare "GA blocked" case from throwing.
+// The GA4 tag is loaded here by initAnalytics(), called first thing in
+// main.tsx, and only on the live site (S-005). Everywhere else window.gtag
+// stays undefined and every event below is a no-op.
 
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
+    dataLayer?: unknown[];
   }
+}
+
+// GA4 property "STACKED 2026", web stream "STACKED Live" (S-005, 2026-10-15).
+// A measurement ID is public by design; it is not a secret.
+export const GA_MEASUREMENT_ID = 'G-ELM837XY9B';
+
+// The live site's hostnames. Previews, localhost and tests send nothing.
+export const LIVE_HOSTS: readonly string[] = ['stackedthegame.com', 'www.stackedthegame.com'];
+
+export function initAnalytics(hostname?: string): void {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return;
+  if (!LIVE_HOSTS.includes(hostname ?? window.location.hostname)) return;
+  if (typeof window.gtag === 'function') return;
+  window.dataLayer = window.dataLayer || [];
+  // gtag.js reads the arguments object itself; pushing an array instead breaks it.
+  window.gtag = function gtag() {
+    // eslint-disable-next-line prefer-rest-params
+    window.dataLayer!.push(arguments);
+  };
+  window.gtag('js', new Date());
+  window.gtag('config', GA_MEASUREMENT_ID);
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+  document.head.appendChild(script);
 }
 
 type GameMode = 'classic' | 'run';

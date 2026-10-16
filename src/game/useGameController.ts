@@ -19,14 +19,7 @@ import {
 import { botCaptureToCombination, validateFullCombo } from '../engine/core/captureValidator';
 import { determineTurnResult } from '../engine/core/turnManager';
 import { botStreamSeed, createPRNG, type PRNG } from '../engine/utils/prng';
-import {
-  createCardTracker,
-  createGameTracker,
-  recordCapture,
-  recordPlacement,
-  seedInitialDeal,
-  type CardTrackerState,
-} from '../engine/ai/cardTracker';
+import { readCardMemory } from '../engine/ai/cardTracker';
 import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../engine/ai/botDecision';
 import { evaluateAllActions } from '../engine/ai/evaluator';
 import { saveGame, loadGame, clearSavedGame, saveModeFor } from './persistence';
@@ -79,13 +72,12 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   const [mount] = useState(() => {
     const saved = loadGame(saveModeFor(currentLevelId), seed);
     return saved
-      ? { saved, seed: saved.seed, dealPrng: createPRNG(saved.dealStream), botPrng: createPRNG(saved.botStream), tracker: saved.tracker }
-      : { saved: null, seed, dealPrng: createPRNG(seed), botPrng: createPRNG(botStreamSeed(seed)), tracker: createCardTracker() };
+      ? { saved, seed: saved.seed, dealPrng: createPRNG(saved.dealStream), botPrng: createPRNG(saved.botStream) }
+      : { saved: null, seed, dealPrng: createPRNG(seed), botPrng: createPRNG(botStreamSeed(seed)) };
   });
   const seedRef = useRef(mount.seed);
   const prngRef = useRef<PRNG>(mount.dealPrng);
   const botPrngRef = useRef<PRNG>(mount.botPrng);
-  const trackerRef = useRef<CardTrackerState>(mount.tracker);
   const botBusyRef = useRef(false);
   const mountedRef = useRef(true);
   // Tutorial freeze (May 26) — runBotTurn and its in-flight checkpoints
@@ -112,17 +104,12 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       if (saved.game.dumpActive) {
         // A save made under the old place-only lock, before RULES.md L8 was
         // in the game: the game places the rest of that hand now.
-        for (const c of saved.game.hands[saved.game.currentPlayer]) {
-          trackerRef.current = recordPlacement(trackerRef.current, c);
-        }
         pendingAdvanceRef.current = true;
         return { ...placeRestOfHand(saved.game), dumpActive: false };
       }
       return saved.game;
     }
-    const initial = createInitialState(settings, prngRef.current);
-    trackerRef.current = createGameTracker(initial.board);
-    return initial;
+    return createInitialState(settings, prngRef.current);
   });
 
   // Per-mode split: latest currentLevelId flows through a ref so every
@@ -140,7 +127,6 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     stateRef.current = s;
     saveGame(saveModeFor(currentLevelIdRef.current), {
       game: s,
-      tracker: trackerRef.current,
       currentLevelId: currentLevelIdRef.current,
       seed: seedRef.current,
       dealStream: prngRef.current.getSeed(),
@@ -188,7 +174,6 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       case 'DEAL_NEW_HAND': {
         let next = dealNewHand(current);
         next = { ...next, currentPlayer: result.startingPlayer };
-        trackerRef.current = seedInitialDeal(trackerRef.current, next.hands.length * 4);
         setAndPersist(next);
         if (result.startingPlayer !== 0) {
           await runBotTurn(next);
@@ -196,15 +181,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         break;
       }
       case 'END_ROUND': {
-        const boardBefore = current.board.slice();
         const { state: afterJackpot, jackpotResult } = applyJackpot(current);
-        if (jackpotResult) {
-          trackerRef.current = recordCapture(
-            trackerRef.current,
-            jackpotResult.player,
-            boardBefore,
-          );
-        }
         setAndPersist(afterJackpot);
         if (jackpotResult) {
           setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
@@ -219,15 +196,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         break;
       }
       case 'END_GAME': {
-        const boardBefore = current.board.slice();
         const { state: afterJackpot, jackpotResult } = applyJackpot(current);
-        if (jackpotResult) {
-          trackerRef.current = recordCapture(
-            trackerRef.current,
-            jackpotResult.player,
-            boardBefore,
-          );
-        }
         setAndPersist(afterJackpot);
         if (jackpotResult) {
           setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
@@ -282,7 +251,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     const allActions = evaluateAllActions(
       current,
       player,
-      trackerRef.current,
+      readCardMemory(current),
       profile.weights,
       { allowMultiSlot: profile.captureComplexity >= 3 },
     );
@@ -306,7 +275,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       current,
       player,
       difficulty,
-      trackerRef.current,
+      readCardMemory(current),
       botPrngRef.current,
     );
 
@@ -354,11 +323,6 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       }
 
       next = executeCapture(current, botCombo);
-      trackerRef.current = recordCapture(
-        trackerRef.current,
-        player,
-        decision.captureDetails.capturedCards,
-      );
       setLastCapture({
         playerIndex: player,
         playerName: PLAYER_DISPLAY_NAMES[player] ?? `Bot ${player}`,
@@ -370,14 +334,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         timestamp: Date.now(),
       });
     } else {
-      const handBefore = current.hands[player];
       next = placeCard(current, decision.handCard.id);
-      // The chosen card plus any the game placed with it (RULES.md L8).
-      for (const c of handBefore) {
-        if (!next.hands[player].some((h) => h.id === c.id)) {
-          trackerRef.current = recordPlacement(trackerRef.current, c);
-        }
-      }
     }
 
     setAndPersist(next);
@@ -500,11 +457,6 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         seed: seedRef.current,
       });
     }
-    trackerRef.current = recordCapture(
-      trackerRef.current,
-      0,
-      validation.allCapturedCards,
-    );
     setLastCapture({
       playerIndex: 0,
       playerName: 'You',
@@ -533,15 +485,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     const card = s.hands[0].find((c) => c.id === cardId);
     if (!card) return;
 
-    const handBefore = s.hands[0];
     let next = resetCombination(s);
     next = placeCard(next, cardId);
-    // The chosen card plus any the game placed with it (RULES.md L8).
-    for (const c of handBefore) {
-      if (!next.hands[0].some((h) => h.id === c.id)) {
-        trackerRef.current = recordPlacement(trackerRef.current, c);
-      }
-    }
     setAndPersist(next);
     void advanceRef.current(next);
   }, [setAndPersist]);

@@ -1,13 +1,14 @@
-import type { Card, CaptureRecord, GameState, Rank, Scores } from '../engine/types';
-import type { CardTrackerState, CardLocation, GamePhase } from '../engine/ai/cardTracker';
-import { createGameTracker } from '../engine/ai/cardTracker';
+import type { Card, CaptureRecord, GameState, Scores } from '../engine/types';
 import { cardId } from '../engine/utils/cardId';
 import { botStreamSeed } from '../engine/utils/prng';
 
-// Saves (S-006): schema version 4, one slot per mode. Classic and The Run each
-// read, write and clear only their own key. An old single-slot save under
-// LEGACY_KEY (schema 3, 2 or the bare-game shape) is converted once into the
-// slot its currentLevelId names, then the old key is removed.
+// Saves (S-006): one slot per mode. Classic and The Run each read, write and
+// clear only their own key. Schema version 5 (S-008) holds the game, its mode,
+// its seed and where each stream stands; the bots' card memory is read from
+// the game state and no longer saved. A version-4 save in a slot converts on
+// load. An old single-slot save under LEGACY_KEY (schema 3, 2 or the bare-game
+// shape) is converted once into the slot its currentLevelId names, then the
+// old key is removed.
 
 export type SaveMode = 'classic' | 'run';
 
@@ -16,32 +17,17 @@ const SLOT_KEYS: Record<SaveMode, string> = {
   classic: 'stacked-save-classic',
   run: 'stacked-save-run',
 };
-const SCHEMA_VERSION = 4;
+const SCHEMA_VERSION = 5;
+// Version 4 (S-006) carried the bots' card memory as well; dropping it is the whole conversion.
+const PREVIOUS_VERSION = 4;
 
 export function saveModeFor(currentLevelId: number | null): SaveMode {
   return currentLevelId === null ? 'classic' : 'run';
 }
 
-// ─── Wire format ────────────────────────────────────
-//
-// CardTrackerState contains a Map<string, CardLocation> for seenCards.
-// JSON.stringify produces `{}` for Maps, so we convert to an array of
-// entries at the persistence boundary. The internal tracker API
-// (cardTracker.ts) keeps working with a real Map.
-
-interface PersistedTracker {
-  seenCardsEntries: Array<[string, CardLocation]>;
-  valueCounts: Record<Rank, number>;
-  playerCaptures: [Card[], Card[], Card[]];
-  deckRemaining: number;
-  totalSeen: number;
-  gamePhase: GamePhase;
-}
-
 interface PersistedSnapshot {
   version: number;
   game: GameState;
-  tracker: PersistedTracker;
   // null = Classic match; number = Run level id.
   currentLevelId: number | null;
   // The game seed, and where each stream stands (PRNG.getSeed()).
@@ -50,33 +36,10 @@ interface PersistedSnapshot {
   botStream: number;
 }
 
-function toWire(tracker: CardTrackerState): PersistedTracker {
-  return {
-    seenCardsEntries: Array.from(tracker.seenCards.entries()),
-    valueCounts: tracker.valueCounts,
-    playerCaptures: tracker.playerCaptures,
-    deckRemaining: tracker.deckRemaining,
-    totalSeen: tracker.totalSeen,
-    gamePhase: tracker.gamePhase,
-  };
-}
-
-function fromWire(wire: PersistedTracker): CardTrackerState {
-  return {
-    seenCards: new Map(wire.seenCardsEntries),
-    valueCounts: wire.valueCounts,
-    playerCaptures: wire.playerCaptures,
-    deckRemaining: wire.deckRemaining,
-    totalSeen: wire.totalSeen,
-    gamePhase: wire.gamePhase,
-  };
-}
-
 // ─── Public API ─────────────────────────────────────
 
 export interface SavedGame {
   game: GameState;
-  tracker: CardTrackerState;
   currentLevelId: number | null;
   seed: number;
   dealStream: number;
@@ -88,7 +51,6 @@ export function saveGame(mode: SaveMode, save: SavedGame): void {
     const snapshot: PersistedSnapshot = {
       version: SCHEMA_VERSION,
       game: save.game,
-      tracker: toWire(save.tracker),
       currentLevelId: save.currentLevelId,
       seed: save.seed,
       dealStream: save.dealStream,
@@ -101,7 +63,7 @@ export function saveGame(mode: SaveMode, save: SavedGame): void {
 }
 
 // mountSeed: the seed the controller was mounted with. An old save has no seed
-// and takes this one on conversion; a version-4 save carries its own.
+// and takes this one on conversion; a version-4 or version-5 save carries its own.
 export function loadGame(mode: SaveMode, mountSeed: number): SavedGame | null {
   convertLegacySave(mountSeed);
   try {
@@ -109,10 +71,9 @@ export function loadGame(mode: SaveMode, mountSeed: number): SavedGame | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedSnapshot>;
     if (
-      parsed.version !== SCHEMA_VERSION ||
+      (parsed.version !== SCHEMA_VERSION && parsed.version !== PREVIOUS_VERSION) ||
       !parsed.game ||
       !isValidGameShape(parsed.game) ||
-      !parsed.tracker ||
       typeof parsed.seed !== 'number' ||
       typeof parsed.dealStream !== 'number' ||
       typeof parsed.botStream !== 'number'
@@ -120,14 +81,16 @@ export function loadGame(mode: SaveMode, mountSeed: number): SavedGame | null {
       clearSavedGame(mode);
       return null;
     }
-    return {
+    const save: SavedGame = {
       game: { ...parsed.game, dumpActive: parsed.game.dumpActive ?? false },
-      tracker: fromWire(parsed.tracker),
       currentLevelId: typeof parsed.currentLevelId === 'number' ? parsed.currentLevelId : null,
       seed: parsed.seed,
       dealStream: parsed.dealStream,
       botStream: parsed.botStream,
     };
+    // A version-4 save: its tracker is left behind and the slot is rewritten now.
+    if (parsed.version !== SCHEMA_VERSION) saveGame(mode, save);
+    return save;
   } catch {
     clearSavedGame(mode);
     return null;
@@ -167,7 +130,6 @@ type OldGameState = Omit<GameState, 'roundStats' | 'gameStats'> & {
 interface OldSnapshot {
   version?: number;
   game?: OldGameState;
-  tracker?: PersistedTracker;
   currentLevelId?: number | null;
 }
 
@@ -209,19 +171,13 @@ function convertOldSave(parsed: unknown, mountSeed: number): SavedGame | null {
   const old = snapshot.game!;
   if (!isValidGameShape(old as Partial<GameState>)) return null;
 
-  // Every card takes its ID from its own rank and suit. Old IDs are mapped to
-  // new ones so the tracker's seen-cards map can be re-keyed; an old ID that
-  // belonged to more than one card (the duplicate-ID bug) is dropped from it.
-  const newIdsByOld = new Map<string, Set<string>>();
+  // Every card takes its ID from its own rank and suit. The old save's
+  // tracker, if it had one, is left behind: the memory is read from the game.
   const renew = (card: Card): Card => {
     if (!card || typeof card !== 'object' || !card.rank || !card.suit) {
       throw new Error('card without rank and suit');
     }
-    const id = cardId(card.rank, card.suit);
-    const seen = newIdsByOld.get(card.id) ?? new Set<string>();
-    seen.add(id);
-    newIdsByOld.set(card.id, seen);
-    return { ...card, id };
+    return { ...card, id: cardId(card.rank, card.suit) };
   };
   const renewAll = (cards: Card[] | undefined): Card[] => (cards ?? []).map(renew);
   const renewRecord = (record: CaptureRecord | null | undefined): CaptureRecord | null =>
@@ -263,37 +219,10 @@ function convertOldSave(parsed: unknown, mountSeed: number): SavedGame | null {
     isOvertime: old.isOvertime ?? false,
   };
 
-  let tracker: CardTrackerState;
-  if (snapshot.tracker) {
-    const wire = snapshot.tracker;
-    const playerCaptures = [
-      renewAll(wire.playerCaptures?.[0]),
-      renewAll(wire.playerCaptures?.[1]),
-      renewAll(wire.playerCaptures?.[2]),
-    ] as CardTrackerState['playerCaptures'];
-    const seenCards = new Map<string, CardLocation>();
-    for (const [oldId, location] of wire.seenCardsEntries ?? []) {
-      const ids = newIdsByOld.get(oldId);
-      if (ids && ids.size === 1) seenCards.set(Array.from(ids)[0], location);
-    }
-    tracker = {
-      seenCards,
-      valueCounts: wire.valueCounts,
-      playerCaptures,
-      deckRemaining: wire.deckRemaining,
-      totalSeen: wire.totalSeen,
-      gamePhase: wire.gamePhase,
-    };
-  } else {
-    // The bare-game shape had no tracker: rebuild one from the board, as before.
-    tracker = createGameTracker(game.board);
-  }
-
   const currentLevelId = typeof snapshot.currentLevelId === 'number' ? snapshot.currentLevelId : null;
   // An old save has no seed: it takes the mount seed, and both streams start fresh from it.
   return {
     game,
-    tracker,
     currentLevelId,
     seed: mountSeed,
     dealStream: mountSeed >>> 0,

@@ -1,9 +1,9 @@
 // A headless full-game runner, for tests only (S-006). It drives all three
 // seats with decideBotAction through the engine's own functions and
 // determineTurnResult, in the controller's order (deal, turns, Take the Table,
-// round end, new round, game end), and updates the card tracker the way
-// useGameController does. The deal stream and the bot stream are the
-// controller's two streams. A game can pause mid-round at the controller's
+// round end, new round, game end), and every seat reads the bots' card memory
+// from the game state, as useGameController does. The deal stream and the bot
+// stream are the controller's two streams. A game can pause mid-round at the controller's
 // save point and resume from a save.
 import type {
   Combination,
@@ -24,13 +24,7 @@ import {
 import { botCaptureToCombination, validateFullCombo } from '../../../src/engine/core/captureValidator';
 import { determineTurnResult } from '../../../src/engine/core/turnManager';
 import { botStreamSeed, createPRNG, type PRNG } from '../../../src/engine/utils/prng';
-import {
-  createGameTracker,
-  recordCapture,
-  recordPlacement,
-  seedInitialDeal,
-  type CardTrackerState,
-} from '../../../src/engine/ai/cardTracker';
+import { readCardMemory } from '../../../src/engine/ai/cardTracker';
 import { decideBotAction, getBotThinkingDelay } from '../../../src/engine/ai/botDecision';
 
 export interface DealRecord {
@@ -70,7 +64,6 @@ export interface GameLog {
 // Where a paused game stands: what the controller saves after a move.
 export interface PausedGame {
   state: GameState;
-  tracker: CardTrackerState;
   dealStream: number;
   botStream: number;
 }
@@ -94,7 +87,6 @@ export interface RunOptions {
 
 interface Run {
   state: GameState;
-  tracker: CardTrackerState;
   dealPrng: PRNG;
   botPrng: PRNG;
   captured: string[];
@@ -123,7 +115,6 @@ export function playGame(seed: number, settings: GameSettings, options: RunOptio
   return run(
     {
       state,
-      tracker: createGameTracker(state.board),
       dealPrng,
       botPrng: createPRNG(botStreamSeed(seed)),
       captured: [],
@@ -137,13 +128,12 @@ export function playGame(seed: number, settings: GameSettings, options: RunOptio
 
 // Plays on from a save, as the controller does on mount.
 export function resumeGame(
-  saved: { game: GameState; tracker: CardTrackerState; dealStream: number; botStream: number },
+  saved: { game: GameState; dealStream: number; botStream: number },
   options: RunOptions = {},
 ): RunResult {
   return run(
     {
       state: saved.game,
-      tracker: saved.tracker,
       dealPrng: createPRNG(saved.dealStream),
       botPrng: createPRNG(saved.botStream),
       captured: [],
@@ -171,7 +161,6 @@ function run(r: Run, options: RunOptions): RunResult {
         return;
       case 'DEAL_NEW_HAND':
         r.state = { ...dealNewHand(r.state), currentPlayer: result.startingPlayer };
-        r.tracker = seedInitialDeal(r.tracker, r.state.hands.length * 4);
         r.deals.push(dealRecord(r.state));
         return;
       case 'END_ROUND':
@@ -179,7 +168,6 @@ function run(r: Run, options: RunOptions): RunResult {
         const boardBefore = r.state.board.slice();
         const { state: afterJackpot, jackpotResult } = applyJackpot(r.state);
         if (jackpotResult) {
-          r.tracker = recordCapture(r.tracker, jackpotResult.player, boardBefore);
           r.captured = r.captured.concat(ids(boardBefore));
           r.sweeps.push({ round: r.state.currentRound, player: jackpotResult.player, points: jackpotResult.points });
         }
@@ -200,7 +188,7 @@ function run(r: Run, options: RunOptions): RunResult {
     const difficulty: Difficulty =
       player === 0 ? seatZero : player === 1 ? r.state.settings.bot1Personality : r.state.settings.bot2Personality;
     if (player !== 0) getBotThinkingDelay(difficulty, r.botPrng);
-    const decision = decideBotAction(r.state, player, difficulty, r.tracker, r.botPrng);
+    const decision = decideBotAction(r.state, player, difficulty, readCardMemory(r.state), r.botPrng);
 
     // Bot captures go through the same capture check as the player's.
     let combo: Combination | null = null;
@@ -216,16 +204,11 @@ function run(r: Run, options: RunOptions): RunResult {
 
     if (combo && decision.captureDetails) {
       r.state = executeCapture(r.state, combo);
-      r.tracker = recordCapture(r.tracker, player, decision.captureDetails.capturedCards);
       const taken = ids(decision.captureDetails.capturedCards);
       r.captured = r.captured.concat(taken);
       r.moves.push({ round: r.state.currentRound, player, action: 'capture', card: decision.handCard.id, captured: taken, points });
     } else {
-      const handBefore = r.state.hands[player];
       r.state = placeCard(r.state, decision.handCard.id);
-      for (const c of handBefore) {
-        if (!r.state.hands[player].some((h) => h.id === c.id)) r.tracker = recordPlacement(r.tracker, c);
-      }
       r.moves.push({ round: r.state.currentRound, player, action: 'place', card: decision.handCard.id, captured: [], points: 0 });
     }
     step();
@@ -259,7 +242,6 @@ function run(r: Run, options: RunOptions): RunResult {
     ) {
       return result({
         state: r.state,
-        tracker: r.tracker,
         dealStream: r.dealPrng.getSeed(),
         botStream: r.botPrng.getSeed(),
       });

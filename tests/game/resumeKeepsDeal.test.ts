@@ -37,7 +37,11 @@ describe('resume keeps the deal (S-006)', () => {
     const straight = playGame(seed, settings);
     expect(straight.rounds).toBeGreaterThanOrEqual(1);
 
-    const first = playGame(seed, settings, { stopAfterMoves: 3 + (seed % 9) });
+    let captured: readonly string[] = [];
+    const first = playGame(seed, settings, {
+      stopAfterMoves: 3 + (seed % 9),
+      onStep: (_state, capturedThisRound) => { captured = capturedThisRound; },
+    });
     const paused = first.paused!;
     expect(paused).not.toBeNull();
     expect(paused.state.currentRound).toBe(1);
@@ -48,13 +52,12 @@ describe('resume keeps the deal (S-006)', () => {
       ...paused.state.deck.map((c) => c.id),
       ...paused.state.board.map((c) => c.id),
       ...paused.state.hands.flat().map((c) => c.id),
-      ...paused.tracker.playerCaptures.flat().map((c) => c.id),
+      ...captured,
     ].sort();
     expect(everywhere).toEqual(ALL_IDS);
 
     saveGame('classic', {
       game: paused.state,
-      tracker: paused.tracker,
       currentLevelId: null,
       seed,
       dealStream: paused.dealStream,

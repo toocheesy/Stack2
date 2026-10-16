@@ -1,19 +1,20 @@
-import type { Card, PlayerIndex, Rank } from '../types';
+import type { GameState, Rank } from '../types';
 import { RANKS } from '../types';
 
-export type CardLocation = 'board' | 'captured_p0' | 'captured_p1' | 'captured_p2';
 export type GamePhase = 'early' | 'mid' | 'late' | 'endgame';
 
+// The bots' memory of played cards (S-008): for each rank, how many of its
+// four cards have been seen; the totals; the phase. It is worked out from the
+// game state each turn by readCardMemory and never stored.
 export interface CardTrackerState {
-  seenCards: Map<string, CardLocation>;
   valueCounts: Record<Rank, number>;
-  playerCaptures: [Card[], Card[], Card[]];
   deckRemaining: number;
   totalSeen: number;
   gamePhase: GamePhase;
 }
 
 const DECK_SIZE = 52;
+const CARDS_PER_RANK = 4;
 
 function emptyValueCounts(): Record<Rank, number> {
   const counts = {} as Record<Rank, number>;
@@ -21,40 +22,14 @@ function emptyValueCounts(): Record<Rank, number> {
   return counts;
 }
 
+// An empty memory, nothing seen. Used by tests.
 export function createCardTracker(): CardTrackerState {
   return {
-    seenCards: new Map(),
     valueCounts: emptyValueCounts(),
-    playerCaptures: [[], [], []],
     deckRemaining: DECK_SIZE,
     totalSeen: 0,
     gamePhase: 'early',
   };
-}
-
-const INITIAL_HAND_CARDS = 12; // 4 cards × 3 players, dealt at game start
-
-/**
- * Convenience factory for game start. Produces a tracker that correctly
- * accounts for: initial board cards (full identity tracking) + 12 cards
- * dealt to player + 2 bot hands (counter-only, no identity tracking).
- *
- * The 12-card counter-only treatment is deliberate (doctrine Option 1):
- * the bot knows 12 cards have left the deck but NOT which cards went to
- * which opponent's hand. This prevents opponent hand info leakage while
- * keeping totalSeen / gamePhase / cardsRemaining counters accurate.
- *
- * Replaces the prior fragile caller pattern (manual createCardTracker
- * → recordPlacement loop → seedInitialDeal(12)) per
- * docs/post-foundation-calibration-diagnosis-2026-05-06.md Sibling 2.
- */
-export function createGameTracker(boardCards: readonly Card[]): CardTrackerState {
-  let tracker = createCardTracker();
-  for (const card of boardCards) {
-    tracker = recordPlacement(tracker, card);
-  }
-  tracker = seedInitialDeal(tracker, INITIAL_HAND_CARDS);
-  return tracker;
 }
 
 export function updateGamePhase(tracker: CardTrackerState): GamePhase {
@@ -65,70 +40,25 @@ export function updateGamePhase(tracker: CardTrackerState): GamePhase {
   return 'endgame';
 }
 
-function cloneState(tracker: CardTrackerState): CardTrackerState {
-  return {
-    seenCards: new Map(tracker.seenCards),
-    valueCounts: { ...tracker.valueCounts },
-    playerCaptures: [
-      tracker.playerCaptures[0].slice(),
-      tracker.playerCaptures[1].slice(),
-      tracker.playerCaptures[2].slice(),
-    ],
-    deckRemaining: tracker.deckRemaining,
-    totalSeen: tracker.totalSeen,
-    gamePhase: tracker.gamePhase,
+// The memory read from the game state. A card counts as seen once it has left
+// the deck and every hand: it is on the board or captured this round. Each
+// round deals a fresh deck (RULES.md M2), so the memory starts afresh with it,
+// and a bot never counts its own hand as seen.
+export function readCardMemory(state: GameState): CardTrackerState {
+  const valueCounts = emptyValueCounts();
+  for (const r of RANKS) valueCounts[r] = CARDS_PER_RANK;
+  for (const c of state.deck) valueCounts[c.rank] -= 1;
+  for (const hand of state.hands) {
+    for (const c of hand) valueCounts[c.rank] -= 1;
+  }
+  const memory: CardTrackerState = {
+    valueCounts,
+    deckRemaining: state.deck.length,
+    totalSeen: DECK_SIZE - state.deck.length,
+    gamePhase: 'early',
   };
-}
-
-function locationFor(playerIndex: PlayerIndex): CardLocation {
-  return `captured_p${playerIndex}` as CardLocation;
-}
-
-export function recordCapture(
-  tracker: CardTrackerState,
-  playerIndex: PlayerIndex,
-  cards: readonly Card[],
-): CardTrackerState {
-  const next = cloneState(tracker);
-  const location = locationFor(playerIndex);
-  for (const c of cards) {
-    const known = next.seenCards.has(c.id);
-    next.seenCards.set(c.id, location);
-    if (!known) {
-      next.valueCounts[c.rank] += 1;
-      next.totalSeen += 1;
-    }
-    next.playerCaptures[playerIndex].push(c);
-  }
-  next.deckRemaining = Math.max(0, DECK_SIZE - next.totalSeen);
-  next.gamePhase = updateGamePhase(next);
-  return next;
-}
-
-export function recordPlacement(
-  tracker: CardTrackerState,
-  card: Card,
-): CardTrackerState {
-  const next = cloneState(tracker);
-  if (!next.seenCards.has(card.id)) {
-    next.valueCounts[card.rank] += 1;
-    next.totalSeen += 1;
-  }
-  next.seenCards.set(card.id, 'board');
-  next.deckRemaining = Math.max(0, DECK_SIZE - next.totalSeen);
-  next.gamePhase = updateGamePhase(next);
-  return next;
-}
-
-export function seedInitialDeal(
-  tracker: CardTrackerState,
-  unseenDealtCount: number,
-): CardTrackerState {
-  const next = cloneState(tracker);
-  next.totalSeen += unseenDealtCount;
-  next.deckRemaining = Math.max(0, DECK_SIZE - next.totalSeen);
-  next.gamePhase = updateGamePhase(next);
-  return next;
+  memory.gamePhase = updateGamePhase(memory);
+  return memory;
 }
 
 export function getRemainingOfRank(

@@ -3,8 +3,8 @@
 // determineTurnResult, in the controller's order (deal, turns, Take the Table,
 // round end, new round, game end), and every seat reads the bots' card memory
 // from the game state, as useGameController does. The deal stream and the bot
-// stream are the controller's two streams. A game can pause mid-round at the controller's
-// save point and resume from a save.
+// stream are the controller's two streams. A game can pause mid-round at the
+// controller's save point and resume from a save.
 import type {
   Combination,
   Difficulty,

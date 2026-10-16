@@ -19,7 +19,6 @@ import type {
 } from '../../../src/engine/types';
 import { RANK_VALUES, SCORE_KEYS } from '../../../src/engine/types';
 import { createPRNG } from '../../../src/engine/utils/prng';
-import { createIdGenerator } from '../../../src/engine/utils/uuid';
 
 function settings(): GameSettings {
   return {
@@ -31,8 +30,7 @@ function settings(): GameSettings {
 
 function makeState(seed = 1): GameState {
   const prng = createPRNG(seed);
-  const gen = createIdGenerator(createPRNG(seed + 1000));
-  return createInitialState(settings(), prng, gen);
+  return createInitialState(settings(), prng);
 }
 
 let idCounter = 0;
@@ -345,8 +343,7 @@ describe('startNewRound', () => {
       currentRound: 1,
     };
     const prng = createPRNG(99);
-    const gen = createIdGenerator(createPRNG(100));
-    const next = startNewRound(s, prng, gen);
+    const next = startNewRound(s, prng);
     expect(next.overallScores).toEqual({ player: 30, bot1: 40, bot2: 50 });
     expect(next.scores).toEqual({ player: 0, bot1: 0, bot2: 0 });
     expect(next.currentDealer).toBe(2);
@@ -359,8 +356,7 @@ describe('startNewRound', () => {
   it('clears dumpActive at the start of a new round (doctrine 2.7)', () => {
     const s: GameState = { ...makeState(10), dumpActive: true };
     const prng = createPRNG(99);
-    const gen = createIdGenerator(createPRNG(100));
-    const next = startNewRound(s, prng, gen);
+    const next = startNewRound(s, prng);
     expect(next.dumpActive).toBe(false);
   });
 });

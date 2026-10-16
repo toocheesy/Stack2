@@ -18,8 +18,7 @@ import {
 } from '../engine/core/gameState';
 import { botCaptureToCombination, validateFullCombo } from '../engine/core/captureValidator';
 import { determineTurnResult } from '../engine/core/turnManager';
-import { createPRNG, type PRNG } from '../engine/utils/prng';
-import { createIdGenerator, type IdGenerator } from '../engine/utils/uuid';
+import { botStreamSeed, createPRNG, type PRNG } from '../engine/utils/prng';
 import {
   createCardTracker,
   createGameTracker,
@@ -73,8 +72,9 @@ function wait(ms: number): Promise<void> {
 }
 
 export function useGameController(seed: number, settings: GameSettings, currentLevelId: number | null, tutorialActive: boolean = false) {
+  // Two streams from the one seed (S-006): prngRef deals, botPrngRef feeds the bots.
   const prngRef = useRef<PRNG>(null!);
-  const idGenRef = useRef<IdGenerator>(null!);
+  const botPrngRef = useRef<PRNG>(null!);
   const trackerRef = useRef<CardTrackerState>(null!);
   const botBusyRef = useRef(false);
   const mountedRef = useRef(true);
@@ -89,7 +89,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
 
   if (prngRef.current === null) {
     prngRef.current = createPRNG(seed);
-    idGenRef.current = createIdGenerator(createPRNG(seed + 1000));
+    botPrngRef.current = createPRNG(botStreamSeed(seed));
     trackerRef.current = createCardTracker();
   }
 
@@ -117,7 +117,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       }
       return saved.game;
     }
-    const initial = createInitialState(settings, prngRef.current, idGenRef.current);
+    const initial = createInitialState(settings, prngRef.current);
     trackerRef.current = createGameTracker(initial.board);
     return initial;
   });
@@ -257,7 +257,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         ? current.settings.bot1Personality
         : current.settings.bot2Personality;
 
-    const delay = getBotThinkingDelay(difficulty, prngRef.current);
+    const delay = getBotThinkingDelay(difficulty, botPrngRef.current);
     await wait(delay);
     if (!mountedRef.current) return;
     // Freeze gate after thinking delay — tutorial opened mid-think.
@@ -297,7 +297,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       player,
       difficulty,
       trackerRef.current,
-      prngRef.current,
+      botPrngRef.current,
     );
 
     console.log(
@@ -558,7 +558,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   function doContinueRound() {
     const s = stateRef.current;
     if (s.gamePhase !== 'roundEnd') return;
-    const next = startNewRound(s, prngRef.current, idGenRef.current);
+    const next = startNewRound(s, prngRef.current);
     setAndPersist(next);
     if (next.currentPlayer !== 0) {
       void runBotTurn(next);

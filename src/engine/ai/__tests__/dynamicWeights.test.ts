@@ -6,14 +6,12 @@ import { NINA_WEIGHTS } from '../personalities/nina';
 import { REX_WEIGHTS } from '../personalities/rex';
 import { addScore, createInitialState } from '../../core/gameState';
 import { createPRNG } from '../../utils/prng';
-import { createIdGenerator } from '../../utils/uuid';
 import type { GameState, PlayerIndex } from '../../types';
 
 function makeState(target = 300, seed = 42): GameState {
   return createInitialState(
     { targetScore: target, bot1Personality: 'beginner', bot2Personality: 'intermediate' },
     createPRNG(seed),
-    createIdGenerator(createPRNG(seed + 1000)),
   );
 }
 

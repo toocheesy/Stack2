@@ -43,3 +43,12 @@ export function createPRNG(seed: number): PRNG {
 
   return { next, nextInt, shuffle, getSeed };
 }
+
+// The bot stream (S-006): a second PRNG seeded from the game seed. It alone feeds
+// the bots' thinking delay and decisions, so what the bots draw never moves the
+// deal stream, which alone does the seating flip, the shuffle and the dealer.
+export const BOT_STREAM_SALT = 0x5bd1e995;
+
+export function botStreamSeed(seed: number): number {
+  return (seed ^ BOT_STREAM_SALT) >>> 0;
+}

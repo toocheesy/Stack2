@@ -6,7 +6,6 @@ import { loadGame, saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
 import { createGameTracker } from '../../src/engine/ai/cardTracker';
 import { createPRNG } from '../../src/engine/utils/prng';
-import { createIdGenerator } from '../../src/engine/utils/uuid';
 import type { Card, GameSettings, GameState, PlayerIndex } from '../../src/engine/types';
 
 // Same settings as tests/game/tutorialFreeze.test.tsx: both bots 'beginner'
@@ -48,7 +47,7 @@ function ids(cards: readonly Card[]): string[] {
 // legal capture exists), every other hand empty, 12+ cards still in the
 // deck so the hand that follows is dealt.
 function lastPlayerState(player: PlayerIndex, dumpActive = false): GameState {
-  const base = createInitialState(settings, createPRNG(SEED), createIdGenerator(createPRNG(SEED + 1000)));
+  const base = createInitialState(settings, createPRNG(SEED));
   const pairTarget = base.board[0];
   const match = base.deck.find((c) => c.rank === pairTarget.rank)!;
   const others = base.deck.filter((c) => c.id !== match.id && c.rank !== pairTarget.rank).slice(0, 2);

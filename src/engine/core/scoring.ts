@@ -15,16 +15,14 @@ export interface RankedPlayer {
   name: string;
   score: number;
   index: PlayerIndex;
-  overall: number;
 }
 
 export function getRankedPlayers(state: GameState): RankedPlayer[] {
   const indices: PlayerIndex[] = [0, 1, 2];
   const ranked = indices.map((i) => ({
     name: PLAYER_NAMES[i],
-    score: state.scores[SCORE_KEYS[i]],
+    score: state.overallScores[SCORE_KEYS[i]],
     index: i,
-    overall: state.overallScores[SCORE_KEYS[i]],
   }));
   ranked.sort((a, b) => b.score - a.score);
   return ranked;

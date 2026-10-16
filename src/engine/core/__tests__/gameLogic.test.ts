@@ -9,7 +9,6 @@ import {
 } from '../gameState';
 import { determineTurnResult } from '../turnManager';
 import { createPRNG } from '../../utils/prng';
-import { createIdGenerator } from '../../utils/uuid';
 import { PLAYER_NAMES } from '../../types';
 import type { Card, GameSettings, GameState, PlayerIndex } from '../../types';
 import { RANK_VALUES } from '../../types';
@@ -24,7 +23,6 @@ function makeState(seed = 42): GameState {
   return createInitialState(
     settings,
     createPRNG(seed),
-    createIdGenerator(createPRNG(seed + 1000)),
   );
 }
 
@@ -51,15 +49,14 @@ describe('createInitialState new fields', () => {
   it('roundStats start zeroed for all 3 players', () => {
     const s = makeState();
     for (const rs of s.roundStats) {
-      expect(rs.roundScore).toBe(0);
+      expect(rs.pointsThisRound).toBe(0);
       expect(rs.highestCapture).toBeNull();
     }
   });
 
-  it('gameStats start zeroed for all 3 players', () => {
+  it('gameStats start with no highest capture', () => {
     const s = makeState();
     for (const gs of s.gameStats) {
-      expect(gs.totalScore).toBe(0);
       expect(gs.highestCapture).toBeNull();
     }
   });
@@ -79,23 +76,23 @@ describe('dealNewHand', () => {
 // ─── addScore stat tracking ─────────────────────────
 
 describe('addScore stat tracking', () => {
-  it('updates roundStats.roundScore', () => {
+  it('updates roundStats.pointsThisRound', () => {
     const result = addScore(makeState(), 0, 25);
-    expect(result.roundStats[0].roundScore).toBe(25);
-    expect(result.roundStats[1].roundScore).toBe(0);
+    expect(result.roundStats[0].pointsThisRound).toBe(25);
+    expect(result.roundStats[1].pointsThisRound).toBe(0);
   });
 
-  it('updates gameStats.totalScore', () => {
+  it('updates overallScores', () => {
     const result = addScore(makeState(), 1, 15);
-    expect(result.gameStats[1].totalScore).toBe(15);
+    expect(result.overallScores.bot1).toBe(15);
   });
 
   it('accumulates across multiple calls', () => {
     let s = makeState();
     s = addScore(s, 2, 10);
     s = addScore(s, 2, 20);
-    expect(s.roundStats[2].roundScore).toBe(30);
-    expect(s.gameStats[2].totalScore).toBe(30);
+    expect(s.roundStats[2].pointsThisRound).toBe(30);
+    expect(s.overallScores.bot2).toBe(30);
   });
 });
 
@@ -177,8 +174,8 @@ describe('applyJackpot stat tracking', () => {
     };
     const { state: result, jackpotResult } = applyJackpot(s);
     expect(jackpotResult!.points).toBe(25);
-    expect(result.roundStats[1].roundScore).toBe(25);
-    expect(result.gameStats[1].totalScore).toBe(25);
+    expect(result.roundStats[1].pointsThisRound).toBe(25);
+    expect(result.overallScores.bot1).toBe(25);
     expect(result.roundStats[1].highestCapture!.points).toBe(25);
   });
 });
@@ -186,26 +183,26 @@ describe('applyJackpot stat tracking', () => {
 // ─── startNewRound ──────────────────────────────────
 
 describe('startNewRound', () => {
-  it('resets roundStats but preserves gameStats', () => {
+  it('resets roundStats but preserves overallScores', () => {
     let s = makeState();
     s = addScore(s, 0, 50);
-    const next = startNewRound(s, createPRNG(99), createIdGenerator(createPRNG(100)));
-    expect(next.roundStats[0].roundScore).toBe(0);
+    const next = startNewRound(s, createPRNG(99));
+    expect(next.roundStats[0].pointsThisRound).toBe(0);
     expect(next.roundStats[0].highestCapture).toBeNull();
-    expect(next.gameStats[0].totalScore).toBe(50);
+    expect(next.overallScores.player).toBe(50);
   });
 
   it('resets handNumber to 1', () => {
     let s = makeState();
     s = dealNewHand(s);
-    const next = startNewRound(s, createPRNG(99), createIdGenerator(createPRNG(100)));
+    const next = startNewRound(s, createPRNG(99));
     expect(next.handNumber).toBe(1);
   });
 
   it('sets gamePhase to playing', () => {
     let s = makeState();
     s = { ...s, gamePhase: 'roundEnd' as const };
-    const next = startNewRound(s, createPRNG(99), createIdGenerator(createPRNG(100)));
+    const next = startNewRound(s, createPRNG(99));
     expect(next.gamePhase).toBe('playing');
   });
 });
@@ -261,7 +258,6 @@ describe('overtime tie-breaker (doctrine 5.4)', () => {
     let s = createInitialState(
       { ...settings, targetScore },
       createPRNG(42),
-      createIdGenerator(createPRNG(43)),
     );
     s = addScore(s, 0, scores[0]);
     s = addScore(s, 1, scores[1]);
@@ -339,8 +335,8 @@ describe('bot seat randomization', () => {
   };
 
   it('same seed produces same bot order (deterministic)', () => {
-    const a = createInitialState(mixedSettings, createPRNG(77), createIdGenerator(createPRNG(1077)));
-    const b = createInitialState(mixedSettings, createPRNG(77), createIdGenerator(createPRNG(1077)));
+    const a = createInitialState(mixedSettings, createPRNG(77));
+    const b = createInitialState(mixedSettings, createPRNG(77));
     expect(a.settings.bot1Personality).toBe(b.settings.bot1Personality);
     expect(a.settings.bot2Personality).toBe(b.settings.bot2Personality);
   });
@@ -348,7 +344,7 @@ describe('bot seat randomization', () => {
   it('different seeds can produce different bot orders', () => {
     const results = new Set<string>();
     for (let seed = 0; seed < 50; seed++) {
-      const s = createInitialState(mixedSettings, createPRNG(seed), createIdGenerator(createPRNG(seed + 1000)));
+      const s = createInitialState(mixedSettings, createPRNG(seed));
       results.add(`${s.settings.bot1Personality}-${s.settings.bot2Personality}`);
     }
     expect(results.size).toBe(2);
@@ -356,7 +352,7 @@ describe('bot seat randomization', () => {
 
   it('both selected bots are always present (no duplication or loss)', () => {
     for (let seed = 0; seed < 20; seed++) {
-      const s = createInitialState(mixedSettings, createPRNG(seed), createIdGenerator(createPRNG(seed + 1000)));
+      const s = createInitialState(mixedSettings, createPRNG(seed));
       const bots = new Set([s.settings.bot1Personality, s.settings.bot2Personality]);
       expect(bots).toContain('beginner');
       expect(bots).toContain('advanced');
@@ -365,7 +361,7 @@ describe('bot seat randomization', () => {
 
   it('human is always player index 0 (hands[0] has cards)', () => {
     for (let seed = 0; seed < 10; seed++) {
-      const s = createInitialState(mixedSettings, createPRNG(seed), createIdGenerator(createPRNG(seed + 1000)));
+      const s = createInitialState(mixedSettings, createPRNG(seed));
       expect(s.hands[0].length).toBe(4);
     }
   });

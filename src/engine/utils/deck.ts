@@ -1,14 +1,14 @@
 import type { Card } from '../types';
 import { RANK_VALUES, RANKS, SUITS } from '../types';
+import { cardId } from './cardId';
 import type { PRNG } from './prng';
-import type { IdGenerator } from './uuid';
 
-export function createDeck(idGenerator: IdGenerator): Card[] {
+export function createDeck(): Card[] {
   const deck: Card[] = [];
   for (const suit of SUITS) {
     for (const rank of RANKS) {
       deck.push({
-        id: idGenerator.generateCardId(),
+        id: cardId(rank, suit),
         suit,
         rank,
         value: RANK_VALUES[rank],

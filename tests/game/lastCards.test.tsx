@@ -5,8 +5,7 @@ import { useGameController } from '../../src/game/useGameController';
 import { loadGame, saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
 import { createGameTracker } from '../../src/engine/ai/cardTracker';
-import { createPRNG } from '../../src/engine/utils/prng';
-import { createIdGenerator } from '../../src/engine/utils/uuid';
+import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
 import type { Card, GameSettings, GameState, PlayerIndex } from '../../src/engine/types';
 
 // Same settings as tests/game/tutorialFreeze.test.tsx: both bots 'beginner'
@@ -48,7 +47,7 @@ function ids(cards: readonly Card[]): string[] {
 // legal capture exists), every other hand empty, 12+ cards still in the
 // deck so the hand that follows is dealt.
 function lastPlayerState(player: PlayerIndex, dumpActive = false): GameState {
-  const base = createInitialState(settings, createPRNG(SEED), createIdGenerator(createPRNG(SEED + 1000)));
+  const base = createInitialState(settings, createPRNG(SEED));
   const pairTarget = base.board[0];
   const match = base.deck.find((c) => c.rank === pairTarget.rank)!;
   const others = base.deck.filter((c) => c.id !== match.id && c.rank !== pairTarget.rank).slice(0, 2);
@@ -57,6 +56,18 @@ function lastPlayerState(player: PlayerIndex, dumpActive = false): GameState {
   const hands: [Card[], Card[], Card[]] = [[], [], []];
   hands[player] = hand;
   return { ...base, hands, deck, currentPlayer: player, lastAction: null, dumpActive };
+}
+
+// A Classic save of `game` with a fresh tracker, as the controller would write it.
+function saveOf(game: GameState) {
+  return {
+    game,
+    tracker: createGameTracker(game.board),
+    currentLevelId: null,
+    seed: SEED,
+    dealStream: SEED,
+    botStream: botStreamSeed(SEED),
+  };
 }
 
 function movedOn(s: GameState): boolean {
@@ -78,7 +89,7 @@ describe('RULES.md L8: the last player holding cards', () => {
 
   it('human last: a capture is accepted, then a place puts the rest on the board and play moves on', async () => {
     const s = lastPlayerState(0);
-    saveGame(s, createGameTracker(s.board), null);
+    saveGame('classic', saveOf(s));
     const { result } = mount(SEED);
     expect(result.current.state.currentPlayer).toBe(0);
     const [match, keep1, keep2] = result.current.state.hands[0];
@@ -110,7 +121,7 @@ describe('RULES.md L8: the last player holding cards', () => {
 
   it('bot last: after its turn its hand is empty, play moves on, and its placed cards are in the card memory as on the board', async () => {
     const s = lastPlayerState(1);
-    saveGame(s, createGameTracker(s.board), null);
+    saveGame('classic', saveOf(s));
     const { result } = mount(SEED);
     const originalHand = ids(result.current.state.hands[1]);
     expect(result.current.state.currentPlayer).toBe(1);
@@ -120,7 +131,7 @@ describe('RULES.md L8: the last player holding cards', () => {
     expect(atEmpty.lastAction).toBe('place');
     const putDown = originalHand.filter((id) => atEmpty.board.some((b) => b.id === id));
     expect(putDown.length).toBeGreaterThan(0);
-    const saved = loadGame()!;
+    const saved = loadGame('classic', SEED)!;
     for (const id of putDown) expect(saved.tracker.seenCards.get(id)).toBe('board');
 
     await advance(WELL_PAST);
@@ -132,7 +143,7 @@ describe('RULES.md L8: the last player holding cards', () => {
       it(`current player ${player === 0 ? 'human' : 'bot'}: on mount the hand is on the board, dumpActive is false, play moves on`, async () => {
         const s = lastPlayerState(player, true);
         const hand = ids(s.hands[player]);
-        saveGame(s, createGameTracker(s.board), null);
+        saveGame('classic', saveOf(s));
         const { result } = mount(SEED);
 
         expect(result.current.state.dumpActive).toBe(false);
@@ -142,7 +153,7 @@ describe('RULES.md L8: the last player holding cards', () => {
         expect(after.dumpActive).toBe(false);
         expect(ids(after.board)).toEqual(expect.arrayContaining(hand));
         expect(movedOn(after)).toBe(true);
-        expect(loadGame()!.game.dumpActive).toBe(false);
+        expect(loadGame('classic', SEED)!.game.dumpActive).toBe(false);
       });
     }
   });

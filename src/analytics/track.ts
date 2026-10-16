@@ -49,6 +49,7 @@ export function trackGameStart(params: {
   mode: GameMode;
   level_id?: number;
   resumed: boolean;
+  seed: number;
 }): void {
   emit('game_start', params);
 }
@@ -65,6 +66,7 @@ export function trackFirstCapture(params: {
   mode: GameMode;
   level_id?: number;
   time_to_first_capture_ms: number;
+  seed: number;
 }): void {
   emit('first_capture', params);
 }
@@ -73,6 +75,7 @@ export function trackGameEnd(params: {
   mode: GameMode;
   won: boolean;
   score: number;
+  seed: number;
   duration_ms: number;
   level_id?: number;
   stars?: 0 | 1 | 2 | 3;

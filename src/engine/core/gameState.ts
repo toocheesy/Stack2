@@ -12,7 +12,6 @@ import type {
 } from '../types';
 import { PLAYER_NAMES, SCORE_KEYS } from '../types';
 import type { PRNG } from '../utils/prng';
-import type { IdGenerator } from '../utils/uuid';
 import { createDeck, shuffleDeck } from '../utils/deck';
 import { validateFullCombo } from './captureValidator';
 import { calculateCardsPoints } from './scoring';
@@ -29,11 +28,11 @@ function emptyCombination(): GameState['combination'] {
 }
 
 function emptyRoundStats(): RoundStats {
-  return { roundScore: 0, highestCapture: null };
+  return { pointsThisRound: 0, highestCapture: null };
 }
 
 function emptyGameStats(): GamePlayerStats {
-  return { totalScore: 0, highestCapture: null };
+  return { highestCapture: null };
 }
 
 function maybeUpdateHighest(
@@ -64,7 +63,6 @@ function deal(deck: Card[], count: number): { taken: Card[]; remaining: Card[] }
 export function createInitialState(
   settings: GameSettings,
   prng: PRNG,
-  idGenerator: IdGenerator,
 ): GameState {
   // Randomize bot seating: 50/50 coin flip swaps bot1 ↔ bot2.
   // Adventure mode disables this (settings.disableSeatingSwap === true) so
@@ -74,7 +72,7 @@ export function createInitialState(
     ? { ...settings, bot1Personality: settings.bot2Personality, bot2Personality: settings.bot1Personality }
     : settings;
 
-  const shuffled = shuffleDeck(createDeck(idGenerator), prng);
+  const shuffled = shuffleDeck(createDeck(), prng);
   let deck = shuffled;
 
   const hands: [Card[], Card[], Card[]] = [[], [], []];
@@ -93,7 +91,6 @@ export function createInitialState(
     deck,
     board,
     hands,
-    scores: emptyScores(),
     overallScores: emptyScores(),
     combination: emptyCombination(),
     currentPlayer,
@@ -143,22 +140,15 @@ export function addScore(
   const roundStats = [...state.roundStats] as [RoundStats, RoundStats, RoundStats];
   roundStats[playerIndex] = {
     ...roundStats[playerIndex],
-    roundScore: roundStats[playerIndex].roundScore + points,
-  };
-  const gameStats = [...state.gameStats] as [GamePlayerStats, GamePlayerStats, GamePlayerStats];
-  gameStats[playerIndex] = {
-    ...gameStats[playerIndex],
-    totalScore: gameStats[playerIndex].totalScore + points,
+    pointsThisRound: roundStats[playerIndex].pointsThisRound + points,
   };
   return {
     ...state,
-    scores: { ...state.scores, [key]: state.scores[key] + points },
     overallScores: {
       ...state.overallScores,
       [key]: state.overallScores[key] + points,
     },
     roundStats,
-    gameStats,
   };
 }
 
@@ -282,9 +272,8 @@ export function applyJackpot(state: GameState): {
 export function startNewRound(
   state: GameState,
   prng: PRNG,
-  idGenerator: IdGenerator,
 ): GameState {
-  const shuffled = shuffleDeck(createDeck(idGenerator), prng);
+  const shuffled = shuffleDeck(createDeck(), prng);
   let deck = shuffled;
   const hands: [Card[], Card[], Card[]] = [[], [], []];
   for (let p = 0; p < 3; p++) {
@@ -303,7 +292,6 @@ export function startNewRound(
     deck,
     board,
     hands,
-    scores: emptyScores(),
     combination: emptyCombination(),
     currentPlayer,
     lastAction: null,

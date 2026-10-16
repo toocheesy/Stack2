@@ -1,3 +1,3 @@
 export * from './prng';
-export * from './uuid';
+export * from './cardId';
 export * from './deck';

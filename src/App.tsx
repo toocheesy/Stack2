@@ -4,7 +4,7 @@ import { ClassicSetup } from './components/ClassicSetup';
 import { ChapterMap } from './components/ChapterMap';
 import { useGameController } from './game/useGameController';
 import type { Difficulty, GameSettings } from './engine/types';
-import { loadGame, clearSavedGame } from './game/persistence';
+import { loadGame, clearSavedGame, saveModeFor } from './game/persistence';
 import { getLevel, TOTAL_LEVELS } from './engine/adventure/levelConfig';
 import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked, unlockJettInClassic, isFinalLevel, getRunStatus, clearProgress, type RunStatus } from './engine/adventure/progressManager';
 import { LevelCompleteOverlay } from './components/LevelCompleteOverlay';
@@ -38,12 +38,12 @@ function App() {
     setSettingsOpen(false);
   }, []);
 
-  // Per-mode saved-game split: read the snapshot once per render and derive
-  // the per-card affordances from currentLevelId. null = Classic save (show
-  // Classic Continue); number = Run save (surfaced via ChapterMap callout).
-  const savedSnapshot = loadGame();
-  const savedIsClassic = !!savedSnapshot && savedSnapshot.currentLevelId === null;
-  const savedRunLevelId: number | null = savedSnapshot?.currentLevelId ?? null;
+  // Per-mode saved games (S-006): one slot each, read once per render. Classic
+  // CONTINUE reads the Classic slot; the Run map's Resume reads the Run slot.
+  const savedClassic = loadGame('classic', seed);
+  const savedRun = loadGame('run', seed);
+  const savedIsClassic = savedClassic !== null;
+  const savedRunLevelId: number | null = savedRun?.currentLevelId ?? null;
 
   useEffect(() => {
     // Drop the orphan useSettings hook's dead localStorage key on any returning user.
@@ -57,7 +57,7 @@ function App() {
   }, []);
 
   const startWithSettings = useCallback((targetScore: number, bot1: Difficulty, bot2: Difficulty) => {
-    clearSavedGame();
+    clearSavedGame('classic');
     setCurrentLevelId(null);
     setSeed(Math.floor(Math.random() * 1_000_000));
     setSettings({ targetScore, bot1Personality: bot1, bot2Personality: bot2 });
@@ -90,28 +90,28 @@ function App() {
     setScreen('game');
   }, [settingsForLevel]);
 
+  // Quitting keeps the save (S-006): CONTINUE on the Classic card picks it up.
   const goHome = useCallback(() => {
-    clearSavedGame();
     setCurrentLevelId(null);
     setScreen('home');
   }, []);
 
+  // Quitting keeps the save (S-006): the Run map's Resume picks it up.
   const goToWorldMap = useCallback(() => {
-    clearSavedGame();
     setScreen('worldMap');
   }, []);
 
   const playAgain = useCallback(() => {
-    clearSavedGame();
+    clearSavedGame(saveModeFor(currentLevelId));
     setSeed(Math.floor(Math.random() * 1_000_000));
-  }, []);
+  }, [currentLevelId]);
 
   const nextLevel = useCallback(() => {
     if (!currentLevelId) return;
     const nextId = currentLevelId + 1;
     if (!getLevel(nextId)) return;
     setCurrentLevelId(nextId);
-    clearSavedGame();
+    clearSavedGame('run');
     setSeed(Math.floor(Math.random() * 1_000_000));
     setSettings(settingsForLevel(nextId));
   }, [currentLevelId, settingsForLevel]);
@@ -126,7 +126,7 @@ function App() {
         onSelectLevel={(id) => {
           if (!getLevel(id)) return;
           setCurrentLevelId(id);
-          clearSavedGame();
+          clearSavedGame('run');
           setSeed(Math.floor(Math.random() * 1_000_000));
           setSettings(settingsForLevel(id));
           setScreen('game');
@@ -553,7 +553,7 @@ function GameWrapper({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tutorialReplayToken]);
 
-  const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, wasResumed, actions } =
+  const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, wasResumed, seed: gameSeed, actions } =
     useGameController(seed, settings, currentLevelId, tutorial.visible);
 
   // Analytics — game_start fires once per GameWrapper mount. seed change
@@ -565,6 +565,7 @@ function GameWrapper({
       mode: currentLevelId === null ? 'classic' : 'run',
       level_id: currentLevelId ?? undefined,
       resumed: wasResumed,
+      seed: gameSeed,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -639,11 +640,12 @@ function GameWrapper({
       level_id: currentLevelId ?? undefined,
       stars: levelComplete?.stars,
       margin: levelComplete?.margin,
+      seed: gameSeed,
     });
     if (levelComplete?.won && levelComplete.isFinalLevel) {
       trackRunComplete({ total_stars: loadProgress().totalStars });
     }
-  }, [gameOver, levelComplete, state.overallScores, currentLevelId]);
+  }, [gameOver, levelComplete, state.overallScores, currentLevelId, gameSeed]);
 
   return (
     <>

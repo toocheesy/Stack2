@@ -19,7 +19,6 @@ import type {
 } from '../../../src/engine/types';
 import { RANK_VALUES, SCORE_KEYS } from '../../../src/engine/types';
 import { createPRNG } from '../../../src/engine/utils/prng';
-import { createIdGenerator } from '../../../src/engine/utils/uuid';
 
 function settings(): GameSettings {
   return {
@@ -31,8 +30,7 @@ function settings(): GameSettings {
 
 function makeState(seed = 1): GameState {
   const prng = createPRNG(seed);
-  const gen = createIdGenerator(createPRNG(seed + 1000));
-  return createInitialState(settings(), prng, gen);
+  return createInitialState(settings(), prng);
 }
 
 let idCounter = 0;
@@ -83,10 +81,10 @@ describe('createInitialState', () => {
     expect(a.currentDealer).toBe(b.currentDealer);
   });
 
-  it('currentRound=1, round scores zero, lastAction null', () => {
+  it('currentRound=1, scores zero, lastAction null', () => {
     const s = makeState();
     expect(s.currentRound).toBe(1);
-    expect(s.scores).toEqual({ player: 0, bot1: 0, bot2: 0 });
+    expect(s.overallScores).toEqual({ player: 0, bot1: 0, bot2: 0 });
     expect(s.lastAction).toBeNull();
     expect(s.lastCapturer).toBeNull();
   });
@@ -132,10 +130,10 @@ describe('nextPlayer', () => {
 });
 
 describe('addScore', () => {
-  it('adds to both round and overall scores', () => {
+  it('adds to overallScores and pointsThisRound', () => {
     const s = makeState();
     const s2 = addScore(s, 1, 25);
-    expect(s2.scores.bot1).toBe(25);
+    expect(s2.roundStats[1].pointsThisRound).toBe(25);
     expect(s2.overallScores.bot1).toBe(25);
     expect(s).not.toBe(s2);
   });
@@ -179,7 +177,7 @@ describe('executeCapture', () => {
       false,
     );
     expect(after.board.some((c) => c.id === boardCard.id)).toBe(false);
-    expect(after.scores[SCORE_KEYS[s.currentPlayer]]).toBe(10);
+    expect(after.overallScores[SCORE_KEYS[s.currentPlayer]]).toBe(10);
     expect(after.lastAction).toBe('capture');
     expect(after.lastCapturer).toBe(s.currentPlayer);
     expect(after).not.toBe(original);
@@ -240,7 +238,7 @@ describe('placeCard', () => {
     const c = card('K');
     const hands: [Card[], Card[], Card[]] = [[], [], []];
     hands[base.currentPlayer] = [a, b, c];
-    return { s: { ...base, hands, lastCapturer: 1, scores: { player: 5, bot1: 10, bot2: 15 } }, a, b, c };
+    return { s: { ...base, hands, lastCapturer: 1, overallScores: { player: 5, bot1: 10, bot2: 15 } }, a, b, c };
   }
 
   it('L8: every other hand empty, placer holds 3 → all 3 on the board, chosen first then hand order; hand empty', () => {
@@ -265,7 +263,7 @@ describe('placeCard', () => {
     const { s, b } = lastPlayerState();
     const after = placeCard(s, b.id);
     expect(after.lastCapturer).toBe(s.lastCapturer);
-    expect(after.scores).toEqual(s.scores);
+    expect(after.overallScores).toEqual(s.overallScores);
     expect(after.roundStats).toEqual(s.roundStats);
   });
 
@@ -310,14 +308,13 @@ describe('applyJackpot', () => {
       board: [card('A'), card('5')],
       lastCapturer: 1,
       overallScores: { player: 0, bot1: 0, bot2: 0 },
-      scores: { player: 0, bot1: 0, bot2: 0 },
     };
     const { state: after, jackpotResult } = applyJackpot(base);
     expect(after.board).toEqual([]);
     expect(jackpotResult).not.toBeNull();
     expect(jackpotResult!.player).toBe(1);
     expect(jackpotResult!.points).toBe(20);
-    expect(after.scores.bot1).toBe(20);
+    expect(after.roundStats[1].pointsThisRound).toBe(20);
     expect(after.overallScores.bot1).toBe(20);
   });
 
@@ -340,15 +337,18 @@ describe('startNewRound', () => {
     const s: GameState = {
       ...makeState(10),
       overallScores: { player: 30, bot1: 40, bot2: 50 },
-      scores: { player: 10, bot1: 20, bot2: 30 },
+      roundStats: [
+        { pointsThisRound: 10, highestCapture: null },
+        { pointsThisRound: 20, highestCapture: null },
+        { pointsThisRound: 30, highestCapture: null },
+      ],
       currentDealer: 1,
       currentRound: 1,
     };
     const prng = createPRNG(99);
-    const gen = createIdGenerator(createPRNG(100));
-    const next = startNewRound(s, prng, gen);
+    const next = startNewRound(s, prng);
     expect(next.overallScores).toEqual({ player: 30, bot1: 40, bot2: 50 });
-    expect(next.scores).toEqual({ player: 0, bot1: 0, bot2: 0 });
+    expect(next.roundStats.map((r) => r.pointsThisRound)).toEqual([0, 0, 0]);
     expect(next.currentDealer).toBe(2);
     expect(next.currentPlayer).toBe(0);
     expect(next.currentRound).toBe(2);
@@ -359,8 +359,7 @@ describe('startNewRound', () => {
   it('clears dumpActive at the start of a new round (doctrine 2.7)', () => {
     const s: GameState = { ...makeState(10), dumpActive: true };
     const prng = createPRNG(99);
-    const gen = createIdGenerator(createPRNG(100));
-    const next = startNewRound(s, prng, gen);
+    const next = startNewRound(s, prng);
     expect(next.dumpActive).toBe(false);
   });
 });

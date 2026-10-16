@@ -33,6 +33,5 @@
 - **M2.** One standard 52-card deck, shuffled fresh at the start of every round. Nothing carries to the next round except the scores.
 - **M3.** The first dealer is chosen at random. The player after the dealer goes first and leads every hand of that round. When a round ends, the deal passes to the next seat.
 - **M4.** One overall score through all rounds, reset only when a game ends.
-  Not in the game yet: S-006.
 - **M5.** In Classic, a coin flip decides which bot sits where.
 - **M6.** In Classic, the player picks the target score.

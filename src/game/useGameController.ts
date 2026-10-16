@@ -18,8 +18,7 @@ import {
 } from '../engine/core/gameState';
 import { botCaptureToCombination, validateFullCombo } from '../engine/core/captureValidator';
 import { determineTurnResult } from '../engine/core/turnManager';
-import { createPRNG, type PRNG } from '../engine/utils/prng';
-import { createIdGenerator, type IdGenerator } from '../engine/utils/uuid';
+import { botStreamSeed, createPRNG, type PRNG } from '../engine/utils/prng';
 import {
   createCardTracker,
   createGameTracker,
@@ -30,7 +29,7 @@ import {
 } from '../engine/ai/cardTracker';
 import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../engine/ai/botDecision';
 import { evaluateAllActions } from '../engine/ai/evaluator';
-import { saveGame, loadGame, clearSavedGame } from './persistence';
+import { saveGame, loadGame, clearSavedGame, saveModeFor } from './persistence';
 import { trackFirstCapture } from '../analytics/track';
 
 type CardSource = 'hand' | 'board';
@@ -73,9 +72,20 @@ function wait(ms: number): Promise<void> {
 }
 
 export function useGameController(seed: number, settings: GameSettings, currentLevelId: number | null, tutorialActive: boolean = false) {
-  const prngRef = useRef<PRNG>(null!);
-  const idGenRef = useRef<IdGenerator>(null!);
-  const trackerRef = useRef<CardTrackerState>(null!);
+  // Set up once, on mount (S-006): the save for this mode if there is one, the
+  // game seed (the seed prop for a new game, the save's own for a resumed one)
+  // and the two streams from it: prngRef deals, botPrngRef feeds the bots. A
+  // resumed game's streams carry on from where the save left them.
+  const [mount] = useState(() => {
+    const saved = loadGame(saveModeFor(currentLevelId), seed);
+    return saved
+      ? { saved, seed: saved.seed, dealPrng: createPRNG(saved.dealStream), botPrng: createPRNG(saved.botStream), tracker: saved.tracker }
+      : { saved: null, seed, dealPrng: createPRNG(seed), botPrng: createPRNG(botStreamSeed(seed)), tracker: createCardTracker() };
+  });
+  const seedRef = useRef(mount.seed);
+  const prngRef = useRef<PRNG>(mount.dealPrng);
+  const botPrngRef = useRef<PRNG>(mount.botPrng);
+  const trackerRef = useRef<CardTrackerState>(mount.tracker);
   const botBusyRef = useRef(false);
   const mountedRef = useRef(true);
   // Tutorial freeze (May 26) — runBotTurn and its in-flight checkpoints
@@ -87,12 +97,6 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   const tutorialActiveRef = useRef(tutorialActive);
   tutorialActiveRef.current = tutorialActive;
 
-  if (prngRef.current === null) {
-    prngRef.current = createPRNG(seed);
-    idGenRef.current = createIdGenerator(createPRNG(seed + 1000));
-    trackerRef.current = createCardTracker();
-  }
-
   // Analytics: set during state init so game_start can emit resumed:true
   // and first_capture is suppressed on resumed games (player isn't making
   // their literal first capture — they're picking up a game in progress).
@@ -102,9 +106,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   const pendingAdvanceRef = useRef(false);
 
   const [state, setState] = useState<GameState>(() => {
-    const saved = loadGame();
+    const saved = mount.saved;
     if (saved) {
-      trackerRef.current = saved.tracker;
       wasResumedRef.current = true;
       if (saved.game.dumpActive) {
         // A save made under the old place-only lock, before RULES.md L8 was
@@ -117,7 +120,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       }
       return saved.game;
     }
-    const initial = createInitialState(settings, prngRef.current, idGenRef.current);
+    const initial = createInitialState(settings, prngRef.current);
     trackerRef.current = createGameTracker(initial.board);
     return initial;
   });
@@ -135,7 +138,14 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   const setAndPersist = useCallback((s: GameState) => {
     setState(s);
     stateRef.current = s;
-    saveGame(s, trackerRef.current, currentLevelIdRef.current);
+    saveGame(saveModeFor(currentLevelIdRef.current), {
+      game: s,
+      tracker: trackerRef.current,
+      currentLevelId: currentLevelIdRef.current,
+      seed: seedRef.current,
+      dealStream: prngRef.current.getSeed(),
+      botStream: botPrngRef.current.getSeed(),
+    });
   }, []);
   const [botViz, setBotViz] = useState<BotVizStep | null>(null);
   const [gameOver, setGameOver] = useState<{
@@ -227,7 +237,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         }
         const finalState = { ...stateRef.current, gamePhase: 'gameOver' as const };
         setAndPersist(finalState);
-        clearSavedGame();
+        clearSavedGame(saveModeFor(currentLevelIdRef.current));
         setGameOver({
           winner: result.winner,
           winnerName: result.winnerName,
@@ -257,7 +267,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         ? current.settings.bot1Personality
         : current.settings.bot2Personality;
 
-    const delay = getBotThinkingDelay(difficulty, prngRef.current);
+    const delay = getBotThinkingDelay(difficulty, botPrngRef.current);
     await wait(delay);
     if (!mountedRef.current) return;
     // Freeze gate after thinking delay — tutorial opened mid-think.
@@ -297,7 +307,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       player,
       difficulty,
       trackerRef.current,
-      prngRef.current,
+      botPrngRef.current,
     );
 
     console.log(
@@ -487,6 +497,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         mode: levelId === null ? 'classic' : 'run',
         level_id: levelId ?? undefined,
         time_to_first_capture_ms: Date.now() - gameStartedAtRef.current,
+        seed: seedRef.current,
       });
     }
     trackerRef.current = recordCapture(
@@ -558,7 +569,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   function doContinueRound() {
     const s = stateRef.current;
     if (s.gamePhase !== 'roundEnd') return;
-    const next = startNewRound(s, prngRef.current, idGenRef.current);
+    const next = startNewRound(s, prngRef.current);
     setAndPersist(next);
     if (next.currentPlayer !== 0) {
       void runBotTurn(next);
@@ -577,6 +588,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     jackpotInfo,
     gameOver,
     wasResumed: wasResumedRef.current,
+    // The game seed (S-006): the save's own for a resumed game, the seed prop for a new one.
+    seed: mount.seed,
     actions: {
       addToCombo,
       removeFromCombo: doRemoveFromCombo,

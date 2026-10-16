@@ -42,12 +42,12 @@ export interface CaptureRecord {
 }
 
 export interface RoundStats {
-  roundScore: number;
+  // A per-round extra for the round-end screen only (S-006). Nothing else reads it.
+  pointsThisRound: number;
   highestCapture: CaptureRecord | null;
 }
 
 export interface GamePlayerStats {
-  totalScore: number;
   highestCapture: CaptureRecord | null;
 }
 
@@ -97,7 +97,7 @@ export interface GameState {
   deck: Card[];
   board: Card[];
   hands: [Card[], Card[], Card[]];
-  scores: Scores;
+  // The one score per player through all rounds, reset only when a game ends (S-006).
   overallScores: Scores;
   combination: Combination;
   currentPlayer: PlayerIndex;

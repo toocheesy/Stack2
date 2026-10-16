@@ -1,6 +1,7 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { saveGame, loadGame, clearSavedGame } from '../../src/game/persistence';
+import { saveGame, loadGame, clearSavedGame, saveModeFor, type SavedGame } from '../../src/game/persistence';
 import type { GameState } from '../../src/engine/types';
+import { botStreamSeed } from '../../src/engine/utils/prng';
 import {
   createGameTracker,
   recordCapture,
@@ -20,14 +21,15 @@ const mockStorage = {
 };
 Object.defineProperty(globalThis, 'localStorage', { value: mockStorage, configurable: true });
 
-const STORAGE_KEY = 'stacked-v2-game';
+const LEGACY_KEY = 'stacked-v2-game';
+const CLASSIC_KEY = 'stacked-save-classic';
+const RUN_KEY = 'stacked-save-run';
 
 function fullState(overrides: Partial<GameState> = {}): GameState {
   return {
     deck: [],
-    board: [{ id: 'b1', rank: '2', suit: 'hearts', value: 2 }],
+    board: [{ id: '2H', rank: '2', suit: 'hearts', value: 2 }],
     hands: [[], [], []],
-    scores: { player: 0, bot1: 0, bot2: 0 },
     overallScores: { player: 0, bot1: 0, bot2: 0 },
     combination: { base: null, combo1: [], combo2: [], combo3: [] },
     currentPlayer: 0,
@@ -43,14 +45,14 @@ function fullState(overrides: Partial<GameState> = {}): GameState {
     handNumber: 1,
     gamePhase: 'playing',
     roundStats: [
-      { roundScore: 0, highestCapture: null },
-      { roundScore: 0, highestCapture: null },
-      { roundScore: 0, highestCapture: null },
+      { pointsThisRound: 0, highestCapture: null },
+      { pointsThisRound: 0, highestCapture: null },
+      { pointsThisRound: 0, highestCapture: null },
     ],
     gameStats: [
-      { totalScore: 0, highestCapture: null },
-      { totalScore: 0, highestCapture: null },
-      { totalScore: 0, highestCapture: null },
+      { highestCapture: null },
+      { highestCapture: null },
+      { highestCapture: null },
     ],
     dumpActive: false,
     isOvertime: false,
@@ -62,34 +64,85 @@ function freshTracker(state: GameState = fullState()): CardTrackerState {
   return createGameTracker(state.board);
 }
 
-describe('persistence — saveGame / loadGame', () => {
+function saveOf(game: GameState, tracker = freshTracker(game), currentLevelId: number | null = null, seed = 7): SavedGame {
+  return { game, tracker, currentLevelId, seed, dealStream: 1234, botStream: 5678 };
+}
+
+// What an old (schema 3) save's game looked like: the three score fields.
+function oldGame(overrides: Record<string, unknown> = {}) {
+  const { roundStats: _r, gameStats: _g, ...rest } = fullState();
+  void _r;
+  void _g;
+  return {
+    ...rest,
+    board: [{ id: 'card_b1', rank: '2', suit: 'hearts', value: 2 }],
+    overallScores: { player: 5, bot1: 0, bot2: 0 },
+    scores: { player: 5, bot1: 0, bot2: 0 },
+    roundStats: [
+      { roundScore: 5, highestCapture: null },
+      { roundScore: 0, highestCapture: null },
+      { roundScore: 0, highestCapture: null },
+    ],
+    gameStats: [
+      { totalScore: 5, highestCapture: null },
+      { totalScore: 0, highestCapture: null },
+      { totalScore: 0, highestCapture: null },
+    ],
+    ...overrides,
+  };
+}
+
+describe('persistence — saveGame / loadGame (schema 4, two slots)', () => {
   beforeEach(() => { store.clear(); });
 
-  it('returns null when nothing saved', () => {
-    expect(loadGame()).toBeNull();
+  it('returns null when nothing saved, in either slot', () => {
+    expect(loadGame('classic', 1)).toBeNull();
+    expect(loadGame('run', 1)).toBeNull();
+  });
+
+  it('saveModeFor: null is Classic, a level id is the Run', () => {
+    expect(saveModeFor(null)).toBe('classic');
+    expect(saveModeFor(1)).toBe('run');
   });
 
   it('saveGame + loadGame round-trip preserves game state including dumpActive', () => {
     const s = fullState({ dumpActive: true });
-    saveGame(s, freshTracker(s), null);
-    const loaded = loadGame();
+    saveGame('classic', saveOf(s));
+    const loaded = loadGame('classic', 1);
     expect(loaded).not.toBeNull();
     expect(loaded!.game.dumpActive).toBe(true);
   });
 
-  it('clearSavedGame wipes the slot', () => {
-    saveGame(fullState(), freshTracker(), null);
-    clearSavedGame();
-    expect(loadGame()).toBeNull();
+  it('a version-4 save carries the seed and both stream states', () => {
+    saveGame('classic', saveOf(fullState()));
+    const raw = JSON.parse(store.get(CLASSIC_KEY)!);
+    expect(raw.version).toBe(4);
+    const loaded = loadGame('classic', 999)!;
+    expect(loaded.seed).toBe(7);
+    expect(loaded.dealStream).toBe(1234);
+    expect(loaded.botStream).toBe(5678);
   });
 
-  // ─── Sibling 1 — tracker persistence ─────────────────
+  it('each mode writes and clears only its own key', () => {
+    saveGame('classic', saveOf(fullState()));
+    expect(store.has(CLASSIC_KEY)).toBe(true);
+    expect(store.has(RUN_KEY)).toBe(false);
+    saveGame('run', saveOf(fullState(), undefined, 4));
+    expect(store.has(RUN_KEY)).toBe(true);
+    clearSavedGame('classic');
+    expect(loadGame('classic', 1)).toBeNull();
+    expect(loadGame('run', 1)!.currentLevelId).toBe(4);
+    clearSavedGame('run');
+    expect(loadGame('run', 1)).toBeNull();
+  });
+
+  // ─── Tracker wire format ─────────────────────────────
 
   it('round-trips tracker counters (totalSeen, deckRemaining, gamePhase)', () => {
     const s = fullState();
     const tracker = freshTracker(s);
-    saveGame(s, tracker, null);
-    const loaded = loadGame();
+    saveGame('classic', saveOf(s, tracker));
+    const loaded = loadGame('classic', 1);
     expect(loaded).not.toBeNull();
     expect(loaded!.tracker.totalSeen).toBe(tracker.totalSeen);
     expect(loaded!.tracker.deckRemaining).toBe(tracker.deckRemaining);
@@ -99,10 +152,10 @@ describe('persistence — saveGame / loadGame', () => {
   it('round-trips seenCards entries (Map survives JSON boundary)', () => {
     const s = fullState();
     let tracker = createGameTracker(s.board);
-    const extra = { id: 'placed-1', rank: '7' as const, suit: 'clubs' as const, value: 7 };
+    const extra = { id: '7C', rank: '7' as const, suit: 'clubs' as const, value: 7 };
     tracker = recordPlacement(tracker, extra);
-    saveGame(s, tracker, null);
-    const loaded = loadGame();
+    saveGame('classic', saveOf(s, tracker));
+    const loaded = loadGame('classic', 1);
     expect(loaded).not.toBeNull();
     expect(loaded!.tracker.seenCards.has(extra.id)).toBe(true);
     expect(loaded!.tracker.seenCards.get(extra.id)).toBe('board');
@@ -113,99 +166,122 @@ describe('persistence — saveGame / loadGame', () => {
     const s = fullState();
     let tracker = createGameTracker(s.board);
     const captured = [
-      { id: 'c1', rank: '5' as const, suit: 'hearts' as const, value: 5 },
-      { id: 'c2', rank: '5' as const, suit: 'clubs' as const, value: 5 },
+      { id: '5H', rank: '5' as const, suit: 'hearts' as const, value: 5 },
+      { id: '5C', rank: '5' as const, suit: 'clubs' as const, value: 5 },
     ];
     tracker = recordCapture(tracker, 1, captured);
-    saveGame(s, tracker, null);
-    const loaded = loadGame();
+    saveGame('classic', saveOf(s, tracker));
+    const loaded = loadGame('classic', 1);
     expect(loaded).not.toBeNull();
     expect(loaded!.tracker.valueCounts['5']).toBe(tracker.valueCounts['5']);
     expect(loaded!.tracker.playerCaptures[1].length).toBe(2);
-    expect(loaded!.tracker.playerCaptures[1].map((c) => c.id)).toEqual(['c1', 'c2']);
+    expect(loaded!.tracker.playerCaptures[1].map((c) => c.id)).toEqual(['5H', '5C']);
   });
 
-  // ─── Backward compat for legacy saves ────────────────
+  // ─── Bad data ────────────────────────────────────────
 
-  it('legacy save (bare GameState, no version/tracker) is loadable with a fresh rebuilt tracker', () => {
-    // Pre-Sibling-1 wire format: just the GameState as the JSON root.
-    const legacy = fullState();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(legacy));
-    const origWarn = console.warn;
-    let warned = false;
-    console.warn = () => { warned = true; };
-    const loaded = loadGame();
-    console.warn = origWarn;
+  it('rejects corrupt JSON in a slot and clears that slot', () => {
+    store.set(CLASSIC_KEY, '{not json');
+    expect(loadGame('classic', 1)).toBeNull();
+    expect(store.has(CLASSIC_KEY)).toBe(false);
+  });
+
+  it('rejects a slot that is not a version-4 save and clears it', () => {
+    store.set(RUN_KEY, JSON.stringify({ version: 3, game: fullState(), currentLevelId: 2 }));
+    expect(loadGame('run', 1)).toBeNull();
+    expect(store.has(RUN_KEY)).toBe(false);
+  });
+
+  // ─── Conversion of the old single-slot key ───────────
+
+  it('old key, schema 3, Classic: converts into the Classic slot, removes the old key', () => {
+    store.set(LEGACY_KEY, JSON.stringify({ version: 3, game: oldGame(), currentLevelId: null }));
+    const loaded = loadGame('classic', 42);
     expect(loaded).not.toBeNull();
-    expect(warned).toBe(true);
-    // Tracker should be a fresh createGameTracker(legacy.board): totalSeen=13
-    // (1 board card + 12 hand-deal seed).
+    expect(store.has(LEGACY_KEY)).toBe(false);
+    expect(store.has(CLASSIC_KEY)).toBe(true);
+    expect(store.has(RUN_KEY)).toBe(false);
+    expect(loaded!.currentLevelId).toBeNull();
+    expect(loaded!.game.board[0].id).toBe('2H');
+    expect(loaded!.game.overallScores).toEqual({ player: 5, bot1: 0, bot2: 0 });
+    expect(loaded!.game.roundStats[0].pointsThisRound).toBe(5);
+    expect('scores' in loaded!.game).toBe(false);
+    expect('totalScore' in loaded!.game.gameStats[0]).toBe(false);
+    // No tracker in the old save: rebuilt from the board, as before.
     expect(loaded!.tracker.totalSeen).toBe(1 + 12);
-    expect(loaded!.tracker.seenCards.has('b1')).toBe(true);
+    expect(loaded!.tracker.seenCards.get('2H')).toBe('board');
+    // An old save has no seed: both streams start fresh from the mount seed.
+    expect(loaded!.seed).toBe(42);
+    expect(loaded!.dealStream).toBe(42);
+    expect(loaded!.botStream).toBe(botStreamSeed(42));
   });
 
-  it('legacy save defaults dumpActive to false on the game side', () => {
-    const legacy = fullState();
-    const { dumpActive: _drop, ...rest } = legacy;
-    void _drop;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(rest));
-    const origWarn = console.warn;
-    console.warn = () => {};
-    const loaded = loadGame();
-    console.warn = origWarn;
-    expect(loaded).not.toBeNull();
-    expect(loaded!.game.dumpActive).toBe(false);
-  });
-
-  it('rejects malformed legacy save shape', () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ not: 'a game' }));
-    expect(loadGame()).toBeNull();
-  });
-
-  it('rejects corrupt JSON', () => {
-    localStorage.setItem(STORAGE_KEY, '{not json');
-    expect(loadGame()).toBeNull();
-  });
-
-  // ─── Per-Mode Split — schema v3 currentLevelId ───────
-
-  it('v3: saveGame writes currentLevelId and loadGame returns it (Run level)', () => {
-    const s = fullState();
-    saveGame(s, freshTracker(s), 5);
-    const loaded = loadGame();
+  it('old key, schema 3, the Run: converts into the Run slot and the Classic slot stays empty', () => {
+    store.set(LEGACY_KEY, JSON.stringify({ version: 3, game: oldGame(), currentLevelId: 5 }));
+    expect(loadGame('classic', 1)).toBeNull();
+    expect(store.has(LEGACY_KEY)).toBe(false);
+    const loaded = loadGame('run', 1);
     expect(loaded).not.toBeNull();
     expect(loaded!.currentLevelId).toBe(5);
+    expect(store.has(CLASSIC_KEY)).toBe(false);
   });
 
-  it('v3: saveGame with null currentLevelId round-trips as null (Classic)', () => {
-    const s = fullState();
-    saveGame(s, freshTracker(s), null);
-    const loaded = loadGame();
-    expect(loaded).not.toBeNull();
-    expect(loaded!.currentLevelId).toBeNull();
-  });
-
-  it('v2 → v3 migration: v2 snapshot (no currentLevelId field) loads with null', () => {
-    // Hand-construct a v2-shape snapshot directly to localStorage. Mirrors the
-    // pre-v3 wire format (no currentLevelId field). Migration should default
-    // it to null without wiping the save.
-    const s = fullState();
+  it('old key, schema 2 (no currentLevelId): converts into the Classic slot', () => {
     const wireTracker = {
-      seenCardsEntries: [['b1', 'board']],
+      seenCardsEntries: [['card_b1', 'board']],
       valueCounts: { A: 0, '2': 1, '3': 0, '4': 0, '5': 0, '6': 0, '7': 0, '8': 0, '9': 0, '10': 0, J: 0, Q: 0, K: 0 },
       playerCaptures: [[], [], []],
       deckRemaining: 0,
       totalSeen: 1,
       gamePhase: 'early',
     };
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({
-      version: 2,
-      game: s,
-      tracker: wireTracker,
-    }));
-    const loaded = loadGame();
+    store.set(LEGACY_KEY, JSON.stringify({ version: 2, game: oldGame(), tracker: wireTracker }));
+    const loaded = loadGame('classic', 1);
     expect(loaded).not.toBeNull();
     expect(loaded!.currentLevelId).toBeNull();
     expect(loaded!.game.board.length).toBe(1);
+    expect(loaded!.tracker.seenCards.get('2H')).toBe('board');
+    expect(loaded!.tracker.valueCounts['2']).toBe(1);
+    expect(store.has(LEGACY_KEY)).toBe(false);
+  });
+
+  it('old key, legacy bare game (no version, no tracker): converts with a rebuilt tracker', () => {
+    store.set(LEGACY_KEY, JSON.stringify(oldGame()));
+    const loaded = loadGame('classic', 1);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.tracker.totalSeen).toBe(1 + 12);
+    expect(loaded!.tracker.seenCards.has('2H')).toBe(true);
+    expect(store.has(LEGACY_KEY)).toBe(false);
+  });
+
+  it('legacy bare game defaults dumpActive to false', () => {
+    const { dumpActive: _drop, ...rest } = oldGame();
+    void _drop;
+    store.set(LEGACY_KEY, JSON.stringify(rest));
+    const loaded = loadGame('classic', 1);
+    expect(loaded).not.toBeNull();
+    expect(loaded!.game.dumpActive).toBe(false);
+  });
+
+  it('old key holding a malformed save: nothing lands in a slot, the old key is removed', () => {
+    store.set(LEGACY_KEY, JSON.stringify({ not: 'a game' }));
+    expect(loadGame('classic', 1)).toBeNull();
+    expect(store.has(LEGACY_KEY)).toBe(false);
+    expect(store.has(CLASSIC_KEY)).toBe(false);
+  });
+
+  it('old key holding corrupt JSON: cleared, as before', () => {
+    store.set(LEGACY_KEY, '{not json');
+    expect(loadGame('classic', 1)).toBeNull();
+    expect(store.has(LEGACY_KEY)).toBe(false);
+  });
+
+  it('old key beside a version-4 save in its slot: the version-4 save is kept, the old key removed', () => {
+    saveGame('classic', saveOf(fullState({ currentRound: 3 })));
+    store.set(LEGACY_KEY, JSON.stringify({ version: 3, game: oldGame(), currentLevelId: null }));
+    const loaded = loadGame('classic', 1);
+    expect(loaded!.game.currentRound).toBe(3);
+    expect(loaded!.seed).toBe(7);
+    expect(store.has(LEGACY_KEY)).toBe(false);
   });
 });

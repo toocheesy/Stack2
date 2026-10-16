@@ -49,15 +49,14 @@ describe('createInitialState new fields', () => {
   it('roundStats start zeroed for all 3 players', () => {
     const s = makeState();
     for (const rs of s.roundStats) {
-      expect(rs.roundScore).toBe(0);
+      expect(rs.pointsThisRound).toBe(0);
       expect(rs.highestCapture).toBeNull();
     }
   });
 
-  it('gameStats start zeroed for all 3 players', () => {
+  it('gameStats start with no highest capture', () => {
     const s = makeState();
     for (const gs of s.gameStats) {
-      expect(gs.totalScore).toBe(0);
       expect(gs.highestCapture).toBeNull();
     }
   });
@@ -77,23 +76,23 @@ describe('dealNewHand', () => {
 // ─── addScore stat tracking ─────────────────────────
 
 describe('addScore stat tracking', () => {
-  it('updates roundStats.roundScore', () => {
+  it('updates roundStats.pointsThisRound', () => {
     const result = addScore(makeState(), 0, 25);
-    expect(result.roundStats[0].roundScore).toBe(25);
-    expect(result.roundStats[1].roundScore).toBe(0);
+    expect(result.roundStats[0].pointsThisRound).toBe(25);
+    expect(result.roundStats[1].pointsThisRound).toBe(0);
   });
 
-  it('updates gameStats.totalScore', () => {
+  it('updates overallScores', () => {
     const result = addScore(makeState(), 1, 15);
-    expect(result.gameStats[1].totalScore).toBe(15);
+    expect(result.overallScores.bot1).toBe(15);
   });
 
   it('accumulates across multiple calls', () => {
     let s = makeState();
     s = addScore(s, 2, 10);
     s = addScore(s, 2, 20);
-    expect(s.roundStats[2].roundScore).toBe(30);
-    expect(s.gameStats[2].totalScore).toBe(30);
+    expect(s.roundStats[2].pointsThisRound).toBe(30);
+    expect(s.overallScores.bot2).toBe(30);
   });
 });
 
@@ -175,8 +174,8 @@ describe('applyJackpot stat tracking', () => {
     };
     const { state: result, jackpotResult } = applyJackpot(s);
     expect(jackpotResult!.points).toBe(25);
-    expect(result.roundStats[1].roundScore).toBe(25);
-    expect(result.gameStats[1].totalScore).toBe(25);
+    expect(result.roundStats[1].pointsThisRound).toBe(25);
+    expect(result.overallScores.bot1).toBe(25);
     expect(result.roundStats[1].highestCapture!.points).toBe(25);
   });
 });
@@ -184,13 +183,13 @@ describe('applyJackpot stat tracking', () => {
 // ─── startNewRound ──────────────────────────────────
 
 describe('startNewRound', () => {
-  it('resets roundStats but preserves gameStats', () => {
+  it('resets roundStats but preserves overallScores', () => {
     let s = makeState();
     s = addScore(s, 0, 50);
     const next = startNewRound(s, createPRNG(99));
-    expect(next.roundStats[0].roundScore).toBe(0);
+    expect(next.roundStats[0].pointsThisRound).toBe(0);
     expect(next.roundStats[0].highestCapture).toBeNull();
-    expect(next.gameStats[0].totalScore).toBe(50);
+    expect(next.overallScores.player).toBe(50);
   });
 
   it('resets handNumber to 1', () => {

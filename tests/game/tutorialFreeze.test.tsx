@@ -54,7 +54,7 @@ function snapshot(s: GameState) {
   return {
     hands: s.hands.map(ids),
     board: ids(s.board),
-    scores: { ...s.scores },
+    scores: { ...s.overallScores },
     currentPlayer: s.currentPlayer,
   };
 }
@@ -135,7 +135,7 @@ describe('tutorial freeze: useGameController', () => {
     expect(result.current.botCombo).toBeNull();
     expect(ids(result.current.state.board)).toEqual(atShow.board);
     expect(ids(result.current.state.hands[bot])).toEqual(atShow.hands[bot]);
-    expect(result.current.state.scores).toEqual(atShow.scores);
+    expect(result.current.state.overallScores).toEqual(atShow.scores);
     expect(result.current.botViz).toBeNull();
   });
 

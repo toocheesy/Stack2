@@ -58,6 +58,8 @@ initAnalytics();
       localStorage.removeItem('stacked_v2_adventure_progress');
       localStorage.removeItem('stacked_v2_jett_unlocked_classic');
       localStorage.removeItem('stacked-v2-game');
+      localStorage.removeItem('stacked-save-classic');
+      localStorage.removeItem('stacked-save-run');
       handled = true;
     }
 

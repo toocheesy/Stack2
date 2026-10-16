@@ -32,14 +32,12 @@ describe('scoring', () => {
     expect(calculateCardsPoints(cards)).toBe(15 + 10 + 5);
   });
 
-  it('getRankedPlayers sorts descending by round score', () => {
+  it('getRankedPlayers sorts descending by overallScores', () => {
     const state = {
-      scores: { player: 20, bot1: 50, bot2: 35 },
       overallScores: { player: 100, bot1: 200, bot2: 150 },
     } as GameState;
     const ranked = getRankedPlayers(state);
     expect(ranked.map((r) => r.index)).toEqual([1, 2, 0]);
-    expect(ranked[0].score).toBe(50);
-    expect(ranked[0].overall).toBe(200);
+    expect(ranked[0].score).toBe(200);
   });
 });

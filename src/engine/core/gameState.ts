@@ -28,11 +28,11 @@ function emptyCombination(): GameState['combination'] {
 }
 
 function emptyRoundStats(): RoundStats {
-  return { roundScore: 0, highestCapture: null };
+  return { pointsThisRound: 0, highestCapture: null };
 }
 
 function emptyGameStats(): GamePlayerStats {
-  return { totalScore: 0, highestCapture: null };
+  return { highestCapture: null };
 }
 
 function maybeUpdateHighest(
@@ -91,7 +91,6 @@ export function createInitialState(
     deck,
     board,
     hands,
-    scores: emptyScores(),
     overallScores: emptyScores(),
     combination: emptyCombination(),
     currentPlayer,
@@ -141,22 +140,15 @@ export function addScore(
   const roundStats = [...state.roundStats] as [RoundStats, RoundStats, RoundStats];
   roundStats[playerIndex] = {
     ...roundStats[playerIndex],
-    roundScore: roundStats[playerIndex].roundScore + points,
-  };
-  const gameStats = [...state.gameStats] as [GamePlayerStats, GamePlayerStats, GamePlayerStats];
-  gameStats[playerIndex] = {
-    ...gameStats[playerIndex],
-    totalScore: gameStats[playerIndex].totalScore + points,
+    pointsThisRound: roundStats[playerIndex].pointsThisRound + points,
   };
   return {
     ...state,
-    scores: { ...state.scores, [key]: state.scores[key] + points },
     overallScores: {
       ...state.overallScores,
       [key]: state.overallScores[key] + points,
     },
     roundStats,
-    gameStats,
   };
 }
 
@@ -300,7 +292,6 @@ export function startNewRound(
     deck,
     board,
     hands,
-    scores: emptyScores(),
     combination: emptyCombination(),
     currentPlayer,
     lastAction: null,

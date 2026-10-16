@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import type { CaptureRecord, Difficulty, GamePlayerStats, RoundStats } from '../engine/types';
+import type { CaptureRecord, Difficulty, RoundStats, Scores } from '../engine/types';
 import { C } from '../config/colors';
 import { getTransition } from '../config/motion';
 
@@ -17,7 +17,7 @@ interface Props {
   visible: boolean;
   roundNumber: number;
   roundStats: [RoundStats, RoundStats, RoundStats];
-  gameStats: [GamePlayerStats, GamePlayerStats, GamePlayerStats];
+  overallScores: Scores;
   targetScore: number;
   bot1Personality: Difficulty;
   bot2Personality: Difficulty;
@@ -35,7 +35,7 @@ function formatHighest(record: CaptureRecord | null): string | null {
 }
 
 export function RoundEndOverlay({
-  visible, roundNumber, roundStats, gameStats, targetScore,
+  visible, roundNumber, roundStats, overallScores, targetScore,
   bot1Personality, bot2Personality, onContinue, adventureMode = false,
 }: Props) {
   const [countdown, setCountdown] = useState(AUTO_ADVANCE_SEC);
@@ -62,9 +62,9 @@ export function RoundEndOverlay({
   const bot2 = BOT_DISPLAY[bot2Personality];
 
   const players = [
-    { name: 'YOU', color: C.amber, rs: roundStats[0], gs: gameStats[0] },
-    { name: bot1.name, color: bot1.color, rs: roundStats[1], gs: gameStats[1] },
-    { name: bot2.name, color: bot2.color, rs: roundStats[2], gs: gameStats[2] },
+    { name: 'YOU', color: C.amber, rs: roundStats[0], total: overallScores.player },
+    { name: bot1.name, color: bot1.color, rs: roundStats[1], total: overallScores.bot1 },
+    { name: bot2.name, color: bot2.color, rs: roundStats[2], total: overallScores.bot2 },
   ];
 
   return (
@@ -114,11 +114,9 @@ export function RoundEndOverlay({
                   fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
                 }}>
                   <span style={{ color: C.textSecondary }}>
-                    Round: <span style={{ color: C.textPrimary, fontWeight: 600 }}>{p.rs.roundScore}</span>
-                  </span>
-                  <span style={{ color: C.textSecondary }}>
-                    Total: <span style={{ color: C.textPrimary, fontWeight: 600 }}>{p.gs.totalScore}</span>
+                    Total: <span style={{ color: C.textPrimary, fontWeight: 600 }}>{p.total}</span>
                     <span style={{ opacity: 0.5 }}>/{targetScore}</span>
+                    {' · +'}<span style={{ color: C.textPrimary, fontWeight: 600 }}>{p.rs.pointsThisRound}</span>{' this round'}
                   </span>
                 </div>
 

@@ -497,6 +497,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         mode: levelId === null ? 'classic' : 'run',
         level_id: levelId ?? undefined,
         time_to_first_capture_ms: Date.now() - gameStartedAtRef.current,
+        seed: seedRef.current,
       });
     }
     trackerRef.current = recordCapture(
@@ -587,6 +588,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     jackpotInfo,
     gameOver,
     wasResumed: wasResumedRef.current,
+    // The game seed (S-006): the save's own for a resumed game, the seed prop for a new one.
+    seed: seedRef.current,
     actions: {
       addToCombo,
       removeFromCombo: doRemoveFromCombo,

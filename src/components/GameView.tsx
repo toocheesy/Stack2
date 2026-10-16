@@ -642,8 +642,8 @@ export function GameView({
               </h3>
               <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', margin: 0 }}>
                 {currentLevelId
-                  ? 'This level will restart next time. Star progress is safe.'
-                  : 'Your progress in this game will be lost.'}
+                  ? 'Your level is saved. Resume it from The Run map. Star progress is safe.'
+                  : 'Your game is saved. Tap Continue on the home screen to pick it up.'}
               </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 4, width: '100%' }}>
                 <Btn label={currentLevelId ? 'BACK' : 'QUIT'} onClick={() => { setShowQuitDialog(false); onQuit(); }} big />

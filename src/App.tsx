@@ -90,14 +90,14 @@ function App() {
     setScreen('game');
   }, [settingsForLevel]);
 
+  // Quitting keeps the save (S-006): CONTINUE on the Classic card picks it up.
   const goHome = useCallback(() => {
-    clearSavedGame('classic');
     setCurrentLevelId(null);
     setScreen('home');
   }, []);
 
+  // Quitting keeps the save (S-006): the Run map's Resume picks it up.
   const goToWorldMap = useCallback(() => {
-    clearSavedGame('run');
     setScreen('worldMap');
   }, []);
 
@@ -553,7 +553,7 @@ function GameWrapper({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tutorialReplayToken]);
 
-  const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, wasResumed, actions } =
+  const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, wasResumed, seed: gameSeed, actions } =
     useGameController(seed, settings, currentLevelId, tutorial.visible);
 
   // Analytics — game_start fires once per GameWrapper mount. seed change
@@ -565,6 +565,7 @@ function GameWrapper({
       mode: currentLevelId === null ? 'classic' : 'run',
       level_id: currentLevelId ?? undefined,
       resumed: wasResumed,
+      seed: gameSeed,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -639,6 +640,7 @@ function GameWrapper({
       level_id: currentLevelId ?? undefined,
       stars: levelComplete?.stars,
       margin: levelComplete?.margin,
+      seed: gameSeed,
     });
     if (levelComplete?.won && levelComplete.isFinalLevel) {
       trackRunComplete({ total_stars: loadProgress().totalStars });

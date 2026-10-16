@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { GA_MEASUREMENT_ID, initAnalytics, trackGameStart } from '../../src/analytics/track';
+import { GA_MEASUREMENT_ID, initAnalytics, trackFirstCapture, trackGameEnd, trackGameStart } from '../../src/analytics/track';
 
 // GA4 reconnect (S-005): the tag loads only on the live site, and events
 // go out only when gtag is present.
@@ -20,12 +20,12 @@ describe('analytics events (S-005)', () => {
   it('sends an event when gtag is present', () => {
     const gtag = vi.fn();
     window.gtag = gtag;
-    trackGameStart({ mode: 'classic', resumed: false });
-    expect(gtag).toHaveBeenCalledWith('event', 'game_start', { mode: 'classic', resumed: false });
+    trackGameStart({ mode: 'classic', resumed: false, seed: 7 });
+    expect(gtag).toHaveBeenCalledWith('event', 'game_start', { mode: 'classic', resumed: false, seed: 7 });
   });
 
   it('does nothing when gtag is absent', () => {
-    expect(() => trackGameStart({ mode: 'run', level_id: 1, resumed: true })).not.toThrow();
+    expect(() => trackGameStart({ mode: 'run', level_id: 1, resumed: true, seed: 7 })).not.toThrow();
   });
 });
 
@@ -54,7 +54,7 @@ describe('initAnalytics (S-005)', () => {
 
   it('queues each command as an arguments object, as gtag.js requires', () => {
     initAnalytics('stackedthegame.com');
-    trackGameStart({ mode: 'classic', resumed: false });
+    trackGameStart({ mode: 'classic', resumed: false, seed: 7 });
     const queue = window.dataLayer as unknown[];
     expect(queue).toHaveLength(3);
     for (const entry of queue) {
@@ -63,7 +63,7 @@ describe('initAnalytics (S-005)', () => {
     expect(Array.from(queue[2] as ArrayLike<unknown>)).toEqual([
       'event',
       'game_start',
-      { mode: 'classic', resumed: false },
+      { mode: 'classic', resumed: false, seed: 7 },
     ]);
   });
 
@@ -76,5 +76,18 @@ describe('initAnalytics (S-005)', () => {
 
   it('uses the new measurement ID, not the old one', () => {
     expect(GA_MEASUREMENT_ID).toBe('G-ELM837XY9B');
+  });
+});
+
+describe('the seed in analytics (S-006)', () => {
+  it('game_start, first_capture and game_end each send the seed', () => {
+    const gtag = vi.fn();
+    window.gtag = gtag;
+    trackGameStart({ mode: 'run', level_id: 3, resumed: true, seed: 90210 });
+    trackFirstCapture({ mode: 'classic', time_to_first_capture_ms: 1200, seed: 90210 });
+    trackGameEnd({ mode: 'classic', won: true, score: 310, duration_ms: 60_000, seed: 90210 });
+    for (const name of ['game_start', 'first_capture', 'game_end']) {
+      expect(gtag).toHaveBeenCalledWith('event', name, expect.objectContaining({ seed: 90210 }));
+    }
   });
 });

@@ -4,7 +4,6 @@ import { act, renderHook } from '@testing-library/react';
 import { useGameController } from '../../src/game/useGameController';
 import { loadGame, saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
-import { createGameTracker } from '../../src/engine/ai/cardTracker';
 import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
 import type { GameSettings } from '../../src/engine/types';
 
@@ -32,7 +31,6 @@ function runSave() {
   const game = createInitialState(runSettings, createPRNG(RUN_SEED));
   return {
     game,
-    tracker: createGameTracker(game.board),
     currentLevelId: RUN_LEVEL,
     seed: RUN_SEED,
     dealStream: createPRNG(RUN_SEED).getSeed(),
@@ -83,7 +81,6 @@ describe('two save slots (S-006)', () => {
     const classicGame = createInitialState(classicSettings, createPRNG(SEED_PLAYER_FIRST));
     saveGame('classic', {
       game: classicGame,
-      tracker: createGameTracker(classicGame.board),
       currentLevelId: null,
       seed: SEED_PLAYER_FIRST,
       dealStream: SEED_PLAYER_FIRST,
@@ -105,7 +102,6 @@ describe('two save slots (S-006)', () => {
     const dealStream = 0xabcdef;
     saveGame('classic', {
       game,
-      tracker: createGameTracker(game.board),
       currentLevelId: null,
       seed: SEED_PLAYER_FIRST,
       dealStream,

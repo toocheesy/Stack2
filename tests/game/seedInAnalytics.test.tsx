@@ -4,7 +4,6 @@ import { act, renderHook } from '@testing-library/react';
 import { useGameController } from '../../src/game/useGameController';
 import { saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
-import { createGameTracker } from '../../src/engine/ai/cardTracker';
 import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
 import type { GameSettings } from '../../src/engine/types';
 
@@ -50,7 +49,6 @@ describe('the seed in analytics (S-006)', () => {
     const game = createInitialState(settings, createPRNG(1));
     saveGame('classic', {
       game,
-      tracker: createGameTracker(game.board),
       currentLevelId: null,
       seed: SAVED_SEED,
       dealStream: 1,

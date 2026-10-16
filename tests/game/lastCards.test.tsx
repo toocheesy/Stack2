@@ -4,7 +4,6 @@ import { act, renderHook } from '@testing-library/react';
 import { useGameController } from '../../src/game/useGameController';
 import { loadGame, saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
-import { createGameTracker } from '../../src/engine/ai/cardTracker';
 import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
 import type { Card, GameSettings, GameState, PlayerIndex } from '../../src/engine/types';
 
@@ -58,11 +57,10 @@ function lastPlayerState(player: PlayerIndex, dumpActive = false): GameState {
   return { ...base, hands, deck, currentPlayer: player, lastAction: null, dumpActive };
 }
 
-// A Classic save of `game` with a fresh tracker, as the controller would write it.
+// A Classic save of `game`, as the controller would write it.
 function saveOf(game: GameState) {
   return {
     game,
-    tracker: createGameTracker(game.board),
     currentLevelId: null,
     seed: SEED,
     dealStream: SEED,
@@ -119,7 +117,7 @@ describe('RULES.md L8: the last player holding cards', () => {
     expect(movedOn(after)).toBe(true);
   });
 
-  it('bot last: after its turn its hand is empty, play moves on, and its placed cards are in the card memory as on the board', async () => {
+  it('bot last: after its turn its hand is empty, its placed cards are on the board, and play moves on', async () => {
     const s = lastPlayerState(1);
     saveGame('classic', saveOf(s));
     const { result } = mount(SEED);
@@ -131,8 +129,6 @@ describe('RULES.md L8: the last player holding cards', () => {
     expect(atEmpty.lastAction).toBe('place');
     const putDown = originalHand.filter((id) => atEmpty.board.some((b) => b.id === id));
     expect(putDown.length).toBeGreaterThan(0);
-    const saved = loadGame('classic', SEED)!;
-    for (const id of putDown) expect(saved.tracker.seenCards.get(id)).toBe('board');
 
     await advance(WELL_PAST);
     expect(movedOn(result.current.state)).toBe(true);

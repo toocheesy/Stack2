@@ -19,7 +19,6 @@ vi.hoisted(() => {
 import App from '../../src/App';
 import { loadGame, saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
-import { createGameTracker } from '../../src/engine/ai/cardTracker';
 import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
 import { getLevel } from '../../src/engine/adventure/levelConfig';
 import type { GameSettings, GameState } from '../../src/engine/types';
@@ -46,7 +45,6 @@ function ids(cards: readonly { id: string }[]): string[] {
 function saveClassic(game: GameState, seed = CLASSIC_SEED) {
   saveGame('classic', {
     game,
-    tracker: createGameTracker(game.board),
     currentLevelId: null,
     seed,
     dealStream: DEAL_SEED,
@@ -119,7 +117,6 @@ describe('quitting keeps the save (S-006)', () => {
     const game = createInitialState(runSettings(), createPRNG(RUN_SEED));
     saveGame('run', {
       game,
-      tracker: createGameTracker(game.board),
       currentLevelId: RUN_LEVEL,
       seed: RUN_SEED,
       dealStream: createPRNG(RUN_SEED).getSeed(),

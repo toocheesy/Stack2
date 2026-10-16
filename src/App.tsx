@@ -645,7 +645,7 @@ function GameWrapper({
     if (levelComplete?.won && levelComplete.isFinalLevel) {
       trackRunComplete({ total_stars: loadProgress().totalStars });
     }
-  }, [gameOver, levelComplete, state.overallScores, currentLevelId]);
+  }, [gameOver, levelComplete, state.overallScores, currentLevelId, gameSeed]);
 
   return (
     <>

@@ -589,7 +589,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     gameOver,
     wasResumed: wasResumedRef.current,
     // The game seed (S-006): the save's own for a resumed game, the seed prop for a new one.
-    seed: seedRef.current,
+    seed: mount.seed,
     actions: {
       addToCombo,
       removeFromCombo: doRemoveFromCombo,

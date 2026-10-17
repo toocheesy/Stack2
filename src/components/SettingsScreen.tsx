@@ -1,5 +1,7 @@
+import { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { getTransition } from '../config/motion';
+import { isAnalyticsOptedOut, setAnalyticsOptOut } from '../analytics/track';
 
 const TAN = '#E8C577';
 const BG = '#0A0A0A';
@@ -12,6 +14,9 @@ interface Props {
 }
 
 export function SettingsScreen({ visible, onClose, onReplayTutorial }: Props) {
+  // S-020: the saved choice; sharing is on unless the player turned it off.
+  const [sharing, setSharing] = useState(() => !isAnalyticsOptedOut());
+
   return (
     <AnimatePresence>
       {visible && (
@@ -56,6 +61,38 @@ export function SettingsScreen({ visible, onClose, onReplayTutorial }: Props) {
               }}
             >
               Replay tutorial
+            </button>
+
+            {/* S-020: the GA4 opt-out, saved on this device. */}
+            <button
+              role="switch"
+              aria-checked={sharing}
+              onClick={() => {
+                const next = !sharing;
+                setSharing(next);
+                setAnalyticsOptOut(!next);
+              }}
+              style={{
+                width: '100%', padding: '8px 12px', borderRadius: 8,
+                background: 'transparent', border: `1px solid ${DIVIDER}`,
+                color: '#fff', fontSize: 12, fontWeight: 600,
+                fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}
+            >
+              <span>Share anonymous play data</span>
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'relative', width: 32, height: 18, borderRadius: 99, flexShrink: 0,
+                  background: sharing ? TAN : 'rgba(255,255,255,0.2)',
+                }}
+              >
+                <span style={{
+                  position: 'absolute', top: 2, left: sharing ? 16 : 2,
+                  width: 14, height: 14, borderRadius: 99, background: BG,
+                }} />
+              </span>
             </button>
 
             <motion.button

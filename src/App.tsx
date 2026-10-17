@@ -264,6 +264,9 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
         <AdventureHeroCard onPlay={onRunCardTap} runStatus={runStatus} />
       </div>
 
+      {/* S-020: the privacy notice, a static page opened in a new tab. */}
+      <a href="/privacy.html" target="_blank" rel="noopener" style={{ position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)', fontSize: 11, color: 'rgba(255,255,255,0.4)', textDecoration: 'none', fontFamily: 'Inter, sans-serif', letterSpacing: '0.04em', padding: '6px 10px' }}>Privacy</a>
+
       {/* Top-right gear — opens Settings modal. Absolute-positioned so
           it sits outside the card flow and can't squeeze the layout. */}
       <button

@@ -246,30 +246,32 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       return;
     }
 
-    // ── AI diagnostic logging ──
-    const profile = getPersonalityProfile(difficulty);
-    const allActions = evaluateAllActions(
-      current,
-      player,
-      readCardMemory(current),
-      profile.weights,
-      { allowMultiSlot: profile.captureComplexity >= 3 },
-    );
-    const top3 = allActions.slice(0, 3);
-    console.log(
-      `[BOT ${player}] ${profile.name} (${difficulty}) | ` +
-      `hand: ${current.hands[player].length} cards | ` +
-      `board: ${current.board.length} cards | ` +
-      `${allActions.length} actions evaluated`,
-    );
-    top3.forEach((a, i) => {
-      console.log(
-        `  #${i + 1}: ${a.action} ${a.handCard.rank}${a.handCard.suit[0]} ` +
-        `total=${a.score.total.toFixed(1)} raw=${a.score.rawPoints} ` +
-        `chain=${a.score.chainPotential} deny=${a.score.opponentDenial.toFixed(1)} ` +
-        `| ${a.reasoning}`,
+    if (import.meta.env.DEV) {
+      // ── AI diagnostic logging ──
+      const profile = getPersonalityProfile(difficulty);
+      const allActions = evaluateAllActions(
+        current,
+        player,
+        readCardMemory(current),
+        profile.weights,
+        { allowMultiSlot: profile.captureComplexity >= 3 },
       );
-    });
+      const top3 = allActions.slice(0, 3);
+      console.log(
+        `[BOT ${player}] ${profile.name} (${difficulty}) | ` +
+        `hand: ${current.hands[player].length} cards | ` +
+        `board: ${current.board.length} cards | ` +
+        `${allActions.length} actions evaluated`,
+      );
+      top3.forEach((a, i) => {
+        console.log(
+          `  #${i + 1}: ${a.action} ${a.handCard.rank}${a.handCard.suit[0]} ` +
+          `total=${a.score.total.toFixed(1)} raw=${a.score.rawPoints} ` +
+          `chain=${a.score.chainPotential} deny=${a.score.opponentDenial.toFixed(1)} ` +
+          `| ${a.reasoning}`,
+        );
+      });
+    }
 
     const decision = decideBotAction(
       current,
@@ -279,10 +281,12 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       botPrngRef.current,
     );
 
-    console.log(
-      `  → CHOSEN: ${decision.action} ${decision.handCard.rank}${decision.handCard.suit[0]} ` +
-      `score=${decision.score.total.toFixed(1)} | ${decision.reasoning}`,
-    );
+    if (import.meta.env.DEV) {
+      console.log(
+        `  → CHOSEN: ${decision.action} ${decision.handCard.rank}${decision.handCard.suit[0]} ` +
+        `score=${decision.score.total.toFixed(1)} | ${decision.reasoning}`,
+      );
+    }
 
     // Bot captures go through the same capture check as the player's.
     // A refused capture falls through to the place branch below.

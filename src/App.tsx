@@ -414,7 +414,7 @@ function ClassicHeroCard({ onPlay, onContinue }: { onPlay: () => void; onContinu
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: 14 }}>
         <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 400, lineHeight: 1.4, maxWidth: onContinue ? '50%' : '60%' }}>
           Capture · Combo · Win.<br/>
-          <span style={{ color: 'rgba(255,255,255,0.4)' }}>Best of three rounds.</span>
+          <span style={{ color: 'rgba(255,255,255,0.4)' }}>Play to the score you pick.</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {onContinue && (
@@ -430,9 +430,9 @@ function ClassicHeroCard({ onPlay, onContinue }: { onPlay: () => void; onContinu
               CONTINUE
             </button>
           )}
-          <div style={{ fontWeight: 800, fontSize: 12, color: TAN, background: JADE, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(6,95,70,0.45), inset 0 1px 0 rgba(255,255,255,0.08)' }}>
+          <button onClick={(e) => { e.stopPropagation(); onPlay(); }} style={{ fontWeight: 800, fontSize: 12, color: TAN, background: JADE, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(6,95,70,0.45), inset 0 1px 0 rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 'inherit' }}>
             PLAY <span style={{ fontSize: 14 }}>→</span>
-          </div>
+          </button>
         </div>
       </div>
     </div>

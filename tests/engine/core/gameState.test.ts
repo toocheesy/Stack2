@@ -89,7 +89,7 @@ describe('createInitialState', () => {
     expect(s.lastCapturer).toBeNull();
   });
 
-  it('dumpActive defaults to false (doctrine 2.7)', () => {
+  it('dumpActive defaults to false (RULES.md Law 8)', () => {
     expect(makeState().dumpActive).toBe(false);
   });
 });
@@ -114,7 +114,7 @@ describe('dealNewHand', () => {
     expect(dealt).not.toBe(s);
   });
 
-  it('clears dumpActive when new cards are dealt (doctrine 2.7)', () => {
+  it('clears dumpActive when new cards are dealt (RULES.md Law 8)', () => {
     const s: GameState = { ...makeState(), dumpActive: true };
     const dealt = dealNewHand(s);
     expect(dealt.dumpActive).toBe(false);
@@ -186,7 +186,7 @@ describe('executeCapture', () => {
     );
   });
 
-  it('throws on the live example (L3): base 10 from hand, combo2 both from hand', () => {
+  it('throws on the live example (Law 3): base 10 from hand, combo2 both from hand', () => {
     const base = makeState();
     const ten = card('10');
     const b6 = card('6');
@@ -230,7 +230,7 @@ describe('placeCard', () => {
     expect(() => placeCard(s, 'bogus')).toThrow();
   });
 
-  // RULES.md L8 — the last player holding cards places one, the game places the rest.
+  // RULES.md Law 8 — the last player holding cards places one, the game places the rest.
   function lastPlayerState(): { s: GameState; a: Card; b: Card; c: Card } {
     const base = makeState(3);
     const a = card('2');
@@ -241,7 +241,7 @@ describe('placeCard', () => {
     return { s: { ...base, hands, lastCapturer: 1, overallScores: { player: 5, bot1: 10, bot2: 15 } }, a, b, c };
   }
 
-  it('L8: every other hand empty, placer holds 3 → all 3 on the board, chosen first then hand order; hand empty', () => {
+  it('Law 8: every other hand empty, placer holds 3 → all 3 on the board, chosen first then hand order; hand empty', () => {
     const { s, a, b, c } = lastPlayerState();
     const after = placeCard(s, b.id);
     expect(after.hands[s.currentPlayer]).toEqual([]);
@@ -259,7 +259,7 @@ describe('placeCard', () => {
     expect(after.board.slice(s.board.length).map((x) => x.id)).toEqual([b.id]);
   });
 
-  it('L8: lastCapturer, scores and roundStats are unchanged by an L8 place', () => {
+  it('Law 8: lastCapturer, scores and roundStats are unchanged by a Law 8 place', () => {
     const { s, b } = lastPlayerState();
     const after = placeCard(s, b.id);
     expect(after.lastCapturer).toBe(s.lastCapturer);
@@ -267,7 +267,7 @@ describe('placeCard', () => {
     expect(after.roundStats).toEqual(s.roundStats);
   });
 
-  it('L8: every card is in exactly one place before and after', () => {
+  it('Law 8: every card is in exactly one place before and after', () => {
     const { s, b } = lastPlayerState();
     const zones = (st: GameState) => [...st.deck, ...st.board, ...st.hands.flat()].map((x) => x.id);
     const before = zones(s);
@@ -356,7 +356,7 @@ describe('startNewRound', () => {
     expect(next.board).toHaveLength(4);
   });
 
-  it('clears dumpActive at the start of a new round (doctrine 2.7)', () => {
+  it('clears dumpActive at the start of a new round (RULES.md Law 8)', () => {
     const s: GameState = { ...makeState(10), dumpActive: true };
     const prng = createPRNG(99);
     const next = startNewRound(s, prng);

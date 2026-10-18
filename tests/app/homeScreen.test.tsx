@@ -24,7 +24,7 @@ import type { GameSettings } from '../../src/engine/types';
 
 // S-021: the Classic card's PLAY and CONTINUE are real buttons the keyboard
 // can reach, and its tagline says the game runs to the score the player picks
-// (RULES.md L11 and M6). Enter and Space aren't pressed here (no user-event
+// (RULES.md Law 11 and Classic rule 6). Enter and Space aren't pressed here (no user-event
 // package); they're checked in the browser.
 
 const classicSettings: GameSettings = {

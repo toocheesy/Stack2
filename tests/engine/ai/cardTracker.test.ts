@@ -79,7 +79,7 @@ describe('readCardMemory (S-008)', () => {
     expect(m.valueCounts).toEqual(expected);
   });
 
-  it('a new round starts the memory afresh (RULES.md M2)', () => {
+  it('a new round starts the memory afresh (RULES.md Classic rule 2)', () => {
     const s = fresh();
     // Round 1 played out: the deck and every hand are empty, so everything is seen.
     const played: GameState = { ...s, deck: [], hands: [[], [], []], board: [], gamePhase: 'roundEnd' };

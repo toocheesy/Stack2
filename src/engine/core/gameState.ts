@@ -220,13 +220,13 @@ export function placeCard(state: GameState, cardId: string): GameState {
     lastAction: 'place',
     combination: emptyCombination(),
   };
-  // RULES.md L8: when every other player is out of cards, a place also
+  // RULES.md Law 8: when every other player is out of cards, a place also
   // puts the rest of the placer's hand on the board.
   const othersEmpty = hands.every((h, i) => i === state.currentPlayer || h.length === 0);
   return othersEmpty ? placeRestOfHand(placed) : placed;
 }
 
-// RULES.md L8: moves every card still in the current player's hand to the
+// RULES.md Law 8: moves every card still in the current player's hand to the
 // end of the board, in hand order. Scores, lastCapturer and stats are untouched.
 export function placeRestOfHand(state: GameState): GameState {
   const hand = state.hands[state.currentPlayer];

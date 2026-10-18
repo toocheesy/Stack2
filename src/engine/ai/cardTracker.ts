@@ -42,7 +42,7 @@ export function updateGamePhase(tracker: CardTrackerState): GamePhase {
 
 // The memory read from the game state. A card counts as seen once it has left
 // the deck and every hand: it is on the board or captured this round. Each
-// round deals a fresh deck (RULES.md M2), so the memory starts afresh with it,
+// round deals a fresh deck (RULES.md Classic rule 2), so the memory starts afresh with it,
 // and a bot never counts its own hand as seen.
 export function readCardMemory(state: GameState): CardTrackerState {
   const valueCounts = emptyValueCounts();

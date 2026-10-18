@@ -133,9 +133,9 @@ describe('determineTurnResult', () => {
     else throw new Error('expected CONTINUE_TURN');
   });
 
-  // ─── RULES.md L8 and L1 — the last player holding cards ──────────
+  // ─── RULES.md Law 8 and Law 1 — the last player holding cards ──────────
 
-  it('L8: the last player places, the game places the rest, deck >= 12 → DEAL_NEW_HAND', () => {
+  it('Law 8: the last player places, the game places the rest, deck >= 12 → DEAL_NEW_HAND', () => {
     const deck: Card[] = [];
     for (let i = 0; i < 12; i++) deck.push(card('2'));
     const two = card('2');
@@ -150,7 +150,7 @@ describe('determineTurnResult', () => {
     expect(r.type).toBe('DEAL_NEW_HAND');
   });
 
-  it('L1: the last player has just captured and still holds cards → CONTINUE_TURN, same player', () => {
+  it('Law 1: the last player has just captured and still holds cards → CONTINUE_TURN, same player', () => {
     const s = state({
       currentPlayer: 2,
       hands: [[], [], [card('2'), card('5')]],
@@ -180,7 +180,7 @@ describe('determineTurnResult', () => {
     expect(r.type).toBe('DEAL_NEW_HAND');
   });
 
-  // ─── Doctrine 5.7 — position locked within a round ─────────
+  // ─── RULES.md Classic rule 3 — position locked within a round ─────────
 
   it('DEAL_NEW_HAND startingPlayer is always (currentDealer + 1) % 3', () => {
     const deck: Card[] = [];

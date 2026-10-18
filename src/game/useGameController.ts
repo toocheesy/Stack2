@@ -102,7 +102,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     if (saved) {
       wasResumedRef.current = true;
       if (saved.game.dumpActive) {
-        // A save made under the old place-only lock, before RULES.md L8 was
+        // A save made under the old place-only lock, before RULES.md Law 8 was
         // in the game: the game places the rest of that hand now.
         pendingAdvanceRef.current = true;
         return { ...placeRestOfHand(saved.game), dumpActive: false };

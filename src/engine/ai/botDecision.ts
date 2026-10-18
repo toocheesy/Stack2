@@ -259,14 +259,6 @@ function highestNumberCard(hand: readonly Card[]): Card | null {
   return best;
 }
 
-// Capture-chain promotion threshold — gates whether a 2-turn capture plan
-// (capture A now → capture B next turn) overrides the best single-turn
-// capture. Sibling to setupChainThreshold(se) which gates place-chains;
-// both derive from the same SE curve so each bot's two chain types
-// behave consistently. Generalized from a hardcoded 1.2x per
-// docs/post-foundation-calibration-diagnosis-2026-05-06.md.
-// Exported for test surface; sibling private functions are exercised
-// indirectly via decideBotAction.
 export function captureChainThreshold(se: number): number {
   if (se <= 5) return 1.40;
   if (se <= 7) return 1.30;

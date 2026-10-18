@@ -22,12 +22,9 @@ interface Props {
 }
 
 export function JackpotCelebration({ info, bot1Personality, bot2Personality }: Props) {
-  // Language rename L3 — asymmetric Take the Table popup formula:
+  // Asymmetric Take the Table popup formula:
   //   Player: "TABLE TAKEN!" (active voice, no name — the event IS the celebration)
   //   Bot:    "[BOT] TOOK THE TABLE!" (name-first, all-caps, parallels FIRST BLOOD — JINX)
-  // Subtitle ("X sweep(s) the board") dropped — redundant with new headline that already
-  // says "took the table." Bundle A's grammar ternary lives on in this comment as
-  // documentation if the subtitle ever returns.
   const isPlayer = !info || info.winner === 0;
   let botName = '';
   let winnerColor: string = C.amber;

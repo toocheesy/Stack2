@@ -209,7 +209,7 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
 // ─── Title Screen (LOCKED) ──────────────────────────
 
 function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings }: { onNewGame: () => void; onAdventure: () => void; onContinueClassic?: () => void; onOpenSettings: () => void }) {
-  // Language rename — entry verb hierarchy: BEGIN / RESUME / NEW RUN.
+  // Entry verb hierarchy: BEGIN / RESUME / NEW RUN.
   const runStatus: RunStatus = getRunStatus();
   const [showNewRunConfirm, setShowNewRunConfirm] = useState(false);
 
@@ -235,11 +235,9 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
       backgroundImage: 'radial-gradient(circle at 30% 10%, rgba(6,95,70,0.10) 0%, transparent 50%), radial-gradient(circle at 80% 90%, rgba(232,197,119,0.05) 0%, transparent 50%)',
       overflow: 'hidden',
     }}>
-      {/* Hero — STACKED! brand mark (Marcus Build 2 audit S2:
-            moved from top-left utility chrome to hero-center at ~3.5×
-            scale. Subtitle kept underneath as small functional context
-            rather than dropped — gives the player a verb for what's
-            below without competing with the brand mark visually). */}
+      {/* Hero — STACKED! brand mark, centered at ~3.5× scale. The subtitle
+            underneath gives the player a verb for what's below without
+            competing with the brand mark. */}
       <div style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center',
         gap: 6, flexShrink: 0, marginBottom: 28,

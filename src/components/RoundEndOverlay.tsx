@@ -22,7 +22,7 @@ interface Props {
   bot1Personality: Difficulty;
   bot2Personality: Difficulty;
   onContinue: () => void;
-  // Bundle A — Adventure overlays use tan CTAs, Classic uses jade. Defaults
+  // Adventure overlays use tan CTAs, Classic uses jade. Defaults
   // to Classic if unset (safe fallback for any caller missing the prop).
   adventureMode?: boolean;
 }

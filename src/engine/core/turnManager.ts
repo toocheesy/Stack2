@@ -61,7 +61,7 @@ export function determineTurnResult(state: GameState): TurnResult {
     // Position locks for the whole round — first player is always
     // (dealer + 1) % 3, regardless of who placed last in the previous
     // hand. Round-boundary rotation lives in startNewRound.
-    // Doctrine 5.7.
+    // RULES.md Classic rule 3.
     const startingPlayer = ((state.currentDealer + 1) % 3) as PlayerIndex;
     return { type: 'DEAL_NEW_HAND', startingPlayer };
   }
@@ -85,7 +85,7 @@ export function determineTurnResult(state: GameState): TurnResult {
         winnerName: PLAYER_NAMES[winner],
       };
     }
-    // Doctrine 5.4 — tied leaders at/above target trigger overtime.
+    // RULES.md Law 11 — tied leaders at/above target trigger overtime.
     // Game does NOT end. Continue into a new round; recursion is automatic
     // via re-entry into determineTurnResult at the next round boundary.
     return {

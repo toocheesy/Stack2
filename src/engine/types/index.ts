@@ -110,11 +110,8 @@ export interface GameState {
   gamePhase: GamePhase;
   roundStats: [RoundStats, RoundStats, RoundStats];
   gameStats: [GamePlayerStats, GamePlayerStats, GamePlayerStats];
-  // Doctrine 2.7 — Forced-Placement Dump: true when only one player has
-  // cards left and they have just placed. Captures are locked out until
-  // a new hand is dealt or a new round starts.
   dumpActive: boolean;
-  // Doctrine 5.4 — true during gamePhase === 'roundEnd' when the round-end
+  // RULES.md Law 11 — true during gamePhase === 'roundEnd' when the round-end
   // was triggered by tied leaders at/above target (overtime continuation).
   isOvertime: boolean;
 }
@@ -168,7 +165,7 @@ export type TurnResult =
       scores: Scores;
       jackpotResult: JackpotResult | null;
       newDealer: PlayerIndex;
-      isOvertime: boolean; // doctrine 5.4 — true when round-end was a tie at/above target
+      isOvertime: boolean; // RULES.md Law 11 — true when round-end was a tie at/above target
     }
   | {
       type: 'END_GAME';

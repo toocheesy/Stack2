@@ -31,7 +31,7 @@ interface Props {
   // can see tutorialActive from its first render (freeze ticket). GameView
   // just renders the overlay and consults visible for ghost SUBMIT/RESET.
   tutorial: TutorialApi;
-  // Bundle C — when an Adventure overlay (LevelCompleteOverlay etc.) is
+  // When an Adventure overlay (LevelCompleteOverlay etc.) is
   // showing from App.tsx, suppress the in-game toast layer. App passes
   // !!levelComplete here so the toast logic doesn't need to know about
   // overlays it can't directly observe.
@@ -74,11 +74,7 @@ export function GameView({
   // when the player has built a combo).
   const tutorialShowGhostActions = tutorial.visible;
   const [error, setError] = useState<string | null>(null);
-  // tap-bug fix (May 25): drag-only model. The previous tap-to-select flow
-  // (selectedHandCard state + handleBoardTap/handleHandTap/handleSlotTap/
-  // handleBoardAreaTap) was retired entirely — tapping a table card was
-  // routing it into the next open combo slot, which was nonsense. Drag is
-  // now the only path into the builder; taps on cards do nothing.
+  // Drag is the only path into the builder; taps on cards do nothing.
   const [hoveredSlot, setHoveredSlot] = useState<ComboSlot | null>(null);
   const [hoveredBoard, setHoveredBoard] = useState(false);
   const [draggingCardId, setDraggingCardId] = useState<string | null>(null);
@@ -111,7 +107,7 @@ export function GameView({
   const bot1HandVisible = botCombo?.playerIndex === 1 ? state.hands[1].filter(c => c.id !== botCombo.baseCard.id) : state.hands[1];
   const bot2HandVisible = botCombo?.playerIndex === 2 ? state.hands[2].filter(c => c.id !== botCombo.baseCard.id) : state.hands[2];
 
-  // Bundle A S2 — active-turn glow gates on gamePhase. Glow MUST clear when
+  // Active-turn glow gates on gamePhase. Glow MUST clear when
   // gamePhase moves to roundEnd / jackpot / gameOver so the overlay messaging
   // doesn't compete with a leftover active-player highlight.
   const inPlay = state.gamePhase === 'playing';
@@ -119,7 +115,7 @@ export function GameView({
   const bot1Active = inPlay && state.currentPlayer === 1;
   const bot2Active = inPlay && state.currentPlayer === 2;
 
-  // Bundle A S4 — score-state escalation. Once a player crosses 80% of target,
+  // Score-state escalation. Once a player crosses 80% of target,
   // their score number transitions white → tan over ~500ms ease-in. Scores are
   // monotonic within a round, so the boolean naturally resets when scores
   // reset for the next round (round-boundary clear).
@@ -204,8 +200,8 @@ export function GameView({
     };
   }, [state.combination, botCombo]);
 
-  // ── Bundle C — Persistent strip content (LAST capture echo) ──
-  // Empty when no capture has happened yet; the header (Bundle B) carries
+  // ── Persistent strip content (LAST capture echo) ──
+  // Empty when no capture has happened yet; the header carries
   // round info so we don't need to repeat it here.
 
   const persistentMessage = useMemo(() => {
@@ -215,7 +211,7 @@ export function GameView({
     return { prefix: 'LAST · ', equation: `${base} = ${areas}` };
   }, [lastCapture]);
 
-  // ── Bundle C — Adventure hint copy (routed through toast layer below) ──
+  // ── Adventure hint copy (routed through toast layer below) ──
 
   const hintText = useMemo(() => {
     if (!state.settings.hintStripEnabled) return null;
@@ -226,14 +222,14 @@ export function GameView({
     return 'Drag a card to start your turn';
   }, [state.settings.hintStripEnabled, state.gamePhase, isPlayerTurn, hasCombo, comboValid]);
 
-  // ── Bundle C — Toast layer state machine ──
+  // ── Toast layer state machine ──
   // Three toast kinds:
   //   - celebration: 2s, +pts · NICE COMBO, tan
   //   - transition:  3s, R[N] · FRESH DECK, white
   //   - hint:        persistent until cleared by player action / interrupt
   // Priority: celebration > transition > hint > none. Higher preempts lower.
   // Suppressed entirely whenever an overlay (RoundEnd/Jackpot/GameOver/
-  // LevelComplete) is showing — closes UX Review finding 9.
+  // LevelComplete) is showing.
 
   type TransientKind = 'celebration' | 'transition';
   type Transient = { kind: TransientKind; text: string; color: string; expires: number };
@@ -365,7 +361,7 @@ export function GameView({
         </motion.button>
       </div>
 
-      {/* ═══ ZONE B — MESSAGE STRIP (Bundle C: persistent + toast) ═══
+      {/* ═══ ZONE B — MESSAGE STRIP (persistent + toast) ═══
            Persistent layer is always rendered (transparent strip carrying
            the LAST capture echo). Toast layer animates in/out over the top
            with celebration/transition/hint content. */}
@@ -431,7 +427,7 @@ export function GameView({
         </AnimatePresence>
       </div>
 
-      {/* ═══ ZONES C+D — BOT ZONES (Bundle B S2) ═══
+      {/* ═══ ZONES C+D — BOT ZONES ═══
             Two-line layout. When both bots share a personality (Adventure
             W1 Calvin+Calvin etc.), seats lock to "Name · 1" / "Name · 2"
             for player-side disambiguation. Position-locked at game start
@@ -463,7 +459,7 @@ export function GameView({
         position: 'relative', zIndex: 15, minHeight: 0, overflow: 'visible',
         transition: 'border 150ms',
       }}>
-        {/* Bundle A S5 — jackpot board tint. Tan #E8C577 @ 6% during the
+        {/* Jackpot board tint. Tan #E8C577 @ 6% during the
              jackpot hand (deck.length===0 + still playing). Coexists with the
              deckEmpty amber border glow above; different signal: tint = "this
              is the jackpot hand", glow = "this hand is ending soon." */}
@@ -561,7 +557,7 @@ export function GameView({
       <div ref={handZoneRef} style={{
         display: 'flex', padding: '0 8px 8px', gap: 8, flexShrink: 0,
       }}>
-        {/* Zone H — Player score block. Bundle A S2 active-turn glow:
+        {/* Zone H — Player score block. Active-turn glow:
               3px tan border + breathing 16px outer + 4px inset. Phase-gated. */}
         <motion.div
           animate={playerActive ? {
@@ -591,11 +587,9 @@ export function GameView({
           <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
             /{target}
           </span>
-          {/* Bundle B — card count moved to Zone A header; the "X cards" line
-              that used to live here was deleted per spec section 1. */}
         </motion.div>
 
-        {/* Zone G — Your hand. Bundle A S2 glow same treatment as Zone H. */}
+        {/* Zone G — Your hand. Same active-turn glow as Zone H. */}
         <motion.div
           animate={playerActive ? {
             boxShadow: [
@@ -680,7 +674,7 @@ export function GameView({
 
 // ─── Tutorial marks (verbatim copy + zone refs) ─────────
 // Teaching order: bottom (your stuff) → middle (workspace) → controls →
-// upper middle (opponents) → top (context). Per Decision Log May 25.
+// upper middle (opponents) → top (context).
 
 interface TutorialMarkRefs {
   handZoneRef: React.RefObject<HTMLDivElement | null>;
@@ -713,8 +707,8 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
   hand: readonly Card[]; active: boolean; thinking: boolean;
   escalated: boolean;
 }) {
-  // Bundle A S2 — active-turn glow (3px border + breathing 16px outer + 4px inset).
-  // Bundle B S2 — two-line layout: name (top) + score (middle) + face-down cards (bottom).
+  // Active-turn glow (3px border + breathing 16px outer + 4px inset).
+  // Two-line layout: name (top) + score (middle) + face-down cards (bottom).
   return (
     <motion.div
       animate={active ? {
@@ -734,7 +728,7 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
         transition: 'border 200ms',
         minWidth: 0,
       }}>
-      {/* Name line — Inter Medium 14px, bot color @ 100% (per spec section 4) */}
+      {/* Name line — Inter Medium 14px, bot color @ 100% */}
       <span style={{
         fontFamily: 'Inter, system-ui, sans-serif',
         fontSize: 14, fontWeight: 500, color,
@@ -743,8 +737,8 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
         {name}{thinking ? ' …' : ''}
       </span>
 
-      {/* Score line — `[score] /[target]` format per spec section 4.
-            Score: Inter Black 22px, white@90% → tan@90% at 80% threshold (Bundle A S4).
+      {/* Score line — `[score] /[target]` format.
+            Score: Inter Black 22px, white@90% → tan@90% at 80% threshold.
             Suffix: Inter Medium 12px, white@50%. */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
         <motion.span
@@ -781,7 +775,7 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
 function Btn({ label, primary, disabled, big, onClick }: {
   label: string; primary?: boolean; disabled?: boolean; big?: boolean; onClick: () => void;
 }) {
-  // Bundle A S3 — secondary outlined spec: 1.5px white@40% border, white@90% text,
+  // Secondary outlined style: 1.5px white@40% border, white@90% text,
   // transparent fill. Primary keeps jade for in-game CTAs (SUBMIT / RESUME).
   return (
     <motion.button onClick={onClick} disabled={disabled} whileTap={disabled ? undefined : { scale: 0.97 }} transition={getTransition('snappy')} style={{
@@ -802,10 +796,8 @@ function Btn({ label, primary, disabled, big, onClick }: {
 // Min-width:0 + overflow:hidden on the container give natural
 // truncation if width is tight.
 //
-// Marcus Build 2 audit (May 15): H[N]/[total] reverted to bare H[N].
-// Display no longer bakes a hands-per-round structural assumption
-// into UI copy — survives engine variants (different hand size,
-// player count, deck composition, future game modes).
+// H[N] shows the hand number alone, with no hands-per-round total, so
+// the header holds for any hand size, player count or game mode.
 
 function HeaderSegments({
   mode, targetOrLevel, round, hand,

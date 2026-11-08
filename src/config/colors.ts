@@ -30,14 +30,16 @@ export const C = {
   botWisteria: '#BE96FF',
 } as const;
 
-/** Card drop shadows. cardFull is tokens.json's card-full shadow without its
+/** Drop shadows. cardFull is tokens.json's card-full shadow without its
  *  ring, which Card.tsx adds from cardRing at the size's ring width; cardHand
- *  and cardTable are the hand and table cards' shadows as GB2 draws them.
- *  The capture-slot card has no shadow. */
+ *  and cardTable are the hand and table cards' shadows as GB2 draws them, and
+ *  bubble is an opponent's speech bubble's (GB2, release 2). The capture-slot
+ *  card has no shadow. */
 export const SHADOWS = {
   cardFull: '0 18px 40px #033019e6',
   cardHand: '0 10px 18px #021F10E6',
   cardTable: '0 6px 12px #021F10D9',
+  bubble: '0 6px 14px #021F10D9',
 } as const;
 
 /** A colour at an alpha, as an eight-digit hex: alpha(C.ink.classic, 0.5). */

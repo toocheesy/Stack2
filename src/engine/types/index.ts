@@ -37,14 +37,21 @@ export type GamePhase = 'playing' | 'jackpot' | 'roundEnd' | 'gameOver';
 
 export interface CaptureRecord {
   points: number;
+  // Every captured card, base first.
   cards: Card[];
   baseCard: Card;
+  // Each filled combo's cards in slot order (combo1, combo2, combo3), the
+  // base not included (D-007 ruling 96).
+  combos: Card[][];
 }
 
 export interface RoundStats {
   // A per-round extra for the round-end screen only (S-006). Nothing else reads it.
   pointsThisRound: number;
   highestCapture: CaptureRecord | null;
+  // RULES.md Law 10: true for the one player who took the table this round
+  // (D-007 ruling 97). A take is not a capture for highestCapture.
+  tookTheTable: boolean;
 }
 
 export interface GamePlayerStats {

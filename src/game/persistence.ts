@@ -1,14 +1,16 @@
-import type { Card, CaptureRecord, GameState, Scores } from '../engine/types';
+import type { Card, CaptureRecord, GamePlayerStats, GameState, RoundStats, Scores } from '../engine/types';
 import { cardId } from '../engine/utils/cardId';
 import { botStreamSeed } from '../engine/utils/prng';
 
 // Saves (S-006): one slot per mode. Classic and The Run each read, write and
-// clear only their own key. Schema version 5 (S-008) holds the game, its mode,
-// its seed and where each stream stands; the bots' card memory is read from
-// the game state and no longer saved. A version-4 save in a slot converts on
-// load. An old single-slot save under LEGACY_KEY (schema 3, 2 or the bare-game
-// shape) is converted once into the slot its currentLevelId names, then the
-// old key is removed.
+// clear only their own key. Schema version 6 (D-007 release 2) holds the
+// game, its mode, its seed and where each stream stands. A version-5 save in
+// a slot (S-008: no tracker) converts on load: every capture record gains its
+// combos and every round's stats gain tookTheTable. A version-4 save (S-006:
+// the bots' card memory beside the game, now read from the game instead)
+// goes through the same step. An old single-slot save under LEGACY_KEY
+// (schema 3, 2 or the bare-game shape) is converted once into the slot its
+// currentLevelId names, then the old key is removed.
 
 export type SaveMode = 'classic' | 'run';
 
@@ -17,9 +19,9 @@ const SLOT_KEYS: Record<SaveMode, string> = {
   classic: 'stacked-save-classic',
   run: 'stacked-save-run',
 };
-const SCHEMA_VERSION = 5;
-// Version 4 (S-006) carried the bots' card memory as well; dropping it is the whole conversion.
-const PREVIOUS_VERSION = 4;
+const SCHEMA_VERSION = 6;
+// Versions a slot may still hold: 5 (no combos, no tookTheTable) and 4 (the same, with a tracker beside the game).
+const READABLE_VERSIONS = [SCHEMA_VERSION, 5, 4];
 
 export function saveModeFor(currentLevelId: number | null): SaveMode {
   return currentLevelId === null ? 'classic' : 'run';
@@ -63,7 +65,7 @@ export function saveGame(mode: SaveMode, save: SavedGame): void {
 }
 
 // mountSeed: the seed the controller was mounted with. An old save has no seed
-// and takes this one on conversion; a version-4 or version-5 save carries its own.
+// and takes this one on conversion; a version-4, 5 or 6 save carries its own.
 export function loadGame(mode: SaveMode, mountSeed: number): SavedGame | null {
   convertLegacySave(mountSeed);
   try {
@@ -71,7 +73,7 @@ export function loadGame(mode: SaveMode, mountSeed: number): SavedGame | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<PersistedSnapshot>;
     if (
-      (parsed.version !== SCHEMA_VERSION && parsed.version !== PREVIOUS_VERSION) ||
+      !READABLE_VERSIONS.includes(parsed.version as number) ||
       !parsed.game ||
       !isValidGameShape(parsed.game) ||
       typeof parsed.seed !== 'number' ||
@@ -82,13 +84,14 @@ export function loadGame(mode: SaveMode, mountSeed: number): SavedGame | null {
       return null;
     }
     const save: SavedGame = {
-      game: { ...parsed.game, dumpActive: parsed.game.dumpActive ?? false },
+      game: completeGame({ ...parsed.game, dumpActive: parsed.game.dumpActive ?? false }),
       currentLevelId: typeof parsed.currentLevelId === 'number' ? parsed.currentLevelId : null,
       seed: parsed.seed,
       dealStream: parsed.dealStream,
       botStream: parsed.botStream,
     };
-    // A version-4 save: its tracker is left behind and the slot is rewritten now.
+    // An older save: its slot is rewritten at the current version now (a
+    // version-4 save's tracker is left behind with it).
     if (parsed.version !== SCHEMA_VERSION) saveGame(mode, save);
     return save;
   } catch {
@@ -107,6 +110,31 @@ export function clearSavedGame(mode: SaveMode): void {
   } catch {
     // ignore
   }
+}
+
+// ─── Version 6 (D-007 release 2, rulings 96 and 97) ──
+
+// A record saved before version 6 has no combos: it gets one combo holding
+// its cards without the base.
+function completeRecord(record: CaptureRecord | null | undefined): CaptureRecord | null {
+  if (!record) return null;
+  if (Array.isArray(record.combos)) return record;
+  return { ...record, combos: [record.cards.filter((c) => c.id !== record.baseCard.id)] };
+}
+
+// Fills what version 6 added and an older save lacks; a version-6 game comes
+// back as it was. Nothing else in the game changes.
+function completeGame(game: GameState): GameState {
+  const roundStats = game.roundStats.map((r) => ({
+    ...r,
+    highestCapture: completeRecord(r.highestCapture),
+    tookTheTable: r.tookTheTable ?? false,
+  })) as [RoundStats, RoundStats, RoundStats];
+  const gameStats = game.gameStats.map((g) => ({
+    ...g,
+    highestCapture: completeRecord(g.highestCapture),
+  })) as [GamePlayerStats, GamePlayerStats, GamePlayerStats];
+  return { ...game, roundStats, gameStats };
 }
 
 // ─── Conversion of the old single-slot save ─────────
@@ -189,12 +217,13 @@ function convertOldSave(parsed: unknown, mountSeed: number): SavedGame | null {
   const roundStats = [0, 1, 2].map((i) => ({
     pointsThisRound: old.roundStats?.[i]?.roundScore ?? 0,
     highestCapture: renewRecord(old.roundStats?.[i]?.highestCapture),
+    tookTheTable: false,
   })) as GameState['roundStats'];
   const gameStats = [0, 1, 2].map((i) => ({
     highestCapture: renewRecord(old.gameStats?.[i]?.highestCapture),
   })) as GameState['gameStats'];
 
-  const game: GameState = {
+  const game: GameState = completeGame({
     deck: renewAll(old.deck),
     board: renewAll(old.board),
     hands: [renewAll(old.hands[0]), renewAll(old.hands[1]), renewAll(old.hands[2])],
@@ -217,7 +246,7 @@ function convertOldSave(parsed: unknown, mountSeed: number): SavedGame | null {
     gameStats,
     dumpActive: old.dumpActive ?? false,
     isOvertime: old.isOvertime ?? false,
-  };
+  });
 
   const currentLevelId = typeof snapshot.currentLevelId === 'number' ? snapshot.currentLevelId : null;
   // An old save has no seed: it takes the mount seed, and both streams start fresh from it.

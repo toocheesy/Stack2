@@ -1,16 +1,20 @@
-import { AnimatePresence, motion } from 'motion/react';
-import type { CaptureRecord, Difficulty, GamePlayerStats, GameState, PlayerIndex } from '../engine/types';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import type { Difficulty, GameState, PlayerIndex } from '../engine/types';
 import { SCORE_KEYS } from '../engine/types';
-import { C, alpha } from '../config/colors';
+import { C } from '../config/colors';
 import { FONTS } from '../config/fonts';
 import { getTransition } from '../config/motion';
+import { CardComponent } from './Card';
+import { SHEET_DIM, SHEET_GLOW, sheetColourOf } from './board/sheet';
+import { captureLine } from './board/words';
 
-const BOT_DISPLAY: Record<Difficulty, { name: string; color: string }> = {
-  beginner:     { name: 'Calvin', color: C.line.classic },
-  intermediate: { name: 'Nina',   color: C.botAzure },
-  advanced:     { name: 'Rex',    color: C.botWisteria },
-  expert:       { name: 'Jett',   color: C.line.classic },
-};
+// Game over, GO2 The Crown (D-007 rulings 72 and 73): a framed plum card
+// lifted off the dimmed table, with the round end sheet's colours, its gold
+// edge and glow. The result big, the winner's best capture of the game held
+// up at hand size, and a podium with the winner's step in the winner's
+// colour: gold only when you win. Never a tie (RULES.md Law 11).
+
+const NAMES: Record<Difficulty, string> = { beginner: 'Calvin', intermediate: 'Nina', advanced: 'Rex', expert: 'Jett' };
 
 interface Props {
   winner: { winner: PlayerIndex; winnerName: string } | null;
@@ -20,161 +24,102 @@ interface Props {
   onHome: () => void;
 }
 
-function getPlayerDisplay(idx: PlayerIndex, state: GameState): { name: string; color: string } {
-  if (idx === 0) return { name: 'YOU', color: C.accent.classic };
-  const d = idx === 1 ? state.settings.bot1Personality : state.settings.bot2Personality;
-  const b = BOT_DISPLAY[d];
-  return { name: b.name, color: b.color };
-}
-
-function formatHighest(record: CaptureRecord | null): string | null {
-  if (!record) return null;
-  const others = record.cards.filter((c) => c.id !== record.baseCard.id);
-  if (others.length === 0) return record.baseCard.rank;
-  return `${record.baseCard.rank} = ${others.map((c) => c.rank).join('+')}`;
-}
-
 export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onHome }: Props) {
+  const calm = useReducedMotion();
   if (!winner) return null;
 
   const target = state.settings.targetScore;
-  const winnerDisplay = getPlayerDisplay(winner.winner, state);
-  const isHumanWin = winner.winner === 0;
+  const nameOf = (idx: PlayerIndex) => (idx === 0 ? 'You' : NAMES[idx === 1 ? state.settings.bot1Personality : state.settings.bot2Personality]);
+  const players = ([0, 1, 2] as PlayerIndex[]).map((idx) => ({
+    idx,
+    name: nameOf(idx),
+    colour: sheetColourOf(idx, state),
+    score: state.overallScores[SCORE_KEYS[idx]],
+  }));
+  // Finishing order: by score, then by seat. The winner is first (Law 11).
+  const order = [...players].sort((a, b) => b.score - a.score || a.idx - b.idx);
+  const [first, second, third] = order;
+  const you = winner.winner === 0;
+  const winnerColour = sheetColourOf(winner.winner, state);
+  const winnerName = nameOf(winner.winner);
+  const best = state.gameStats[winner.winner].highestCapture;
+  const opponents = `${NAMES[state.settings.bot1Personality]} and ${NAMES[state.settings.bot2Personality]}`;
 
-  const players: { idx: PlayerIndex; name: string; color: string; score: number; stats: GamePlayerStats }[] = (
-    [0, 1, 2] as PlayerIndex[]
-  ).map((idx) => {
-    const d = getPlayerDisplay(idx, state);
-    return {
-      idx,
-      name: d.name,
-      color: d.color,
-      score: state.overallScores[SCORE_KEYS[idx]],
-      stats: state.gameStats[idx],
-    };
-  });
-  players.sort((a, b) => b.score - a.score);
-
-  const winnerStats = state.gameStats[winner.winner];
-  const bestEver = formatHighest(winnerStats.highestCapture);
+  const step = (p: typeof first, place: '1ST' | '2ND' | '3RD', height: number) => {
+    const win = place === '1ST';
+    return (
+      <div key={p.idx} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, minWidth: 0 }}>
+        <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 18, color: p.colour, whiteSpace: 'nowrap' }}>{p.name}</span>
+        <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 24, lineHeight: 1, color: C.classicSheetInk }}>{p.score}</span>
+        <div style={{
+          width: '100%', height, boxSizing: 'border-box', borderRadius: '8px 8px 0 0',
+          background: win ? winnerColour : C.classicSheetDeep, border: `1px solid ${win ? winnerColour : C.classicSheetLine}`,
+          display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 10,
+          fontSize: 12, fontWeight: 700, letterSpacing: '0.12em', color: win ? C.classicTable : C.classicSheetMuted,
+        }}>
+          {place}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.3 }}
-        style={{
-          position: 'fixed', inset: 0,
-          background: alpha(C.classicTable, 0.85),
-          display: 'flex', flexDirection: 'column',
-          alignItems: 'center', justifyContent: 'center',
-          gap: 16, zIndex: 200, padding: '24px 16px',
-        }}
-      >
-        {/* Winner section */}
-        <span style={{
-          fontSize: 11, fontWeight: 600, letterSpacing: 2,
-          color: C.muted.classic, fontFamily: FONTS.sans,
-          textTransform: 'uppercase',
-        }}>
-          {isHumanWin ? 'VICTORY' : 'GAME OVER'}
-        </span>
-
-        <motion.h1
-          initial={{ scale: 0.8 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 22 }}
+      <motion.div key="game-over" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: SHEET_DIM }} />
+        <motion.section
+          aria-label="Game over"
+          initial={calm ? { opacity: 0 } : { opacity: 0, scale: 0.96 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.3, ease: 'easeOut' }}
           style={{
-            fontSize: 28, fontWeight: 400, margin: 0,
-            fontFamily: FONTS.display,
-            color: winnerDisplay.color,
+            position: 'absolute', left: 14, right: 14, top: 56, bottom: 18, boxSizing: 'border-box', padding: '24px 18px 18px',
+            background: C.classicSheet, border: `2px solid ${C.classicGold}`, borderRadius: 20, boxShadow: SHEET_GLOW,
+            display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, textAlign: 'center', overflowY: 'auto', touchAction: 'pan-y',
+            fontFamily: FONTS.sans, color: C.classicSheetInk,
           }}
         >
-          {isHumanWin ? 'YOU WIN!' : `${winnerDisplay.name} Wins`}
-        </motion.h1>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.16em', color: C.classicSheetMuted }}>GAME OVER · {state.currentRound} {state.currentRound === 1 ? 'ROUND' : 'ROUNDS'}</div>
+          <h2 style={{ margin: 0, fontFamily: FONTS.display, fontWeight: 400, fontSize: 52, lineHeight: 1.02, color: you ? C.classicGold : C.classicSheetInk }}>
+            {you ? 'You win!' : <><span style={{ color: winnerColour }}>{winnerName}</span> wins</>}
+          </h2>
 
-        <span style={{
-          fontSize: 24, fontWeight: 700,
-          fontFamily: FONTS.sans,
-          color: C.ink.classic,
-        }}>
-          {players[0].score}<span style={{ fontSize: 14, color: C.muted.classic, opacity: 0.6 }}>/{target}</span>
-        </span>
-
-        {bestEver && (
-          <span style={{
-            fontSize: 11, color: C.muted.classic,
-            fontFamily: FONTS.sans,
-          }}>
-            Best capture: {bestEver}
-            <span style={{ color: C.accent.classic, fontWeight: 600 }}> +{winnerStats.highestCapture!.points}</span>
-          </span>
-        )}
-
-        {/* All players */}
-        <div style={{ width: '100%', maxWidth: 300, display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-          {players.map((p) => {
-            const isWinner = p.idx === winner.winner;
-            return (
-              <div key={p.idx} style={{
-                padding: '8px 12px', borderRadius: 6,
-                background: isWinner ? alpha(C.ink.classic, 0.06) : alpha(C.ink.classic, 0.02),
-                borderLeft: `3px solid ${p.color}`,
-                opacity: isWinner ? 1 : 0.7,
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              }}>
-                <span style={{
-                  fontSize: isWinner ? 13 : 12, fontWeight: isWinner ? 700 : 500,
-                  color: p.color, fontFamily: FONTS.sans,
-                  textTransform: 'uppercase',
-                }}>
-                  {p.name}
-                </span>
-                <span style={{
-                  fontSize: isWinner ? 18 : 14, fontWeight: 700,
-                  fontFamily: FONTS.sans,
-                  color: isWinner ? C.ink.classic : C.muted.classic,
-                }}>
-                  {p.score}
-                </span>
+          {best && (
+            <div style={{ marginTop: 4, padding: '16px 18px 14px', borderRadius: 14, background: C.classicSheetDeep, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+              <div style={{ display: 'flex', gap: 14 }}>
+                {best.cards.map((c) => <CardComponent key={c.id} card={c} size="hand" />)}
               </div>
-            );
-          })}
-        </div>
+              <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.14em', color: C.classicSheetMuted }}>{you ? 'YOUR' : `${winnerName.toUpperCase()}'S`} BEST CAPTURE</span>
+              <span>
+                <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 22, color: C.classicSheetInk }}>{captureLine(best)}</span>
+                <span style={{ fontSize: 15, fontWeight: 700, color: C.classicSheetInk }}>{'  '}+{best.points}</span>
+              </span>
+            </div>
+          )}
 
-        {/* Buttons */}
-        <div style={{ display: 'flex', gap: 12, marginTop: 12 }}>
-          <motion.button
-            onClick={onPlayAgain}
-            whileTap={{ scale: 0.97 }}
-            transition={getTransition('snappy')}
-            style={{
-              padding: '12px 28px', borderRadius: 6,
-              border: 'none',
-              background: C.classicGold,
-              color: C.classicTable,
-              fontSize: 15, fontWeight: 700,
-              fontFamily: FONTS.sans, cursor: 'pointer',
-            }}
-          >
-            PLAY AGAIN
-          </motion.button>
-          <motion.button
-            onClick={onHome}
-            whileTap={{ scale: 0.97 }}
-            transition={getTransition('snappy')}
-            style={{
-              padding: '12px 24px', borderRadius: 6,
-              border: `1.5px solid ${alpha(C.ink.classic, 0.4)}`,
-              background: 'transparent',
-              color: alpha(C.ink.classic, 0.9), fontSize: 15, fontWeight: 600,
-              fontFamily: FONTS.sans, cursor: 'pointer',
-            }}
-          >
-            {adventureMode ? 'WORLD MAP' : 'HOME'}
-          </motion.button>
-        </div>
+          <div style={{ width: '100%', marginTop: 'auto', display: 'flex', alignItems: 'flex-end', gap: 8, borderBottom: `2px solid ${C.classicSheetLine}` }}>
+            {step(second, '2ND', 96)}
+            {step(first, '1ST', 132)}
+            {step(third, '3RD', 72)}
+          </div>
+          <div style={{ width: '100%', fontSize: 12, color: C.classicSheetMuted }}>Target {target}</div>
+
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <motion.button type="button" onClick={onPlayAgain} whileTap={{ scale: 0.98 }} transition={getTransition('snappy')} style={{
+              width: '100%', height: 56, borderRadius: 6, border: 'none', background: C.classicGold, fontFamily: FONTS.sans,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, color: C.classicTable, cursor: 'pointer',
+            }}>
+              <span style={{ fontSize: 15, fontWeight: 700, letterSpacing: '0.18em' }}>PLAY AGAIN</span>
+              <span style={{ fontSize: 11, fontWeight: 600 }}>{opponents} · to {target}</span>
+            </motion.button>
+            <motion.button type="button" onClick={onHome} whileTap={{ scale: 0.98 }} transition={getTransition('snappy')} style={{
+              width: '100%', height: 46, borderRadius: 6, border: `1.5px solid ${C.classicSheetInk}`, background: 'transparent', fontFamily: FONTS.sans,
+              fontSize: 14, fontWeight: 700, letterSpacing: '0.16em', color: C.classicSheetInk, cursor: 'pointer',
+            }}>
+              {adventureMode ? 'WORLD MAP' : 'HOME'}
+            </motion.button>
+          </div>
+        </motion.section>
       </motion.div>
     </AnimatePresence>
   );

@@ -45,7 +45,7 @@ function state(over: Partial<GameState> & { hand?: string[]; table?: string[]; b
 }
 
 function move(over: Partial<LastMove>): LastMove {
-  return { player: 0, captures: [], placed: null, rest: [], round: 1, hand: 1, next: null, ...over };
+  return { id: 1, player: 0, captures: [], placed: null, rest: [], round: 1, hand: 1, next: null, before: state(), ...over };
 }
 const ONE_CAPTURE = { combination: build('5H', [fromTable('5C')]), points: 10 };
 

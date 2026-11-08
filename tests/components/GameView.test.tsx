@@ -88,12 +88,14 @@ describe('the game board (GB2)', () => {
     expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
     expect(screen.getByText('Nina')).toBeTruthy();
     expect(screen.getByText('Rex')).toBeTruthy();
-    expect(screen.getAllByText('0 / 300')).toHaveLength(2);
+    // The scores pop when they change, so each sits in its own span inside the line.
+    const lineOf = (text: string) => screen.getAllByText((_, el) => el?.tagName === 'SPAN' && el.textContent === text && el.children.length > 0);
+    expect(lineOf('0 / 300')).toHaveLength(2);
     expect(screen.getAllByText('4 CARDS')).toHaveLength(2);
     expect(screen.getByText('Your turn. Pick a base card to start a capture.')).toBeTruthy();
     expect(screen.getByText('DECK 36')).toBeTruthy();
     expect(screen.getByText('YOUR TURN')).toBeTruthy();
-    expect(screen.getByText('You 0 / 300')).toBeTruthy();
+    expect(lineOf('You 0 / 300')).toHaveLength(1);
     expect(screen.queryByText('YOUR CAPTURE')).toBeNull();
     expect(screen.queryByText('SUBMIT')).toBeNull();
     expect(screen.queryByText(/NICE COMBO|FRESH DECK|LAST ·/)).toBeNull();

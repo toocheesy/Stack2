@@ -176,7 +176,11 @@ describe('applyJackpot stat tracking', () => {
     expect(jackpotResult!.points).toBe(25);
     expect(result.roundStats[1].pointsThisRound).toBe(25);
     expect(result.overallScores.bot1).toBe(25);
-    expect(result.roundStats[1].highestCapture!.points).toBe(25);
+    // D-007 ruling 97: a take is not a capture for best captures; the taker's round marks it.
+    expect(result.roundStats[1].highestCapture).toBeNull();
+    expect(result.roundStats[1].tookTheTable).toBe(true);
+    expect(result.roundStats[0].tookTheTable).toBe(false);
+    expect(result.roundStats[2].tookTheTable).toBe(false);
   });
 });
 

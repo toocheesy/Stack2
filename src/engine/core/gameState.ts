@@ -28,7 +28,7 @@ function emptyCombination(): GameState['combination'] {
 }
 
 function emptyRoundStats(): RoundStats {
-  return { pointsThisRound: 0, highestCapture: null };
+  return { pointsThisRound: 0, highestCapture: null, tookTheTable: false };
 }
 
 function emptyGameStats(): GamePlayerStats {
@@ -183,10 +183,16 @@ export function executeCapture(
 
   const baseCard = combination.base ?? allCapturedCards[0];
   if (baseCard) {
+    // The record keeps the capture's shape: each filled combo's cards in slot
+    // order, the base apart (D-007 ruling 96).
+    const combos = [combination.combo1, combination.combo2, combination.combo3]
+      .filter((groups) => groups.length > 0)
+      .map((groups) => groups.map((g) => g.card));
     result = maybeUpdateHighest(result, state.currentPlayer, {
       points: totalPoints,
       cards: allCapturedCards,
       baseCard,
+      combos,
     });
   }
 
@@ -246,6 +252,9 @@ export function placeRestOfHand(state: GameState): GameState {
   };
 }
 
+// RULES.md Law 10: the round's last capturer takes every card left on the
+// board at their scoring-table values. The take is not a capture: it never
+// becomes a highestCapture (D-007 ruling 97); the taker's round marks it.
 export function applyJackpot(state: GameState): {
   state: GameState;
   jackpotResult: JackpotResult | null;
@@ -257,14 +266,11 @@ export function applyJackpot(state: GameState): {
   const points = calculateCardsPoints(state.board);
   const cardCount = state.board.length;
   const message = `${PLAYER_NAMES[player]} sweeps ${cardCount} board cards for ${points} points`;
-  let scored = addScore(state, player, points);
-  scored = maybeUpdateHighest(scored, player, {
-    points,
-    cards: state.board.slice(),
-    baseCard: state.board[0],
-  });
+  const scored = addScore(state, player, points);
+  const roundStats = [...scored.roundStats] as [RoundStats, RoundStats, RoundStats];
+  roundStats[player] = { ...roundStats[player], tookTheTable: true };
   return {
-    state: { ...scored, board: [] },
+    state: { ...scored, roundStats, board: [] },
     jackpotResult: { player, points, cardCount, message },
   };
 }

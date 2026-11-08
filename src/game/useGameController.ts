@@ -8,6 +8,7 @@ import type {
   GameState,
   PlayerIndex,
   Rank,
+  Scores,
   Suit,
 } from '../engine/types';
 import {
@@ -73,12 +74,15 @@ export interface MoveCapture {
   points: number;
 }
 
-/** The last move made, for the board's message line (D-007 ruling 95) and the
- *  opponents' speech bubbles (GB2). A turn's captures build up until the turn
- *  ends with a place or an empty hand; another player's move replaces it, a
- *  new deal or round clears it, and so does your staging a card. App.tsx
- *  passes it to GameView under its name from before release 2, lastCapture. */
+/** The last move made, for the board's message line (D-007 ruling 95), the
+ *  opponents' speech bubbles (GB2) and the board's motion (YC1, the last
+ *  cards landing). A turn's captures build up until the turn ends with a
+ *  place or an empty hand; another player's move replaces it, a new deal or
+ *  round clears it, and so does your staging a card. App.tsx passes it to
+ *  GameView under its name from before release 2, lastCapture. */
 export interface LastMove {
+  /** Counts up with every move, so the board plays each move's motion once. */
+  id: number;
   player: PlayerIndex;
   captures: MoveCapture[];
   /** The card placed to end the turn; null while the turn goes on. */
@@ -91,6 +95,41 @@ export interface LastMove {
   /** After a capture that emptied your hand: the next player holding cards
    *  (RULES.md Law 12); null otherwise. */
   next: PlayerIndex | null;
+  /** The game as it stood before the move, for the board's motion. */
+  before: GameState;
+}
+
+/** Take the Table on show (TT1, RULES.md Law 10): who takes it, the cards as
+ *  they lay and the scores before, for the board's motion. App.tsx passes it
+ *  to GameView as jackpotInfo. */
+export interface TakeTheTableMoment {
+  id: number;
+  winner: PlayerIndex;
+  points: number;
+  cardCount: number;
+  cards: Card[];
+  scoresBefore: Scores;
+}
+
+/** The moments' timings in milliseconds, as the boards' notes give them. The
+ *  board reads them for its motion; the controller for when play moves on. */
+export const MOMENTS = {
+  /** YC1, your capture, about 1,020 ms from SUBMIT: the tray's chrome fades,
+   *  the cards fly to your bar, the message line changes, the score lands. */
+  yourCapture: { chromeOut: 140, cardStep: 60, cardFlight: 460, message: 640, land: 700, end: 1020, calm: { out: 180, land: 350, end: 750 } },
+  /** RULES.md Law 8 (ruling 44): the rest of a hand lands one card at a time,
+   *  then the last-cards line holds before play moves on. */
+  landing: { step: 80, flight: 400, hold: 1500 },
+  /** TT1, Take the Table, 2,500 ms: a beat, the cards fly to the taker, the
+   *  banner, the score lands, and RE1p's sheet starts to rise. */
+  takeTheTable: { hold: 240, step: 80, flight: 640, banner: 260, land: 1180, bannerEnd: 1760, sheet: 2120, end: 2500, calm: { out: 400, land: 500, bannerEnd: 1700, sheet: 2100 } },
+} as const;
+
+/** How long the last cards take to land and the line to hold (Law 8). */
+export function landingMs(restCount: number): number {
+  if (restCount <= 0) return 0;
+  const l = MOMENTS.landing;
+  return l.step * (restCount - 1) + l.flight + l.hold;
 }
 
 function wait(ms: number): Promise<void> {
@@ -187,20 +226,18 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     winnerName: string;
   } | null>(null);
   const [botCombo, setBotCombo] = useState<BotComboDisplay | null>(null);
-  const [jackpotInfo, setJackpotInfo] = useState<{
-    winner: PlayerIndex;
-    points: number;
-    cardCount: number;
-  } | null>(null);
+  const [jackpotInfo, setJackpotInfo] = useState<TakeTheTableMoment | null>(null);
 
   // The last move (D-007 release 2): a derived read for the board, not saved.
   // A reload starts with none, and the message line falls back to the rules
   // that read the state alone.
   const [lastMove, setLastMove] = useState<LastMove | null>(null);
   const lastMoveRef = useRef<LastMove | null>(null);
-  const recordMove = useCallback((m: LastMove | null) => {
-    lastMoveRef.current = m;
-    setLastMove(m);
+  const moveIdRef = useRef(0);
+  const recordMove = useCallback((m: Omit<LastMove, 'id'> | null) => {
+    const move = m ? { ...m, id: ++moveIdRef.current } : null;
+    lastMoveRef.current = move;
+    setLastMove(move);
   }, []);
 
   // Always-fresh ref to current state (avoids stale closures)
@@ -243,23 +280,42 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         const { state: afterJackpot, jackpotResult } = applyJackpot(current);
         setAndPersist(afterJackpot);
         if (jackpotResult) {
-          setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
-          await wait(2500);
+          // Take the Table plays (TT1): the sheet starts to rise before it ends.
+          setJackpotInfo({
+            id: ++moveIdRef.current,
+            winner: jackpotResult.player,
+            points: jackpotResult.points,
+            cardCount: jackpotResult.cardCount,
+            cards: current.board,
+            scoresBefore: current.overallScores,
+          });
+          await wait(MOMENTS.takeTheTable.sheet);
+          if (!mountedRef.current) return;
+          setAndPersist({ ...stateRef.current, gamePhase: 'roundEnd' as const, isOvertime: result.isOvertime });
+          await wait(MOMENTS.takeTheTable.end - MOMENTS.takeTheTable.sheet);
           if (!mountedRef.current) return;
           setJackpotInfo(null);
         } else {
           await wait(500);
           if (!mountedRef.current) return;
+          setAndPersist({ ...stateRef.current, gamePhase: 'roundEnd' as const, isOvertime: result.isOvertime });
         }
-        setAndPersist({ ...stateRef.current, gamePhase: 'roundEnd' as const, isOvertime: result.isOvertime });
         break;
       }
       case 'END_GAME': {
         const { state: afterJackpot, jackpotResult } = applyJackpot(current);
         setAndPersist(afterJackpot);
         if (jackpotResult) {
-          setJackpotInfo({ winner: jackpotResult.player, points: jackpotResult.points, cardCount: jackpotResult.cardCount });
-          await wait(2500);
+          // Take the Table plays, then game over.
+          setJackpotInfo({
+            id: ++moveIdRef.current,
+            winner: jackpotResult.player,
+            points: jackpotResult.points,
+            cardCount: jackpotResult.cardCount,
+            cards: current.board,
+            scoresBefore: current.overallScores,
+          });
+          await wait(MOMENTS.takeTheTable.end);
           if (!mountedRef.current) return;
           setJackpotInfo(null);
         }
@@ -274,6 +330,18 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       }
     }
   };
+
+  // Moves play on after a wait: when your capture empties your hand (YC1's
+  // land), and when the last cards land (Law 8). If play has moved on another
+  // way meanwhile, or the tutorial is open, the wait ends quietly.
+  function advanceLater(next: GameState, ms: number) {
+    void (async () => {
+      await wait(ms);
+      if (!mountedRef.current || tutorialActiveRef.current) return;
+      if (stateRef.current !== next) return;
+      await advanceRef.current(next);
+    })();
+  }
 
   // ─── Bot turn execution ───────────────────────────
 
@@ -372,6 +440,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     }
 
     let next: GameState;
+    let restPlaced = 0;
     if (botCombo && decision.captureDetails) {
       // Show the opponent's capture in the tray as it built it, slot by slot,
       // for the player to read; its speech bubble recaps it from here on.
@@ -384,6 +453,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         round: current.currentRound,
         hand: current.handNumber,
         next: null,
+        before: current,
       });
       setBotCombo({ playerIndex: player, combination: botCombo, points: botPoints, cards: botCards });
       await wait(2000);
@@ -391,7 +461,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       setBotCombo(null);
       // Freeze gate after bot-combo display — tutorial opened mid-show.
       if (tutorialActiveRef.current) {
-        recordMove(moveBefore);
+        lastMoveRef.current = moveBefore;
+        setLastMove(moveBefore);
         setBotViz(null);
         botBusyRef.current = false;
         return;
@@ -400,6 +471,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       next = executeCapture(current, botCombo);
     } else {
       const rest = restAfterPlace(current, player, decision.handCard.id);
+      restPlaced = rest.length;
       next = placeCard(current, decision.handCard.id);
       recordMove({
         player,
@@ -409,6 +481,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         round: current.currentRound,
         hand: current.handNumber,
         next: null,
+        before: current,
       });
     }
 
@@ -416,7 +489,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     setBotViz(null);
     botBusyRef.current = false;
 
-    await wait(500);
+    // The last cards land and the line holds (Law 8) before play moves on.
+    await wait(restPlaced > 0 ? landingMs(restPlaced) : 500);
     if (!mountedRef.current) return;
     // Freeze gate before recursive advance — tutorial opened after bot's
     // move resolved. State is already persisted; just stop the chain.
@@ -445,8 +519,16 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       void advanceRef.current(stateRef.current);
       return;
     }
-    if (!tutorialActive && stateRef.current.currentPlayer !== 0 && !botBusyRef.current && !gameOver) {
-      void runBotTurn(stateRef.current);
+    if (tutorialActive || botBusyRef.current || gameOver) return;
+    const s = stateRef.current;
+    if (s.currentPlayer !== 0) {
+      void runBotTurn(s);
+      return;
+    }
+    // A save made between your last move and its advance (your hand empty,
+    // the game still playing): play moves on now.
+    if (s.gamePhase === 'playing' && s.hands[0].length === 0) {
+      void advanceRef.current(s);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tutorialActive]);
@@ -534,6 +616,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         seed: seedRef.current,
       });
     }
+    const handEmptied = next.hands[0].length === 0;
     recordMove({
       player: 0,
       captures: [...turnCaptures(lastMoveRef.current, 0, s), { combination: s.combination, points: validation.totalPoints }],
@@ -542,10 +625,14 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       round: s.currentRound,
       hand: s.handNumber,
       // RULES.md Law 12: when the capture emptied your hand, the next player holding cards.
-      next: next.hands[0].length === 0 ? findNextPlayerWithCards(next, false) : null,
+      next: handEmptied ? findNextPlayerWithCards(next, false) : null,
+      before: s,
     });
     setAndPersist(next);
-    void advanceRef.current(next);
+    // Your turn goes on at once; when your hand is empty the next turn starts
+    // as your capture lands (YC1).
+    if (handEmptied) advanceLater(next, MOMENTS.yourCapture.land);
+    else void advanceRef.current(next);
     return null;
   }, [setAndPersist, recordMove]);
 
@@ -567,9 +654,12 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       round: s.currentRound,
       hand: s.handNumber,
       next: null,
+      before: s,
     });
     setAndPersist(next);
-    void advanceRef.current(next);
+    // RULES.md Law 8: the last cards land and the line holds before play moves on.
+    if (rest.length > 0) advanceLater(next, landingMs(rest.length));
+    else void advanceRef.current(next);
   }, [setAndPersist, recordMove]);
 
   const doRemoveFromCombo = useCallback((cardId: string) => {

@@ -111,7 +111,11 @@ describe('RULES.md Law 8: the last player holding cards', () => {
     act(() => {
       result.current.actions.placeCard(keep1.id);
     });
+    // The rest of the hand is on the board at once; the next hand deals after
+    // the last cards have landed and the line has held (D-007 release 2, ruling 44).
     await advance(0);
+    expect(ids(result.current.state.board)).toEqual(expect.arrayContaining([keep1.id, keep2.id]));
+    await advance(WELL_PAST);
     const after = result.current.state;
     expect(ids(after.board)).toEqual(expect.arrayContaining([keep1.id, keep2.id]));
     expect(movedOn(after)).toBe(true);

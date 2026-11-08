@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../../src/engine/core/gameState';
 import { createPRNG } from '../../src/engine/utils/prng';
-import { RANK_VALUES, type Card, type CaptureGroup, type Combination, type GameSettings, type GameState, type Rank, type Suit } from '../../src/engine/types';
+import { RANK_VALUES, type Card, type CaptureGroup, type CaptureRecord, type Combination, type GameSettings, type GameState, type Rank, type Suit } from '../../src/engine/types';
 import { baseSourceOf, cannotJoin, cardLabel, comboIsValid, stagedPoints, tableCardsThatCannotJoin, takeTheTable } from '../../src/game/useGameController';
-import { captureWords, moveWords, pointsBreakdown, sourceTags, takeTheTableSentence, worthWords } from '../../src/components/board/words';
+import { captureLine, captureWords, moveWords, pointsBreakdown, sourceTags, takeTheTableSentence, worthWords } from '../../src/components/board/words';
 import { tableFit } from '../../src/components/board/tableFit';
 
 // The board's reads (D-007 release 2, part 1): the shading rule, the points
@@ -128,15 +128,34 @@ describe('Take the Table (RULES.md Law 10) in the last hand', () => {
     expect(pointsBreakdown(cards('7C'))).toBe('7 5');
     expect(worthWords(1, 5)).toBe('1 card · worth 5');
   });
-  it('the line on who can still take it, names following the game', () => {
+  it('the line on who can still take it: GB2 when you are in line, ruling 100 when an opponent is', () => {
     expect(takeTheTableSentence('You', ['Rex', 'Nina'])).toBe('You captured last. If Rex or Nina captures before the round ends, they take it instead.');
-    expect(takeTheTableSentence('Rex', ['Nina', 'You'])).toBe('Rex captured last. If Nina or you capture before the round ends, they take it instead.');
-    expect(takeTheTableSentence('Rex', ['You', 'Nina'])).toBe('Rex captured last. If Nina or you capture before the round ends, they take it instead.');
+    expect(takeTheTableSentence('Rex', ['Nina', 'You'])).toBe('Rex captured last. Whoever captures next before the round ends takes it instead.');
+    expect(takeTheTableSentence('Nina', ['You', 'Rex'])).toBe('Nina captured last. Whoever captures next before the round ends takes it instead.');
+  });
+});
+
+describe("a recorded capture's line on the sheets (RE1p, GO2)", () => {
+  const record = (base: string, combos: string[][], points: number): CaptureRecord => ({
+    points, baseCard: card(base), cards: [card(base), ...combos.flat().map(card)], combos: combos.map((c) => c.map(card)),
+  });
+  it('one sum combo', () => {
+    expect(captureLine(record('10D', [['6C', '4H']], 20))).toBe('10 = 6 + 4');
+  });
+  it('combos joined with " and "', () => {
+    expect(captureLine(record('9S', [['5H', '4C'], ['9D']], 20))).toBe('9 = 5 + 4 and 9');
+  });
+  it('a match', () => {
+    expect(captureLine(record('KS', [['KH']], 20))).toBe('K = K');
+    expect(captureLine(record('AS', [['AH', 'AC']], 45))).toBe('A = A + A');
+  });
+  it('a record converted from an old save with nothing beyond the base shows the base', () => {
+    expect(captureLine(record('7C', [[]], 5))).toBe('7');
   });
 });
 
 describe("an opponent's move in words (GB2's speech bubble)", () => {
-  const base = { player: 2 as const, rest: [], round: 1, hand: 1, next: null };
+  const base = { id: 1, player: 2 as const, rest: [], round: 1, hand: 1, next: null, before: state() };
   it('a capture, then a place', () => {
     const capture = { combination: build('10S', [fromTable('8C'), fromTable('2D')]), points: 20 };
     expect(moveWords({ ...base, captures: [capture], placed: card('6C') })).toBe('took 8 + 2 = 10 (+20), then placed 6♣.');

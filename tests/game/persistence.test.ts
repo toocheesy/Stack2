@@ -39,9 +39,9 @@ function fullState(overrides: Partial<GameState> = {}): GameState {
     handNumber: 1,
     gamePhase: 'playing',
     roundStats: [
-      { pointsThisRound: 0, highestCapture: null },
-      { pointsThisRound: 0, highestCapture: null },
-      { pointsThisRound: 0, highestCapture: null },
+      { pointsThisRound: 0, highestCapture: null, tookTheTable: false },
+      { pointsThisRound: 0, highestCapture: null, tookTheTable: false },
+      { pointsThisRound: 0, highestCapture: null, tookTheTable: false },
     ],
     gameStats: [
       { highestCapture: null },
@@ -113,10 +113,10 @@ describe('persistence — saveGame / loadGame (schema 5, two slots)', () => {
     expect(loaded!.game.dumpActive).toBe(true);
   });
 
-  it('a version-5 save carries the seed and both stream states, and no tracker', () => {
+  it('a version-6 save carries the seed and both stream states, and no tracker', () => {
     saveGame('classic', saveOf(fullState()));
     const raw = JSON.parse(store.get(CLASSIC_KEY)!);
-    expect(raw.version).toBe(5);
+    expect(raw.version).toBe(6);
     expect('tracker' in raw).toBe(false);
     const loaded = loadGame('classic', 999)!;
     expect(loaded.seed).toBe(7);
@@ -140,7 +140,7 @@ describe('persistence — saveGame / loadGame (schema 5, two slots)', () => {
 
   // ─── A version-4 save in a slot ──────────────────────
 
-  it('a version-4 save in a slot converts in place to version 5: tracker dropped, the rest kept', () => {
+  it('a version-4 save in a slot converts in place to version 6: tracker dropped, the rest kept', () => {
     const game = fullState({ currentRound: 2 });
     store.set(RUN_KEY, JSON.stringify({ version: 4, game, tracker: v4Tracker, currentLevelId: 6, seed: 99, dealStream: 11, botStream: 22 }));
     const loaded = loadGame('run', 1)!;
@@ -152,13 +152,13 @@ describe('persistence — saveGame / loadGame (schema 5, two slots)', () => {
     expect(loaded.dealStream).toBe(11);
     expect(loaded.botStream).toBe(22);
     const raw = JSON.parse(store.get(RUN_KEY)!);
-    expect(raw.version).toBe(5);
+    expect(raw.version).toBe(6);
     expect('tracker' in raw).toBe(false);
     expect(raw.game).toEqual(game);
     expect(store.has(CLASSIC_KEY)).toBe(false);
   });
 
-  it('a version-4 save without a stream is cleared, as a version-5 one would be', () => {
+  it('a version-4 save without a stream is cleared, as a version-6 one would be', () => {
     store.set(CLASSIC_KEY, JSON.stringify({ version: 4, game: fullState(), tracker: v4Tracker, currentLevelId: null, seed: 99, dealStream: 11 }));
     expect(loadGame('classic', 1)).toBeNull();
     expect(store.has(CLASSIC_KEY)).toBe(false);
@@ -172,7 +172,7 @@ describe('persistence — saveGame / loadGame (schema 5, two slots)', () => {
     expect(store.has(CLASSIC_KEY)).toBe(false);
   });
 
-  it('rejects a slot that is neither a version-5 nor a version-4 save and clears it', () => {
+  it('rejects a slot that is none of a version-6, version-5 or version-4 save and clears it', () => {
     store.set(RUN_KEY, JSON.stringify({ version: 3, game: fullState(), currentLevelId: 2 }));
     expect(loadGame('run', 1)).toBeNull();
     expect(store.has(RUN_KEY)).toBe(false);
@@ -194,7 +194,7 @@ describe('persistence — saveGame / loadGame (schema 5, two slots)', () => {
     expect('scores' in loaded!.game).toBe(false);
     expect('totalScore' in loaded!.game.gameStats[0]).toBe(false);
     expect('tracker' in loaded!).toBe(false);
-    expect(JSON.parse(store.get(CLASSIC_KEY)!).version).toBe(5);
+    expect(JSON.parse(store.get(CLASSIC_KEY)!).version).toBe(6);
     // An old save has no seed: both streams start fresh from the mount seed.
     expect(loaded!.seed).toBe(42);
     expect(loaded!.dealStream).toBe(42);

@@ -1,15 +1,20 @@
 import { TABLE_CARD_W } from '../Card';
 
-// The table's layout numbers (GB2): cards at 54 x 76 with an 8px gap across
-// and 10px between rows, inside 12px side padding, 50px above (the deck
-// pill's row) and 10px below.
+// The table's layout numbers (GB2, tightened for short screens in D-007
+// release 2 part 2, ruling 99): cards at 54 x 76 with an 8px gap across and
+// 10px between rows, inside 12px side padding, the deck pill's row above and
+// a little room below. On a short screen the pill's row and the room below
+// shrink.
 export const TABLE_CARD_H = 76;
 export const TABLE_GAP_X = 8;
 export const TABLE_GAP_Y = 10;
-export const TABLE_PAD_TOP = 50;
 export const TABLE_PAD_X = 12;
-export const TABLE_PAD_BOTTOM = 10;
 const MIN_SCALE = 0.55;
+
+/** The table's padding above (the deck pill's row) and below the cards. */
+export function tablePadding(compact: boolean): { top: number; bottom: number } {
+  return compact ? { top: 30, bottom: 6 } : { top: 34, bottom: 8 };
+}
 
 /** The largest scale, 1 at most, at which `n` table cards wrap into rows that
  *  fit a zone `w` wide and `h` tall (today's behaviour kept: rows wrap, the

@@ -338,9 +338,9 @@ describe('startNewRound', () => {
       ...makeState(10),
       overallScores: { player: 30, bot1: 40, bot2: 50 },
       roundStats: [
-        { pointsThisRound: 10, highestCapture: null },
-        { pointsThisRound: 20, highestCapture: null },
-        { pointsThisRound: 30, highestCapture: null },
+        { pointsThisRound: 10, highestCapture: null, tookTheTable: false },
+        { pointsThisRound: 20, highestCapture: null, tookTheTable: false },
+        { pointsThisRound: 30, highestCapture: null, tookTheTable: false },
       ],
       currentDealer: 1,
       currentRound: 1,

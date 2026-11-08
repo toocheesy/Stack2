@@ -19,6 +19,16 @@ export const C = {
   classicGoldDeep: '#A36A00',
   classicTable: '#033019',
 
+  // Classic's round end sheet and game over card (RE1p, GO2; D-007 rulings 70
+  // to 73): plum, with its own text, labels and lines, and the gold glow
+  // above its gold edge.
+  classicSheet: '#5B2470',
+  classicSheetDeep: '#44195A',
+  classicSheetInk: '#FBF1FF',
+  classicSheetMuted: '#E6D3F2',
+  classicSheetLine: '#C9A6DD',
+  classicSheetGlow: '#FFC53A40',
+
   // The card, the same in every mode.
   cardFace: '#FFFAF6',
   cardRing: '#FFC53A',
@@ -28,6 +38,8 @@ export const C = {
   // Bot colours. A bot's colour shows only on its own things; no bot owns one yet.
   botAzure: '#5CC2FF',
   botWisteria: '#BE96FF',
+  // The wisteria bot's colour on the plum sheet only; everywhere else it stays botWisteria.
+  botWisteriaOnSheet: '#D9C2FF',
 } as const;
 
 /** Drop shadows. cardFull is tokens.json's card-full shadow without its

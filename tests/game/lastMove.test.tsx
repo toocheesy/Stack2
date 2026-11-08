@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
-import { messageLine, useGameController } from '../../src/game/useGameController';
+import { MOMENTS, landingMs, messageLine, useGameController } from '../../src/game/useGameController';
 import { saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
 import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
@@ -180,9 +180,13 @@ describe('the board reads from the controller', () => {
 
     const last = result.current.lastCapture!;
     expect(last.next).toBe(2);
-    const s = result.current.state;
-    expect(s.currentPlayer).toBe(2);
+    let s = result.current.state;
     expect(messageLine(s, s.combination, last, result.current.botCombo)).toBe('Your turn ends: your hand is empty. Nina is next.');
+    // The next turn starts as your capture lands (YC1, part 2); the line holds meanwhile.
+    await advance(MOMENTS.yourCapture.land);
+    s = result.current.state;
+    expect(s.currentPlayer).toBe(2);
+    expect(messageLine(s, s.combination, result.current.lastCapture, result.current.botCombo)).toBe('Your turn ends: your hand is empty. Nina is next.');
   });
 
   it('RULES.md Law 8: your last place records the rest of your hand, and the line reads it', async () => {
@@ -196,8 +200,10 @@ describe('the board reads from the controller', () => {
     expect(last.placed!.id).toBe('6H');
     expect(ids(last.rest)).toEqual(['JC']);
     expect(last.hand).toBe(4);
-    // The hand was the round's last: Take the Table (RULES.md Law 10) has
-    // already swept the four table cards to the round's last capturer.
+    // The rest is on the table at once; the round end (and Take the Table,
+    // RULES.md Law 10) waits for the last cards to land and the line to hold.
+    expect(ids(result.current.state.board)).toEqual(['5C', '9D', '6H', 'JC']);
+    await advance(landingMs(1));
     expect(result.current.state.board).toEqual([]);
     expect(result.current.state.overallScores.bot1).toBe(5 + 5 + 5 + 10);
     const s = result.current.state;

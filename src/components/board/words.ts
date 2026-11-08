@@ -1,7 +1,7 @@
-import type { Card, CaptureGroup, Combination } from '../../engine/types';
+import type { Card, CaptureGroup, CaptureRecord, Combination } from '../../engine/types';
 import { cardLabel, cardPoints, type LastMove } from '../../game/useGameController';
 
-// The board's words beyond the message line, as GB2 has them.
+// The board's words beyond the message line, as GB2, RE1p and GO2 have them.
 
 /** One combo in words: a sum "8 + 2 = 10", a match "9" (two matched cards "9, 9"). */
 function comboWords(groups: readonly CaptureGroup[], base: Card): string {
@@ -28,6 +28,14 @@ export function moveWords(move: LastMove): string {
   return parts.join(', ') + '.';
 }
 
+/** A recorded capture's line on the sheets (RE1p, GO2): the base, then each
+ *  combo's cards joined with " + ", the combos joined with " and ":
+ *  "10 = 6 + 4", "9 = 5 + 4 and 9", "K = K". */
+export function captureLine(record: CaptureRecord): string {
+  const combos = record.combos.filter((c) => c.length > 0).map((c) => c.map((x) => x.rank).join(' + '));
+  return combos.length > 0 ? `${record.baseCard.rank} = ${combos.join(' and ')}` : record.baseCard.rank;
+}
+
 /** The Take the Table panel's points line: "A 15 · K 10 · 8, 5, 4, 9 at 5 each". */
 export function pointsBreakdown(cards: readonly Card[]): string {
   const groups = new Map<number, string[]>();
@@ -51,13 +59,14 @@ export function worthWords(count: number, points: number): string {
   return `${count} ${count === 1 ? 'card' : 'cards'} · worth ${points}`;
 }
 
-/** The Take the Table panel's line on who can still take it, in GB2's words
- *  with the names following the game. "you" goes last so the verb agrees. */
+/** The Take the Table panel's line on who can still take it. When you are in
+ *  line, GB2's words with the two opponents in turn order; when an opponent
+ *  is, D-007 ruling 100's words. */
 export function takeTheTableSentence(inLine: string, others: readonly string[]): string {
-  const named = others.filter((n) => n !== 'You');
-  const list = others.includes('You') ? [...named, 'you'] : named;
-  const verb = list[list.length - 1] === 'you' ? 'capture' : 'captures';
-  return `${inLine} captured last. If ${list[0]} or ${list[1]} ${verb} before the round ends, they take it instead.`;
+  if (inLine === 'You') {
+    return `You captured last. If ${others[0]} or ${others[1]} captures before the round ends, they take it instead.`;
+  }
+  return `${inLine} captured last. Whoever captures next before the round ends takes it instead.`;
 }
 
 export interface SourceTag {

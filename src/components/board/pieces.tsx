@@ -1,10 +1,11 @@
-import { motion, useReducedMotion } from 'motion/react';
-import type { ReactNode, Ref } from 'react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react';
 import { C } from '../../config/colors';
 import { FONTS } from '../../config/fonts';
 import { getTransition } from '../../config/motion';
+import { centreOf, type Point } from './moments';
 
-// Small pieces shared by the game board (GB2) and Classic Setup (CS1).
+// Small pieces shared by the game board (GB2), its moments and Classic Setup (CS1).
 
 /** The wordmark: STACKED in Abril Fatface at 0.04em, with the "A" in gold. */
 export function Wordmark({ size }: { size: number }) {
@@ -44,21 +45,47 @@ export function Gear() {
   );
 }
 
-/** A race bar toward the target: an 8px track outlined in the line colour and
+/** A race bar toward the target: a track outlined in the line colour and
  *  open, so what it sits on shows through its empty part, filled in the
- *  runner's colour. The fill moves by transform; under reduce-motion it steps. */
-export function RaceBar({ value, max, colour }: { value: number; max: number; colour: string }) {
+ *  runner's colour. The fill grows by transform (TT1: 420 ms); under
+ *  reduce-motion it steps. */
+export function RaceBar({ value, max, colour, height = 8, track = C.line.classic, delay = 0 }: {
+  value: number; max: number; colour: string; height?: number; track?: string; delay?: number;
+}) {
   const calm = useReducedMotion();
   const fraction = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
   return (
-    <div style={{ flex: 1, height: 8, boxSizing: 'border-box', border: `1px solid ${C.line.classic}`, borderRadius: 4, overflow: 'hidden' }}>
+    <div style={{ flex: 1, height, boxSizing: 'border-box', border: `1px solid ${track}`, borderRadius: height / 2, overflow: 'hidden' }}>
       <motion.div
         initial={false}
         animate={{ scaleX: fraction }}
-        transition={calm ? { duration: 0 } : { duration: 0.4, ease: 'easeOut' }}
+        transition={calm ? { duration: 0 } : { duration: 0.42, ease: [0.2, 0.8, 0.2, 1], delay }}
         style={{ width: '100%', height: '100%', background: colour, transformOrigin: 'left center' }}
       />
     </div>
+  );
+}
+
+/** A number that swaps with a pop when it changes: the new value lands from
+ *  160% as the old fades beneath it (YC1, TT1). Under reduce-motion the two
+ *  crossfade. */
+export function PopNumber({ value, delay = 0 }: { value: number; delay?: number }) {
+  const calm = useReducedMotion();
+  return (
+    <span style={{ display: 'inline-grid' }}>
+      <AnimatePresence initial={false}>
+        <motion.span
+          key={value}
+          initial={calm ? { opacity: 0 } : { opacity: 0, scale: 1.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: calm ? 0.16 : 0.22, ease: 'easeOut', delay }}
+          style={{ gridArea: '1 / 1', display: 'inline-block' }}
+        >
+          {value}
+        </motion.span>
+      </AnimatePresence>
+    </span>
   );
 }
 
@@ -93,19 +120,109 @@ export function TextButton({ label, onClick, disabled, primary, wide, wrapRef }:
   );
 }
 
-/** A dashed ghost where a staged card came from: "IN BASE", "IN COMBO 1". */
-export function Ghost({ w, h, radius, label, fontSize, twoLines }: {
-  w: number; h: number; radius: number; label: string; fontSize: number; twoLines?: boolean;
+/** A dashed ghost where a staged card came from: "IN BASE", "IN COMBO 1".
+ *  With `fade`, it fades away over that many seconds (YC1's tray chrome). */
+export function Ghost({ w, h, radius, label, fontSize, twoLines, fade }: {
+  w: number; h: number; radius: number; label: string; fontSize: number; twoLines?: boolean; fade?: number;
 }) {
   const space = label.indexOf(' ');
   const lines = twoLines && space > 0 ? [label.slice(0, space), label.slice(space + 1)] : [label];
   return (
-    <div style={{
+    <motion.div animate={{ opacity: fade ? 0 : 1 }} transition={{ duration: fade ?? 0, ease: 'linear' }} style={{
       width: w, height: h, borderRadius: radius, border: `1.5px dashed ${C.line.classic}`, boxSizing: 'border-box', flexShrink: 0,
       display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center',
       fontFamily: FONTS.sans, fontSize, fontWeight: 700, lineHeight: 1.2, color: C.muted.classic,
     }}>
       {lines.map((l) => <span key={l}>{l}</span>)}
-    </div>
+    </motion.div>
+  );
+}
+
+/** Something that fades out when `out` is set: a moment's chrome. */
+export function Fade({ out, duration, delay = 0, style, children }: {
+  out: boolean; duration: number; delay?: number; style?: CSSProperties; children?: ReactNode;
+}) {
+  return (
+    <motion.div animate={{ opacity: out ? 0 : 1 }} transition={{ duration, delay, ease: 'linear' }} style={style}>
+      {children}
+    </motion.div>
+  );
+}
+
+/** How a card flies: to where `target` says at the moment it starts, after
+ *  `delay`, over `duration` (seconds), hopping up `hop` px and growing to
+ *  `grow` first, then tilting by `rotate` and shrinking to `shrink` as it
+ *  lands and fades. Under reduce-motion it only fades out, over `calmDuration`. */
+export interface Flight {
+  target: () => Point | null;
+  delay: number;
+  duration: number;
+  hop: number;
+  grow: number;
+  shrink: number;
+  rotate: number;
+  calmDuration: number;
+  calmDelay?: number;
+}
+
+/** A card on its way to a seat or a bar (YC1, TT1). Its contents are the card itself. */
+export function FlyingCard({ flight, children }: { flight: Flight; children: ReactNode }) {
+  const calm = useReducedMotion();
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [delta, setDelta] = useState<Point | null>(null);
+
+  useLayoutEffect(() => {
+    const from = centreOf(ref.current);
+    const to = flight.target();
+    setDelta(from && to ? { x: to.x - from.x, y: to.y - from.y } : { x: 0, y: 0 });
+    // Measured once, as the flight starts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const ease: [number, number, number, number] = [0.5, 0, 0.2, 1];
+  const leg = { duration: flight.duration, delay: flight.delay, ease };
+  return (
+    <motion.div
+      ref={ref}
+      animate={delta
+        ? (calm
+          ? { opacity: 0 }
+          : { x: delta.x, y: [0, -flight.hop, delta.y], scale: [1, flight.grow, flight.shrink], rotate: flight.rotate, opacity: [1, 1, 0] })
+        : undefined}
+      transition={calm
+        ? { duration: flight.calmDuration, delay: flight.calmDelay ?? 0, ease: 'linear' }
+        : { ...leg, y: { ...leg, times: [0, 0.2, 1] }, scale: { ...leg, times: [0, 0.2, 1] }, opacity: { ...leg, times: [0, 0.85, 1] } }}
+      style={{ position: 'relative', zIndex: 5, flexShrink: 0 }}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+/** A card landing where it now lies, from where `from` says (your hand or
+ *  an opponent's seat), after `delay` seconds: the last cards (RULES.md Law 8,
+ *  ruling 44). Under reduce-motion it fades in. */
+export function LandingCard({ from, delay, children }: { from: () => Point | null; delay: number; children: ReactNode }) {
+  const calm = useReducedMotion();
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [start, setStart] = useState<Point | null>(null);
+
+  useLayoutEffect(() => {
+    const here = centreOf(ref.current);
+    const f = from();
+    setStart(here && f ? { x: f.x - here.x, y: f.y - here.y } : { x: 0, y: 0 });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <motion.div
+      ref={ref}
+      initial={{ opacity: 0 }}
+      animate={start ? (calm ? { opacity: 1 } : { x: [start.x, 0], y: [start.y, 0], scale: [0.8, 1], opacity: [1, 1] }) : undefined}
+      transition={calm ? { duration: 0.2, delay, ease: 'linear' } : { duration: 0.4, delay, ease: [0.2, 0.8, 0.2, 1] }}
+      style={{ position: 'relative', zIndex: 3, flexShrink: 0 }}
+    >
+      {children}
+    </motion.div>
   );
 }

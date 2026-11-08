@@ -42,9 +42,9 @@ function state(overrides: Partial<GameState>): GameState {
     handNumber: 1,
     gamePhase: 'playing',
     roundStats: [
-      { pointsThisRound: 0, highestCapture: null },
-      { pointsThisRound: 0, highestCapture: null },
-      { pointsThisRound: 0, highestCapture: null },
+      { pointsThisRound: 0, highestCapture: null, tookTheTable: false },
+      { pointsThisRound: 0, highestCapture: null, tookTheTable: false },
+      { pointsThisRound: 0, highestCapture: null, tookTheTable: false },
     ],
     gameStats: [
       { highestCapture: null },

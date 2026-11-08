@@ -1,10 +1,11 @@
 import { C } from '../../config/colors';
 import { FONTS } from '../../config/fonts';
-import { RaceBar } from './pieces';
+import { PopNumber, RaceBar } from './pieces';
 
 /** An opponent's seat (GB2): its name, score over the target, the cards it
  *  holds (or THINKING ···) and its race bar, all in its own colour. The edge
- *  thickens to 2px on its turn. */
+ *  thickens to 2px on its turn. The score pops and the bar grows when points
+ *  land (TT1). */
 export function OpponentSeat({ name, colour, score, target, cardsHeld, thinking, active, seatRef }: {
   name: string;
   colour: string;
@@ -23,7 +24,7 @@ export function OpponentSeat({ name, colour, score, target, cardsHeld, thinking,
     }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 6 }}>
         <span style={{ fontFamily: FONTS.display, fontSize: 18, lineHeight: 1.2, color: colour, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{name}</span>
-        <span style={{ fontSize: 12, fontWeight: 700, color: C.ink.classic, whiteSpace: 'nowrap' }}>{score} / {target}</span>
+        <span style={{ fontSize: 12, fontWeight: 700, color: C.ink.classic, whiteSpace: 'nowrap' }}><PopNumber value={score} /> / {target}</span>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
         {Array.from({ length: held }, (_, i) => (

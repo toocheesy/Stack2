@@ -3,13 +3,15 @@ import { AnimatePresence, motion } from 'motion/react';
 import type { Card, ComboSlot, Difficulty, GameState, PlayerIndex } from '../engine/types';
 import { getTransition } from '../config/motion';
 import type { GameActions, BotVizStep, BotComboDisplay, LastCaptureInfo } from '../game/useGameController';
-import { CardComponent, CARD_W } from './Card';
+import { CardComponent, HAND_CARD_RING, HAND_CARD_W, TABLE_CARD_W } from './Card';
 import { RoundEndOverlay } from './RoundEndOverlay';
 import { JackpotCelebration, type JackpotDisplay } from './JackpotCelebration';
 import { GameOverOverlay } from './GameOverOverlay';
 import { validateFullCombo } from '../engine/core/captureValidator';
 import { TutorialOverlay, type TutorialMark } from './TutorialOverlay';
 import type { TutorialApi } from '../tutorial/useTutorial';
+import { C, alpha } from '../config/colors';
+import { FONTS } from '../config/fonts';
 
 type CardSource = 'hand' | 'board';
 
@@ -43,17 +45,23 @@ const SLOT_LABELS: Record<ComboSlot, string> = {
   base: 'BASE', combo1: 'COMBO 1', combo2: 'COMBO 2', combo3: 'COMBO 3',
 };
 
+// Bot colours (STACKED v2): Nina azure, Rex wisteria; Calvin and Jett have no colour yet (line).
 const PLAYER_COLORS: Record<Difficulty, { color: string; name: string }> = {
-  beginner:     { color: '#3B82F6', name: 'Calvin' },
-  intermediate: { color: '#DBEAFE', name: 'Nina' },
-  advanced:     { color: '#DC2626', name: 'Rex' },
-  expert:       { color: '#8B5CF6', name: 'Jett' },
+  beginner:     { color: C.line.classic, name: 'Calvin' },
+  intermediate: { color: C.botAzure, name: 'Nina' },
+  advanced:     { color: C.botWisteria, name: 'Rex' },
+  expert:       { color: C.line.classic, name: 'Jett' },
 };
 
-const JADE = '#065F46';
-const TAN = '#E8C577';
-const BG = '#0A0A0A';
 const BOARD_GAP = 4;
+// The hand rule (D-007 ruling 92). The engine deals four cards a hand
+// (src/engine/core/gameState.ts); this much table shows between two hand
+// cards' rings; and this much of the screen's width sits beside the hand row:
+// the zone's 16px padding, the 8px gap, the 72px YOU block, the hand panel's
+// 8px padding and its 3px active border on each side.
+const HAND_SIZE = 4;
+const HAND_RING_CLEARANCE = 2;
+const HAND_ROW_CHROME = 16 + 8 + 72 + 8 + 6;
 
 export function GameView({
   state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, onOpenSettings, tutorial, suppressToasts = false,
@@ -116,7 +124,7 @@ export function GameView({
   const bot2Active = inPlay && state.currentPlayer === 2;
 
   // Score-state escalation. Once a player crosses 80% of target,
-  // their score number transitions white → tan over ~500ms ease-in. Scores are
+  // their score number transitions ink → the accent over ~500ms ease-in. Scores are
   // monotonic within a round, so the boolean naturally resets when scores
   // reset for the next round (round-boundary clear).
   const escalateThreshold = target * 0.8;
@@ -177,16 +185,30 @@ export function GameView({
     if (err) { setError(err); setTimeout(() => setError(null), 2000); }
   }, [actions]);
 
-  // ── Board card scaling (6 across) ─────────────────
+  // ── Table card scaling (6 across) ─────────────────
+  // Six table cards (54 x 76) across; scaled down only when they don't fit, never above 1.
 
   const boardCardScale = useMemo(() => {
-    if (visibleBoard.length === 0) return 0.85;
+    if (visibleBoard.length === 0) return 1;
     const avail = typeof window !== 'undefined' ? window.innerWidth - 24 : 350;
     const perRow = 6;
     const maxW = (avail - BOARD_GAP * (perRow - 1)) / perRow;
-    const scale = Math.min(0.85, maxW / CARD_W);
+    const scale = Math.min(1, maxW / TABLE_CARD_W);
     return Math.max(0.55, scale);
   }, [visibleBoard.length]);
+
+  // ── Hand card fit (D-007 ruling 92) ───────────────
+  // The hand card is drawn at the largest size that fits today's row, in its
+  // exact 72:100 shape, never above 72 x 100, with the rings of neighbouring
+  // cards apart: four cards, three gaps of two rings plus the clearance, and
+  // a ring at each end. Its exact 72 x 100 arrives with release 2's layout.
+
+  const handFit = useMemo(() => {
+    const rowWidth = (typeof window !== 'undefined' ? window.innerWidth : 390) - HAND_ROW_CHROME;
+    const perScale = HAND_SIZE * HAND_CARD_W + (HAND_SIZE - 1) * 2 * HAND_CARD_RING + 2 * HAND_CARD_RING;
+    const scale = Math.min(1, (rowWidth - (HAND_SIZE - 1) * HAND_RING_CLEARANCE) / perScale);
+    return { scale, gap: 2 * HAND_CARD_RING * scale + HAND_RING_CLEARANCE };
+  }, []);
 
   // ── Combo display ─────────────────────────────────
 
@@ -216,7 +238,7 @@ export function GameView({
   const hintText = useMemo(() => {
     if (!state.settings.hintStripEnabled) return null;
     if (state.gamePhase !== 'playing') return null;
-    if (!isPlayerTurn) return 'Watch the bots play their turn';
+    if (!isPlayerTurn) return 'Watch the opponents play their turn';
     if (hasCombo && !comboValid) return 'Combo groups must sum (or match) the base card value';
     if (hasCombo && comboValid) return 'Tap SUBMIT to capture, or RESET to clear';
     return 'Drag a card to start your turn';
@@ -224,8 +246,8 @@ export function GameView({
 
   // ── Toast layer state machine ──
   // Three toast kinds:
-  //   - celebration: 2s, +pts · NICE COMBO, tan
-  //   - transition:  3s, R[N] · FRESH DECK, white
+  //   - celebration: 2s, +pts · NICE COMBO, the accent
+  //   - transition:  3s, R[N] · FRESH DECK, ink
   //   - hint:        persistent until cleared by player action / interrupt
   // Priority: celebration > transition > hint > none. Higher preempts lower.
   // Suppressed entirely whenever an overlay (RoundEnd/Jackpot/GameOver/
@@ -252,7 +274,7 @@ export function GameView({
     setTransient({
       kind: 'celebration',
       text: `+${lastCapture.points} · NICE COMBO`,
-      color: TAN,
+      color: C.accent.classic,
       expires: Date.now() + 2000,
     });
   }, [lastCapture, isOverlaySuppressing]);
@@ -268,7 +290,7 @@ export function GameView({
       return {
         kind: 'transition',
         text: `R${state.currentRound} · FRESH DECK`,
-        color: '#fff',
+        color: C.ink.classic,
         expires: Date.now() + 3000,
       };
     });
@@ -287,7 +309,7 @@ export function GameView({
   const activeToast = useMemo<{ kind: TransientKind | 'hint'; text: string; color: string } | null>(() => {
     if (isOverlaySuppressing) return null;
     if (transient) return transient;
-    if (hintText) return { kind: 'hint', text: hintText, color: 'rgba(232,197,119,0.9)' };
+    if (hintText) return { kind: 'hint', text: hintText, color: alpha(C.accent.classic, 0.9) };
     return null;
   }, [isOverlaySuppressing, transient, hintText]);
 
@@ -295,10 +317,10 @@ export function GameView({
 
   return (
     <div style={{
-      width: '100vw', height: '100dvh', background: BG,
+      width: '100vw', height: '100dvh', background: C.ground.classic,
       display: 'flex', flexDirection: 'column',
       overflow: 'hidden', touchAction: 'none',
-      fontFamily: 'Inter, system-ui, sans-serif',
+      fontFamily: FONTS.sans,
     }}>
 
       {/* ═══ ZONE A — HEADER BAR ═══
@@ -314,7 +336,7 @@ export function GameView({
         {!gameOver && !jackpotInfo && state.gamePhase === 'playing' ? (
           <motion.button onClick={() => setShowQuitDialog(true)} whileTap={{ scale: 0.9 }} transition={getTransition('snappy')} style={{
             width: 32, height: 32, borderRadius: 99, border: 'none',
-            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+            background: alpha(C.ink.classic, 0.06), color: alpha(C.ink.classic, 0.7),
             fontSize: 16, cursor: 'pointer', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>←</motion.button>
@@ -326,11 +348,11 @@ export function GameView({
           gap: 10, flex: 1, minWidth: 0, overflow: 'hidden',
         }}>
           <span style={{
-            fontFamily: 'Inter, system-ui, sans-serif',
-            fontWeight: 900, fontSize: 14, letterSpacing: '-0.02em',
-            color: '#fff', flexShrink: 0,
+            fontFamily: FONTS.display,
+            fontWeight: 400, fontSize: 14, letterSpacing: '-0.02em',
+            color: C.ink.classic, flexShrink: 0,
           }}>
-            STACKED<span style={{ color: JADE }}>!</span>
+            STACKED<span style={{ color: C.accent.classic }}>!</span>
           </span>
           <HeaderSegments
             mode={currentLevelId ? 'THE RUN' : 'CLASSIC'}
@@ -351,7 +373,7 @@ export function GameView({
           transition={getTransition('snappy')}
           style={{
             width: 32, height: 32, borderRadius: 99, border: 'none',
-            background: 'rgba(255,255,255,0.06)', color: 'rgba(255,255,255,0.7)',
+            background: alpha(C.ink.classic, 0.06), color: alpha(C.ink.classic, 0.7),
             fontSize: 16, cursor: 'pointer', flexShrink: 0,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: 0, lineHeight: 1,
@@ -376,12 +398,12 @@ export function GameView({
         }}>
           {persistentMessage && (
             <span style={{
-              fontFamily: 'Inter, system-ui, sans-serif',
-              fontSize: 14, fontWeight: 500, color: 'rgba(255,255,255,0.6)',
+              fontFamily: FONTS.sans,
+              fontSize: 14, fontWeight: 600, color: alpha(C.ink.classic, 0.6),
               letterSpacing: '0.02em',
             }}>
               {persistentMessage.prefix}
-              <span style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+              <span style={{ fontFamily: FONTS.sans }}>
                 {persistentMessage.equation}
               </span>
             </span>
@@ -403,20 +425,20 @@ export function GameView({
                 padding: '4px 16px', textAlign: 'center',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 gap: 6,
-                background: BG, // covers persistent strip while toast active
+                background: C.ground.classic, // covers persistent strip while toast active
               }}
             >
               {activeToast.kind === 'hint' && (
                 <span style={{
-                  fontFamily: 'Inter, system-ui, sans-serif',
+                  fontFamily: FONTS.sans,
                   fontSize: 11, fontWeight: 700,
-                  color: TAN, letterSpacing: '0.18em',
+                  color: C.accent.classic, letterSpacing: '0.18em',
                 }}>HINT</span>
               )}
               <span style={{
-                fontFamily: 'Inter, system-ui, sans-serif',
+                fontFamily: FONTS.sans,
                 fontSize: activeToast.kind === 'hint' ? 13 : 14,
-                fontWeight: activeToast.kind === 'transition' ? 700 : 500,
+                fontWeight: activeToast.kind === 'transition' ? 700 : 600,
                 color: activeToast.color,
                 letterSpacing: activeToast.kind === 'transition' ? '0.06em' : '0.02em',
               }}>
@@ -452,16 +474,16 @@ export function GameView({
       {/* ═══ ZONE E — GAME BOARD ═══ */}
       <div ref={boardRef} style={{
         flex: 1, margin: '8px 8px 0', borderRadius: 12, padding: '8px 6px',
-        background: 'rgba(255,255,255,0.03)',
-        border: hoveredBoard ? '1px solid rgba(16,185,129,0.5)' : deckEmpty ? `1px solid ${TAN}55` : '1px solid rgba(255,255,255,0.06)',
+        background: alpha(C.ink.classic, 0.03),
+        border: hoveredBoard ? `1px solid ${alpha(C.accent.classic, 0.5)}` : deckEmpty ? `1px solid ${C.accent.classic}55` : `1px solid ${alpha(C.ink.classic, 0.06)}`,
         display: 'flex', flexWrap: 'wrap', gap: BOARD_GAP,
         justifyContent: 'center', alignItems: 'center', alignContent: 'center',
         position: 'relative', zIndex: 15, minHeight: 0, overflow: 'visible',
         transition: 'border 150ms',
       }}>
-        {/* Jackpot board tint. Tan #E8C577 @ 6% during the
+        {/* Jackpot table tint. The accent @ 6% during the
              jackpot hand (deck.length===0 + still playing). Coexists with the
-             deckEmpty amber border glow above; different signal: tint = "this
+             deckEmpty gold border glow above; different signal: tint = "this
              is the jackpot hand", glow = "this hand is ending soon." */}
         <motion.div
           initial={false}
@@ -469,26 +491,23 @@ export function GameView({
           transition={{ duration: deckEmpty ? 0.6 : 0.4, ease: deckEmpty ? 'easeOut' : 'easeIn' }}
           style={{
             position: 'absolute', inset: 0, borderRadius: 12,
-            background: TAN, pointerEvents: 'none', zIndex: 0,
+            background: C.accent.classic, pointerEvents: 'none', zIndex: 0,
           }}
         />
         {visibleBoard.length === 0 && !botCombo && inPlay && (
-          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.25)', position: 'relative', zIndex: 1 }}>Board empty</span>
+          <span style={{ fontSize: 11, color: alpha(C.ink.classic, 0.25), position: 'relative', zIndex: 1 }}>Table empty</span>
         )}
         {visibleBoard.map((card) => (
-          <div key={card.id} style={{ transform: `scale(${boardCardScale})`, transformOrigin: 'center' }}>
-            <CardComponent card={card}
-              draggable={isPlayerTurn}
-              isDragging={draggingCardId === card.id}
-              onDragMove={(pt) => { handleDragStart(card.id, 'board'); handleDragMove(pt, 'board'); }}
-              onDragEnd={(pt) => handleDragEnd(card.id, 'board', pt)}
-            />
-          </div>
+          <CardComponent key={card.id} card={card} size="table" scale={boardCardScale}
+            draggable={isPlayerTurn}
+            onDragMove={(pt) => { handleDragStart(card.id, 'board'); handleDragMove(pt, 'board'); }}
+            onDragEnd={(pt) => handleDragEnd(card.id, 'board', pt)}
+          />
         ))}
         {deckEmpty && (
           <motion.div
             style={{ position: 'absolute', inset: -1, borderRadius: 12, pointerEvents: 'none' }}
-            animate={{ boxShadow: [`0 0 8px ${TAN}20`, `0 0 20px ${TAN}48`, `0 0 8px ${TAN}20`] }}
+            animate={{ boxShadow: [`0 0 8px ${C.accent.classic}20`, `0 0 20px ${C.accent.classic}48`, `0 0 8px ${C.accent.classic}20`] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           />
         )}
@@ -508,24 +527,24 @@ export function GameView({
             const isHovered = hoveredSlot === key && draggingCardId !== null;
             return (
               <div key={key} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, flex: '1 1 0', maxWidth: 72 }}>
-                <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', fontWeight: 500, letterSpacing: 1, textTransform: 'uppercase' }}>{SLOT_LABELS[key]}</span>
+                <span style={{ fontSize: 8, color: alpha(C.ink.classic, 0.4), fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>{SLOT_LABELS[key]}</span>
                 <div
                   ref={(el) => { slotRefs.current[i] = el; }}
                   style={{
                     width: '100%', aspectRatio: '2.5/3.5', borderRadius: 6,
-                    border: isHovered ? `2px solid ${JADE}` : isBase ? (filled ? `2px solid ${JADE}` : `1px solid ${JADE}`) : (filled ? `2px solid ${JADE}` : '1px dashed rgba(255,255,255,0.12)'),
-                    boxShadow: isHovered ? `0 0 8px ${JADE}66` : 'none',
+                    border: isHovered ? `2px solid ${C.classicGold}` : isBase ? (filled ? `2px solid ${C.classicGold}` : `1px solid ${C.classicGold}`) : (filled ? `2px solid ${C.classicGold}` : `1px dashed ${alpha(C.ink.classic, 0.12)}`),
+                    boxShadow: isHovered ? `0 0 8px ${C.classicGold}66` : 'none',
                     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
-                    background: isHovered ? `${JADE}1A` : filled ? `${JADE}0F` : 'transparent',
+                    background: isHovered ? `${C.classicGold}1A` : filled ? `${C.classicGold}0F` : 'transparent',
                     transition: 'border 150ms, box-shadow 150ms, background 150ms',
                   }}
                 >
                   {filled ? staged.map((c) => (
                     <div key={c.id} onClick={(e) => { e.stopPropagation(); handleStagedCardTap(c.id); }} style={{ cursor: 'pointer' }}>
-                      <CardComponent card={c} small />
+                      <CardComponent card={c} size="slot" />
                     </div>
                   )) : (
-                    <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.2)' }}>EMPTY</span>
+                    <span style={{ fontSize: 9, color: alpha(C.ink.classic, 0.2) }}>EMPTY</span>
                   )}
                 </div>
               </div>
@@ -550,7 +569,7 @@ export function GameView({
             </div>
           </div>
         )}
-        {error &&<span style={{ fontSize: 11, color: '#EF4444' }}>{error}</span>}
+        {error &&<span style={{ fontSize: 11, color: C.suitRed }}>{error}</span>}
       </div>
 
       {/* ═══ ZONES G+H — PLAYER HAND + SCORE ═══ */}
@@ -558,12 +577,12 @@ export function GameView({
         display: 'flex', padding: '0 8px 8px', gap: 8, flexShrink: 0,
       }}>
         {/* Zone H — Player score block. Active-turn glow:
-              3px tan border + breathing 16px outer + 4px inset. Phase-gated. */}
+              3px accent border + breathing 16px outer + 4px inset. Phase-gated. */}
         <motion.div
           animate={playerActive ? {
             boxShadow: [
-              `0 0 16px ${TAN}80, inset 0 0 4px ${TAN}4D`,
-              `0 0 16px ${TAN}B3, inset 0 0 4px ${TAN}4D`,
+              `0 0 16px ${C.accent.classic}80, inset 0 0 4px ${C.accent.classic}4D`,
+              `0 0 16px ${C.accent.classic}B3, inset 0 0 4px ${C.accent.classic}4D`,
             ],
           } : { boxShadow: '0 0 0 0 transparent' }}
           transition={playerActive
@@ -571,20 +590,20 @@ export function GameView({
             : { duration: 0.2 }}
           style={{
             width: 72, borderRadius: 10, padding: '8px 4px',
-            background: 'rgba(255,255,255,0.03)',
-            border: playerActive ? `3px solid ${TAN}` : '1px solid rgba(255,255,255,0.06)',
+            background: alpha(C.ink.classic, 0.03),
+            border: playerActive ? `3px solid ${C.accent.classic}` : `1px solid ${alpha(C.ink.classic, 0.06)}`,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
             transition: 'border 200ms',
           }}>
-          <span style={{ fontSize: 9, fontWeight: 600, color: '#F59E0B', letterSpacing: '0.1em' }}>YOU</span>
+          <span style={{ fontSize: 9, fontWeight: 600, color: C.accent.classic, letterSpacing: '0.1em' }}>YOU</span>
           <motion.span
-            animate={{ color: playerEscalated ? TAN : '#fff' }}
+            animate={{ color: playerEscalated ? C.accent.classic : C.ink.classic }}
             transition={{ duration: 0.5, ease: 'easeIn' }}
-            style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 800, fontSize: 18 }}
+            style={{ fontFamily: FONTS.sans, fontWeight: 700, fontSize: 18 }}
           >
             {state.overallScores.player}
           </motion.span>
-          <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: 'rgba(255,255,255,0.4)' }}>
+          <span style={{ fontFamily: FONTS.sans, fontSize: 9, color: alpha(C.ink.classic, 0.4) }}>
             /{target}
           </span>
         </motion.div>
@@ -593,8 +612,8 @@ export function GameView({
         <motion.div
           animate={playerActive ? {
             boxShadow: [
-              `0 0 16px ${TAN}80, inset 0 0 4px ${TAN}4D`,
-              `0 0 16px ${TAN}B3, inset 0 0 4px ${TAN}4D`,
+              `0 0 16px ${C.accent.classic}80, inset 0 0 4px ${C.accent.classic}4D`,
+              `0 0 16px ${C.accent.classic}B3, inset 0 0 4px ${C.accent.classic}4D`,
             ],
           } : { boxShadow: '0 0 0 0 transparent' }}
           transition={playerActive
@@ -602,18 +621,17 @@ export function GameView({
             : { duration: 0.2 }}
           style={{
             flex: 1, borderRadius: 10, padding: '6px 4px',
-            background: 'rgba(255,255,255,0.03)',
-            border: playerActive ? `3px solid ${TAN}` : '1px solid rgba(255,255,255,0.06)',
+            background: alpha(C.ink.classic, 0.03),
+            border: playerActive ? `3px solid ${C.accent.classic}` : `1px solid ${alpha(C.ink.classic, 0.06)}`,
             display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 2,
             transition: 'border 200ms',
             position: 'relative', zIndex: 20,
           }}>
-          <span style={{ fontSize: 8, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, fontWeight: 500, textTransform: 'uppercase' }}>YOUR HAND</span>
-          <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
+          <span style={{ fontSize: 8, color: alpha(C.ink.classic, 0.4), letterSpacing: 1, fontWeight: 600, textTransform: 'uppercase' }}>YOUR HAND</span>
+          <div style={{ display: 'flex', gap: handFit.gap, justifyContent: 'center' }}>
             {visibleHand.map((card) => (
-              <CardComponent key={card.id} card={card}
+              <CardComponent key={card.id} card={card} size="hand" scale={handFit.scale}
                 draggable={isPlayerTurn}
-                isDragging={draggingCardId === card.id}
                 onDragMove={(pt) => { handleDragStart(card.id, 'hand'); handleDragMove(pt, 'hand'); }}
                 onDragEnd={(pt) => handleDragEnd(card.id, 'hand', pt)}
               />
@@ -627,14 +645,14 @@ export function GameView({
         {showQuitDialog && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
             onClick={() => setShowQuitDialog(false)}
-            style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 250, padding: 20 }}>
+            style={{ position: 'fixed', inset: 0, background: alpha(C.classicTable, 0.7), display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 250, padding: 20 }}>
             <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
               onClick={(e) => e.stopPropagation()}
-              style={{ background: '#1a1a1a', borderRadius: 12, padding: 24, maxWidth: 280, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <h3 style={{ fontWeight: 700, fontSize: 18, color: '#fff', margin: 0 }}>
+              style={{ background: C.surface.classic, borderRadius: 12, padding: 24, maxWidth: 280, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
+              <h3 style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 18, color: C.inkOnSurface.classic, margin: 0 }}>
                 {currentLevelId ? 'Return to The Run Map?' : 'Quit Game?'}
               </h3>
-              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', margin: 0 }}>
+              <p style={{ fontSize: 13, color: alpha(C.inkOnSurface.classic, 0.6), textAlign: 'center', margin: 0 }}>
                 {currentLevelId
                   ? 'Your level is saved. Resume it from The Run map. Star progress is safe.'
                   : 'Your game is saved. Tap Continue on the home screen to pick it up.'}
@@ -694,7 +712,7 @@ function TUTORIAL_MARKS(refs: TutorialMarkRefs): TutorialMark[] {
     { title: 'Combo builder', copy: 'Drag a base card here — from your hand or the table — then add cards that add up to it, or match it.', ref: refs.comboBuilderRef },
     { title: 'Reset', copy: 'Dragged the wrong card? Reset sends everything in the builder back where it came from.', ref: refs.resetWrapRef, pill: true },
     { title: 'Submit', copy: 'Hit submit to capture, and your turn keeps going. To place instead, drag a card onto the table — that ends your turn.', ref: refs.submitWrapRef, pill: true },
-    { title: 'The bots', copy: 'Two bots are after the same cards. Watch what they leave behind.', ref: refs.botZonesRef },
+    { title: 'The opponents', copy: 'Two opponents are after the same cards. Watch what they leave behind.', ref: refs.botZonesRef },
     { title: 'Message strip', copy: 'Hints and the last move land here.', ref: refs.msgStripRef },
     { title: 'Header', copy: "Where you are: your world and level, and the round and hand you're on.", ref: refs.headerRef },
   ];
@@ -722,38 +740,38 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
         : { duration: 0.2 }}
       style={{
         flex: 1, borderRadius: 10, padding: '8px 10px',
-        background: 'rgba(255,255,255,0.03)',
-        border: active ? `3px solid ${color}` : '1px solid rgba(255,255,255,0.06)',
+        background: alpha(C.ink.classic, 0.03),
+        border: active ? `3px solid ${color}` : `1px solid ${alpha(C.ink.classic, 0.06)}`,
         display: 'flex', flexDirection: 'column', gap: 4,
         transition: 'border 200ms',
         minWidth: 0,
       }}>
-      {/* Name line — Inter Medium 14px, bot color @ 100% */}
+      {/* Name line — 14px, bot colour @ 100% */}
       <span style={{
-        fontFamily: 'Inter, system-ui, sans-serif',
-        fontSize: 14, fontWeight: 500, color,
+        fontFamily: FONTS.sans,
+        fontSize: 14, fontWeight: 600, color,
         whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
       }}>
         {name}{thinking ? ' …' : ''}
       </span>
 
       {/* Score line — `[score] /[target]` format.
-            Score: Inter Black 22px, white@90% → tan@90% at 80% threshold.
-            Suffix: Inter Medium 12px, white@50%. */}
+            Score: 700 at 18px, ink@90% → the accent@90% at the 80% threshold.
+            Suffix: 600 at 12px, ink@50%. */}
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
         <motion.span
-          animate={{ color: escalated ? 'rgba(232,197,119,0.9)' : 'rgba(255,255,255,0.9)' }}
+          animate={{ color: escalated ? alpha(C.accent.classic, 0.9) : alpha(C.ink.classic, 0.9) }}
           transition={{ duration: 0.5, ease: 'easeIn' }}
           style={{
-            fontFamily: 'Inter, system-ui, sans-serif',
-            fontWeight: 900, fontSize: 18, lineHeight: 1,
+            fontFamily: FONTS.sans,
+            fontWeight: 700, fontSize: 18, lineHeight: 1,
           }}
         >
           {score}
         </motion.span>
         <span style={{
-          fontFamily: 'Inter, system-ui, sans-serif',
-          fontSize: 12, fontWeight: 500, color: 'rgba(255,255,255,0.5)',
+          fontFamily: FONTS.sans,
+          fontSize: 12, fontWeight: 600, color: alpha(C.ink.classic, 0.5),
         }}>/{target}</span>
       </div>
 
@@ -761,10 +779,10 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
       <div style={{ display: 'flex', gap: -4, marginTop: 2 }}>
         {hand.slice(0, 4).map((c, i) => (
           <div key={c.id} style={{ marginLeft: i > 0 ? -8 : 0 }}>
-            <CardComponent card={c} faceDown small />
+            <CardComponent card={c} faceDown size="slot" />
           </div>
         ))}
-        {hand.length === 0 && <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)' }}>No cards</span>}
+        {hand.length === 0 && <span style={{ fontSize: 9, color: alpha(C.ink.classic, 0.25) }}>No cards</span>}
       </div>
     </motion.div>
   );
@@ -775,15 +793,15 @@ function BotZone({ name, color, score, target, hand, active, thinking, escalated
 function Btn({ label, primary, disabled, big, onClick }: {
   label: string; primary?: boolean; disabled?: boolean; big?: boolean; onClick: () => void;
 }) {
-  // Secondary outlined style: 1.5px white@40% border, white@90% text,
-  // transparent fill. Primary keeps jade for in-game CTAs (SUBMIT / RESUME).
+  // Secondary outlined style: 1.5px ink@40% border, ink@90% text,
+  // transparent fill. Primary is Classic's gold with the table colour (SUBMIT / RESUME).
   return (
     <motion.button onClick={onClick} disabled={disabled} whileTap={disabled ? undefined : { scale: 0.97 }} transition={getTransition('snappy')} style={{
       padding: big ? '10px 24px' : '5px 14px', borderRadius: 6,
-      border: primary ? 'none' : '1.5px solid rgba(255,255,255,0.4)',
-      background: primary ? (disabled ? 'rgba(255,255,255,0.08)' : JADE) : 'transparent',
-      color: primary ? (disabled ? 'rgba(255,255,255,0.3)' : '#fff') : 'rgba(255,255,255,0.9)',
-      fontSize: big ? 15 : 12, fontWeight: 600, fontFamily: 'Inter, system-ui, sans-serif',
+      border: primary ? 'none' : `1.5px solid ${alpha(C.ink.classic, 0.4)}`,
+      background: primary ? (disabled ? alpha(C.ink.classic, 0.08) : C.classicGold) : 'transparent',
+      color: primary ? (disabled ? alpha(C.ink.classic, 0.3) : C.classicTable) : alpha(C.ink.classic, 0.9),
+      fontSize: big ? 15 : 12, fontWeight: 600, fontFamily: FONTS.sans,
       cursor: disabled ? 'default' : 'pointer',
     }}>{label}</motion.button>
   );
@@ -791,8 +809,8 @@ function Btn({ label, primary, disabled, big, onClick }: {
 
 // Header bar segments. 4 segments separated by mid-dots:
 //   MODE · TARGET/LEVEL · R[N] · H[N]
-// Mode + target/level stable white@90% (never drop). R[N] / H[N]
-// white@70% by default, tan@90% during the Hand 3 round-arc cue.
+// Mode + target/level stable ink@90% (never drop). R[N] / H[N]
+// ink@70% by default, the accent@90% during the Hand 3 round-arc cue.
 // Min-width:0 + overflow:hidden on the container give natural
 // truncation if width is tight.
 //
@@ -808,21 +826,21 @@ function HeaderSegments({
   hand: number;
 }) {
   const HAND_3_FORK = hand >= 3;
-  const stable = 'rgba(255,255,255,0.9)';
-  const secondary = 'rgba(255,255,255,0.7)';
-  const tan = 'rgba(232,197,119,0.9)'; // TAN #E8C577 @ 90%
-  const dotColor = 'rgba(255,255,255,0.4)';
+  const stable = alpha(C.ink.classic, 0.9);
+  const secondary = alpha(C.ink.classic, 0.7);
+  const cue = alpha(C.accent.classic, 0.9);
+  const dotColor = alpha(C.ink.classic, 0.4);
 
   const seg = (text: string, color: string, key: string, letterSpacing = 'normal') => (
     <span key={key} style={{
-      fontFamily: 'Inter, system-ui, sans-serif',
+      fontFamily: FONTS.sans,
       fontSize: 13, fontWeight: 500, color, letterSpacing, whiteSpace: 'nowrap',
     }}>{text}</span>
   );
 
   const dot = (key: string) => (
     <span key={key} aria-hidden style={{
-      fontFamily: 'Inter, system-ui, sans-serif',
+      fontFamily: FONTS.sans,
       fontSize: 13, color: dotColor, padding: '0 8px', whiteSpace: 'nowrap',
     }}>·</span>
   );
@@ -830,8 +848,8 @@ function HeaderSegments({
   const segments = [
     seg(mode, stable, 'mode', '0.04em'),
     seg(targetOrLevel, stable, 'tl'),
-    seg(`R${round}`, HAND_3_FORK ? tan : secondary, 'r'),
-    seg(`H${hand}`, HAND_3_FORK ? tan : secondary, 'h'),
+    seg(`R${round}`, HAND_3_FORK ? cue : secondary, 'r'),
+    seg(`H${hand}`, HAND_3_FORK ? cue : secondary, 'h'),
   ];
 
   // Interleave separators between segments

@@ -1,51 +1,46 @@
-/** Central color tokens — single source of truth.
- *  Every component references these, never raw hex. */
+/** STACKED v2 colour tokens, copied from design/system/tokens.json (D-007 release 1).
+ *  One home for every colour: no other file under src holds a colour value
+ *  (tests/config/oneColourHome.test.ts). The seven role tokens carry both
+ *  themes, brand (Citrus Press) and classic (Emerald Noir); the rest are
+ *  named colours. A token nothing uses yet is left out until the release
+ *  that uses it. Use the roles by name, never by hex. */
 export const C = {
-  // Brand palette (locked May 1, 2026)
-  jade: '#065F46',
-  tan: '#E8C577',
-  brown: '#72571C',
-  bgNearBlack: '#0A0A0A',
+  // Role tokens, one value per theme.
+  ground:       { brand: '#FFF4B8', classic: '#064428' },
+  surface:      { brand: '#1E2A44', classic: '#033019' },
+  ink:          { brand: '#1E2A44', classic: '#F0FFF6' },
+  inkOnSurface: { brand: '#FFF4B8', classic: '#F0FFF6' },
+  muted:        { brand: '#4A5470', classic: '#B8F0D2' },
+  accent:       { brand: '#1E5BD8', classic: '#FFC53A' },
+  line:         { brand: '#6B7390', classic: '#B8F0D2' },
 
-  slateBg: '#1E1E2E',
-  board: '#252538',
-  card: '#FFFFFF',
-  // indigo / indigoHover — DEPRECATED. Phaser-era leftovers. Bundle A swaps
-  // overlay CTA usage to brand jade/tan; tokens kept temporarily for any
-  // residual reference. Schedule for removal.
-  indigo: '#4F46E5',
-  indigoHover: '#6366F1',
-  amber: '#F59E0B',
-  textPrimary: '#F1F1F3',
-  textSecondary: '#8B8BA3',
-  success: '#10B981',
-  error: '#EF4444',
-  divider: '#3A3A50',
-  slotEmpty: '#4A4A5A',
-  disabled: '#2A2A3D',
-  disabledText: '#5A5A70',
-  ruleText: '#C0C0D0',
+  // Classic's named colours. Gold is the player's and the board's; text on it is the table colour.
+  classicGold: '#FFC53A',
+  classicGoldDeep: '#A36A00',
+  classicTable: '#033019',
 
-  // Bot personality colors — locked palette per visual paint brief Section 7.
-  // Re-aligned May 14: botNina #A78BFA → #DBEAFE (resolved Game Over drift),
-  // botJett #FBBF24 → #8B5CF6 (Stacy May 6 inconsistency closed; teal #0D9488
-  // and golden #FBBF24 both retired). Calvin / Rex updated to locked palette.
-  botCalvin: '#3B82F6',
-  botTalia: '#F472B6',
-  botNina: '#DBEAFE',
-  botMira: '#34D399',
-  botJett: '#8B5CF6',
-  botRex: '#DC2626',
+  // The card, the same in every mode.
+  cardFace: '#FFFAF6',
+  cardRing: '#FFC53A',
+  suitDark: '#0A1A12',
+  suitRed: '#D9241C',
 
-  // Suit colors
-  suitRed: '#DC2626',
-  suitBlack: '#0F0F1A',
+  // Bot colours. A bot's colour shows only on its own things; no bot owns one yet.
+  botAzure: '#5CC2FF',
+  botWisteria: '#BE96FF',
 } as const;
 
+/** Card drop shadows. cardFull is tokens.json's card-full shadow without its
+ *  ring, which Card.tsx adds from cardRing at the size's ring width; cardHand
+ *  and cardTable are the hand and table cards' shadows as GB2 draws them.
+ *  The capture-slot card has no shadow. */
 export const SHADOWS = {
-  cardRest: '0 2px 12px rgba(0,0,0,0.3), inset 1px 1px 0 rgba(255,255,255,0.06)',
-  cardSelected: '0 4px 20px rgba(79,70,229,0.35)',
-  cardLifted: '0 8px 24px rgba(0,0,0,0.4)',
-  comboReady: '0 0 12px rgba(79,70,229,0.2)',
-  cardPeek: '0 8px 24px rgba(0,0,0,0.5)',
+  cardFull: '0 18px 40px #033019e6',
+  cardHand: '0 10px 18px #021F10E6',
+  cardTable: '0 6px 12px #021F10D9',
 } as const;
+
+/** A colour at an alpha, as an eight-digit hex: alpha(C.ink.classic, 0.5). */
+export function alpha(hex: string, a: number): string {
+  return hex + Math.round(a * 255).toString(16).padStart(2, '0');
+}

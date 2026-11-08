@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from 'motion/react';
-import { C } from '../config/colors';
+import { C, alpha } from '../config/colors';
+import { FONTS } from '../config/fonts';
 import { getTransition } from '../config/motion';
 
 interface PlayerScore {
@@ -35,7 +36,7 @@ export function LevelCompleteOverlay({
           transition={{ duration: 0.25 }}
           style={{
             position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.85)',
+            background: alpha(C.classicTable, 0.85),
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             gap: 14, zIndex: 200, padding: '24px 16px',
@@ -47,9 +48,9 @@ export function LevelCompleteOverlay({
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 22 }}
             style={{
-              fontSize: won ? 22 : 20, fontWeight: 800, margin: 0,
-              fontFamily: 'Inter, sans-serif',
-              color: won ? C.amber : C.textSecondary,
+              fontSize: won ? 22 : 20, fontWeight: 400, margin: 0,
+              fontFamily: FONTS.display,
+              color: won ? C.accent.classic : C.muted.classic,
               letterSpacing: 1,
             }}
           >
@@ -66,7 +67,7 @@ export function LevelCompleteOverlay({
                 transition={{ delay: i * 0.12, type: 'spring', stiffness: 400, damping: 20 }}
                 style={{
                   fontSize: 32,
-                  color: i <= starsEarned ? C.amber : C.divider,
+                  color: i <= starsEarned ? C.accent.classic : C.line.classic,
                 }}
               >
                 {i <= starsEarned ? '★' : '☆'}
@@ -76,9 +77,9 @@ export function LevelCompleteOverlay({
 
           {/* Margin */}
           <span style={{
-            fontFamily: "'JetBrains Mono', monospace",
+            fontFamily: FONTS.sans,
             fontSize: 14, fontWeight: 600,
-            color: won ? C.success : C.error,
+            color: won ? C.accent.classic : C.suitRed,
           }}>
             {won ? `Won by ${margin} points` : `Lost by ${Math.abs(margin)} points`}
           </span>
@@ -93,17 +94,17 @@ export function LevelCompleteOverlay({
               <div key={i} style={{
                 display: 'flex', justifyContent: 'space-between',
                 padding: '4px 10px', borderRadius: 4,
-                background: p.isPlayer ? 'rgba(255,255,255,0.06)' : 'transparent',
+                background: p.isPlayer ? alpha(C.ink.classic, 0.06) : 'transparent',
               }}>
                 <span style={{
-                  fontFamily: 'Inter, sans-serif', fontSize: 12, fontWeight: p.isPlayer ? 700 : 400,
-                  color: p.isPlayer ? C.amber : C.textSecondary,
+                  fontFamily: FONTS.sans, fontSize: 12, fontWeight: p.isPlayer ? 700 : 400,
+                  color: p.isPlayer ? C.accent.classic : C.muted.classic,
                 }}>
                   {p.name}
                 </span>
                 <span style={{
-                  fontFamily: "'JetBrains Mono', monospace", fontSize: 13, fontWeight: 600,
-                  color: p.isPlayer ? C.textPrimary : C.textSecondary,
+                  fontFamily: FONTS.sans, fontSize: 13, fontWeight: 600,
+                  color: p.isPlayer ? C.ink.classic : C.muted.classic,
                 }}>
                   {p.score}
                 </span>
@@ -119,23 +120,23 @@ export function LevelCompleteOverlay({
               transition={{ delay: 0.5 }}
               style={{
                 marginTop: 4, padding: '10px 18px', borderRadius: 8,
-                background: 'rgba(245,158,11,0.1)',
-                border: `1px solid ${C.amber}`,
+                background: alpha(C.accent.classic, 0.1),
+                border: `1px solid ${C.accent.classic}`,
                 textAlign: 'center',
               }}
             >
               <span style={{
-                fontFamily: 'Inter, sans-serif', fontSize: 14, fontWeight: 700,
-                color: C.amber,
+                fontFamily: FONTS.sans, fontSize: 14, fontWeight: 700,
+                color: C.accent.classic,
               }}>
                 JETT UNLOCKED IN CLASSIC
               </span>
               <br />
               <span style={{
-                fontFamily: 'Inter, sans-serif', fontSize: 11,
-                color: C.textSecondary,
+                fontFamily: FONTS.sans, fontSize: 11,
+                color: C.muted.classic,
               }}>
-                Bot intelligence arc complete.
+                Opponent intelligence arc complete.
               </span>
             </motion.div>
           )}
@@ -149,9 +150,9 @@ export function LevelCompleteOverlay({
                 transition={getTransition('snappy')}
                 style={{
                   width: '100%', height: 46, borderRadius: 8,
-                  border: 'none', background: C.tan,
-                  color: C.bgNearBlack, fontSize: 15, fontWeight: 700,
-                  fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                  border: 'none', background: C.accent.classic,
+                  color: C.classicTable, fontSize: 15, fontWeight: 700,
+                  fontFamily: FONTS.sans, cursor: 'pointer',
                 }}
               >
                 NEXT LEVEL
@@ -163,11 +164,11 @@ export function LevelCompleteOverlay({
               transition={getTransition('snappy')}
               style={{
                 width: '100%', height: 42, borderRadius: 8,
-                border: onNextLevel ? `1.5px solid rgba(255,255,255,0.4)` : 'none',
-                background: onNextLevel ? 'transparent' : C.tan,
-                color: onNextLevel ? 'rgba(255,255,255,0.9)' : C.bgNearBlack,
+                border: onNextLevel ? `1.5px solid ${alpha(C.ink.classic, 0.4)}` : 'none',
+                background: onNextLevel ? 'transparent' : C.accent.classic,
+                color: onNextLevel ? alpha(C.ink.classic, 0.9) : C.classicTable,
                 fontSize: 14, fontWeight: onNextLevel ? 600 : 700,
-                fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                fontFamily: FONTS.sans, cursor: 'pointer',
               }}
             >
               PLAY AGAIN
@@ -178,10 +179,10 @@ export function LevelCompleteOverlay({
               transition={getTransition('snappy')}
               style={{
                 width: '100%', height: 42, borderRadius: 8,
-                border: `1.5px solid rgba(255,255,255,0.4)`,
+                border: `1.5px solid ${alpha(C.ink.classic, 0.4)}`,
                 background: 'transparent',
-                color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 600,
-                fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                color: alpha(C.ink.classic, 0.9), fontSize: 14, fontWeight: 600,
+                fontFamily: FONTS.sans, cursor: 'pointer',
               }}
             >
               WORLD MAP

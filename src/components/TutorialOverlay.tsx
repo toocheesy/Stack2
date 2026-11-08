@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState, type RefObject } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { C, alpha } from '../config/colors';
+import { FONTS } from '../config/fonts';
 
-const JADE = '#065F46';
-const TAN = '#E8C577';
-const BROWN = '#72571C';
-const SCRIM = 'rgba(10,10,10,0.85)';
+const SCRIM = alpha(C.classicTable, 0.85);
 
 export interface TutorialMark {
   title: string;
@@ -153,7 +152,7 @@ export function TutorialOverlay({
                 height: rect.height + RING_PAD * 2,
                 borderRadius: activeMark.pill ? 999 : 10,
                 boxShadow: `0 0 0 9999px ${SCRIM}`,
-                outline: `2px solid ${TAN}`,
+                outline: `2px solid ${C.accent.classic}`,
                 outlineOffset: 0,
                 pointerEvents: 'none',
                 transition: 'top 0.22s ease, left 0.22s ease, width 0.22s ease, height 0.22s ease',
@@ -178,31 +177,31 @@ export function TutorialOverlay({
                 top: cardPlacement.top,
                 bottom: cardPlacement.bottom,
                 width: cardPlacement.width,
-                background: '#1a1a1a',
+                background: C.surface.classic,
                 borderRadius: 10,
-                borderTop: `3px solid ${TAN}`,
-                border: `1px solid rgba(232,197,119,0.25)`,
-                boxShadow: '0 8px 32px rgba(0,0,0,0.55)',
+                borderTop: `3px solid ${C.accent.classic}`,
+                border: `1px solid ${alpha(C.accent.classic, 0.25)}`,
+                boxShadow: `0 8px 32px ${alpha(C.classicTable, 0.55)}`,
                 padding: 18,
                 display: 'flex', flexDirection: 'column', gap: 12,
                 pointerEvents: 'auto',
               }}
             >
               <div style={{
-                fontFamily: 'Inter, sans-serif', fontSize: 10, fontWeight: 600,
-                color: JADE, letterSpacing: '0.2em', textTransform: 'uppercase',
+                fontFamily: FONTS.sans, fontSize: 10, fontWeight: 600,
+                color: C.classicGold, letterSpacing: '0.2em', textTransform: 'uppercase',
               }}>
                 Step {currentStep + 1} of {totalSteps}
               </div>
               <div style={{
-                fontFamily: 'Inter, sans-serif', fontWeight: 800, fontSize: 16,
-                color: '#fff', lineHeight: 1.2,
+                fontFamily: FONTS.display, fontWeight: 400, fontSize: 16,
+                color: C.inkOnSurface.classic, lineHeight: 1.2,
               }}>
                 {activeMark.title}
               </div>
               <div style={{
-                fontFamily: 'Inter, sans-serif', fontSize: 13, lineHeight: 1.4,
-                color: 'rgba(255,255,255,0.75)',
+                fontFamily: FONTS.sans, fontSize: 13, lineHeight: 1.4,
+                color: alpha(C.inkOnSurface.classic, 0.75),
               }}>
                 {activeMark.copy}
               </div>
@@ -217,8 +216,8 @@ export function TutorialOverlay({
                       width: i === currentStep ? 8 : 6,
                       height: i === currentStep ? 8 : 6,
                       borderRadius: 99, padding: 0,
-                      border: i === currentStep ? 'none' : `1px solid ${JADE}`,
-                      background: i === currentStep ? TAN : 'transparent',
+                      border: i === currentStep ? 'none' : `1px solid ${C.classicGold}`,
+                      background: i === currentStep ? C.accent.classic : 'transparent',
                       cursor: 'pointer',
                     }}
                   />
@@ -230,8 +229,8 @@ export function TutorialOverlay({
                   onClick={onSkip}
                   style={{
                     background: 'transparent', border: 'none', cursor: 'pointer',
-                    color: 'rgba(255,255,255,0.5)', fontSize: 12,
-                    fontFamily: 'Inter, sans-serif', padding: '4px 8px',
+                    color: alpha(C.inkOnSurface.classic, 0.5), fontSize: 12,
+                    fontFamily: FONTS.sans, padding: '4px 8px',
                   }}
                 >
                   Skip
@@ -242,8 +241,8 @@ export function TutorialOverlay({
                       onClick={onPrev}
                       style={{
                         background: 'transparent', border: 'none', cursor: 'pointer',
-                        color: 'rgba(255,255,255,0.5)', fontSize: 12,
-                        fontFamily: 'Inter, sans-serif', padding: '4px 8px',
+                        color: alpha(C.inkOnSurface.classic, 0.5), fontSize: 12,
+                        fontFamily: FONTS.sans, padding: '4px 8px',
                       }}
                     >
                       Back
@@ -253,9 +252,9 @@ export function TutorialOverlay({
                     whileTap={{ scale: 0.97 }}
                     onClick={handleNext}
                     style={{
-                      background: TAN, color: BROWN, border: 'none',
+                      background: C.accent.classic, color: C.classicTable, border: 'none',
                       borderRadius: 99, padding: '8px 18px',
-                      fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 700,
+                      fontFamily: FONTS.sans, fontSize: 13, fontWeight: 700,
                       letterSpacing: '0.04em', cursor: 'pointer',
                     }}
                   >
@@ -280,8 +279,8 @@ export function TutorialOverlay({
               }}
             >
               <div style={{
-                fontFamily: 'Inter, sans-serif', fontSize: 22, fontWeight: 800,
-                color: TAN, letterSpacing: '0.04em',
+                fontFamily: FONTS.display, fontSize: 22, fontWeight: 400,
+                color: C.accent.classic, letterSpacing: '0.04em',
               }}>
                 You're ready to play
               </div>

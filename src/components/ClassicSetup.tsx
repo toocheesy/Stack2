@@ -3,21 +3,20 @@ import { motion } from 'motion/react';
 import type { Difficulty } from '../engine/types';
 import { getTransition } from '../config/motion';
 import { isJettUnlockedInClassic } from '../engine/adventure/progressManager';
+import { C, alpha } from '../config/colors';
+import { FONTS } from '../config/fonts';
 
-const JADE = '#065F46';
-const BG = '#0A0A0A';
 const TARGET_PRESETS = [100, 300, 500, 1000] as const;
 
 type BotId = 'calvin' | 'nina' | 'rex' | 'jett';
 
-// Bot color literals reference the central tokens in src/config/colors.ts.
-// Kept inline here for component locality; if the locked palette shifts in
-// the future, update colors.ts and these in lockstep.
+// Bot colours come from src/config/colors.ts (STACKED v2): Nina azure, Rex wisteria;
+// Calvin and Jett have no colour yet (line). Text on a bot colour is the table colour.
 const BOTS: { id: BotId; name: string; color: string; textOnAvatar: string; difficulty: Difficulty; label: string; flavor: string }[] = [
-  { id: 'calvin', name: 'Calvin', color: '#3B82F6', textOnAvatar: '#fff',    difficulty: 'beginner',     label: 'Easy',   flavor: 'Cautious, hesitant. Easy.' },
-  { id: 'nina',   name: 'Nina',   color: '#DBEAFE', textOnAvatar: '#1E293B', difficulty: 'intermediate', label: 'Medium', flavor: 'Balanced, calculating. Medium.' },
-  { id: 'rex',    name: 'Rex',    color: '#DC2626', textOnAvatar: '#fff',    difficulty: 'advanced',     label: 'Hard',   flavor: 'Aggressive, combo-greedy. Hard.' },
-  { id: 'jett',   name: 'Jett',   color: '#8B5CF6', textOnAvatar: '#fff',    difficulty: 'expert',       label: 'Expert', flavor: 'Patient, relentless. Expert.' },
+  { id: 'calvin', name: 'Calvin', color: C.line.classic, textOnAvatar: C.classicTable, difficulty: 'beginner',     label: 'Easy',   flavor: 'Cautious, hesitant. Easy.' },
+  { id: 'nina',   name: 'Nina',   color: C.botAzure,     textOnAvatar: C.classicTable, difficulty: 'intermediate', label: 'Medium', flavor: 'Balanced, calculating. Medium.' },
+  { id: 'rex',    name: 'Rex',    color: C.botWisteria,  textOnAvatar: C.classicTable, difficulty: 'advanced',     label: 'Hard',   flavor: 'Aggressive, combo-greedy. Hard.' },
+  { id: 'jett',   name: 'Jett',   color: C.line.classic, textOnAvatar: C.classicTable, difficulty: 'expert',       label: 'Expert', flavor: 'Patient, relentless. Expert.' },
 ];
 
 interface Props {
@@ -52,28 +51,28 @@ export function ClassicSetup({ onStart, onBack }: Props) {
 
   return (
     <div style={{
-      width: '100vw', height: '100dvh', background: BG,
-      backgroundImage: 'radial-gradient(circle at 30% 10%, rgba(6,95,70,0.10) 0%, transparent 50%), radial-gradient(circle at 80% 90%, rgba(232,197,119,0.05) 0%, transparent 50%)',
+      width: '100vw', height: '100dvh', background: C.ground.classic,
+      backgroundImage: `radial-gradient(circle at 30% 10%, ${alpha(C.accent.classic, 0.10)} 0%, transparent 50%), radial-gradient(circle at 80% 90%, ${alpha(C.accent.classic, 0.05)} 0%, transparent 50%)`,
       display: 'flex', flexDirection: 'column',
       padding: '16px 20px 24px',
       overflow: 'hidden',
-      fontFamily: 'Inter, system-ui, sans-serif',
-      color: '#fff',
+      fontFamily: FONTS.sans,
+      color: C.ink.classic,
     }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 24 }}>
         <motion.button onClick={onBack} whileTap={{ scale: 0.9 }} transition={getTransition('snappy')} style={{
           width: 36, height: 36, borderRadius: 99,
-          background: 'rgba(255,255,255,0.06)', border: 'none',
-          color: 'rgba(255,255,255,0.7)', fontSize: 18, cursor: 'pointer',
+          background: alpha(C.ink.classic, 0.06), border: 'none',
+          color: alpha(C.ink.classic, 0.7), fontSize: 18, cursor: 'pointer',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}>←</motion.button>
-        <h2 style={{ fontWeight: 900, fontSize: 18, margin: 0, letterSpacing: '-0.01em' }}>Classic Setup</h2>
+        <h2 style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 18, margin: 0, letterSpacing: '-0.01em' }}>Classic Setup</h2>
       </div>
 
       {/* Target Score */}
       <div style={{ marginBottom: 24 }}>
-        <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.22em', textTransform: 'uppercase' as const }}>
+        <span style={{ fontSize: 9, fontWeight: 600, color: alpha(C.ink.classic, 0.5), letterSpacing: '0.22em', textTransform: 'uppercase' as const }}>
           TARGET SCORE
         </span>
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
@@ -82,11 +81,11 @@ export function ClassicSetup({ onStart, onBack }: Props) {
             return (
               <motion.button key={val} onClick={() => setTargetScore(val)} whileTap={{ scale: 0.95 }} transition={getTransition('snappy')} style={{
                 flex: 1, height: 44, borderRadius: 10,
-                border: selected ? `2px solid ${JADE}` : '1px solid rgba(255,255,255,0.1)',
-                background: selected ? 'rgba(6,95,70,0.18)' : 'transparent',
-                boxShadow: selected ? `0 0 12px rgba(6,95,70,0.3)` : 'none',
-                color: '#fff',
-                fontFamily: "'JetBrains Mono', monospace",
+                border: selected ? `2px solid ${C.classicGold}` : `1px solid ${alpha(C.ink.classic, 0.1)}`,
+                background: selected ? alpha(C.classicGold, 0.18) : 'transparent',
+                boxShadow: selected ? `0 0 12px ${alpha(C.classicGold, 0.3)}` : 'none',
+                color: C.ink.classic,
+                fontFamily: FONTS.sans,
                 fontWeight: 700, fontSize: 16, cursor: 'pointer',
                 transition: 'border 150ms, background 150ms, box-shadow 150ms',
               }}>
@@ -95,14 +94,14 @@ export function ClassicSetup({ onStart, onBack }: Props) {
             );
           })}
         </div>
-        <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginTop: 8, display: 'block' }}>
+        <span style={{ fontSize: 11, color: alpha(C.ink.classic, 0.4), marginTop: 8, display: 'block' }}>
           First to target wins after a round ends
         </span>
       </div>
 
       {/* Opponents */}
       <div style={{ flex: 1 }}>
-        <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.22em', textTransform: 'uppercase' as const }}>
+        <span style={{ fontSize: 9, fontWeight: 600, color: alpha(C.ink.classic, 0.5), letterSpacing: '0.22em', textTransform: 'uppercase' as const }}>
           PICK 2 OPPONENTS
         </span>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
@@ -113,9 +112,9 @@ export function ClassicSetup({ onStart, onBack }: Props) {
               <motion.button key={bot.id} onClick={() => toggleBot(bot.id)} whileTap={locked ? undefined : { scale: 0.97 }} transition={getTransition('snappy')} style={{
                 display: 'flex', alignItems: 'center', gap: 12,
                 padding: '12px 14px', borderRadius: 12,
-                border: selected ? `2px solid ${bot.color}` : '1px solid rgba(255,255,255,0.08)',
+                border: selected ? `2px solid ${bot.color}` : `1px solid ${alpha(C.ink.classic, 0.08)}`,
                 boxShadow: selected ? `0 0 14px ${bot.color}44` : 'none',
-                background: selected ? 'rgba(255,255,255,0.04)' : 'transparent',
+                background: selected ? alpha(C.ink.classic, 0.04) : 'transparent',
                 cursor: locked ? 'default' : 'pointer', textAlign: 'left' as const, width: '100%',
                 opacity: locked ? 0.55 : 1,
                 transition: 'border 200ms, box-shadow 200ms, opacity 200ms',
@@ -123,32 +122,32 @@ export function ClassicSetup({ onStart, onBack }: Props) {
               }}>
                 <div style={{
                   width: 40, height: 40, borderRadius: 20,
-                  background: selected ? bot.color : 'rgba(255,255,255,0.08)',
+                  background: selected ? bot.color : alpha(C.ink.classic, 0.08),
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: selected ? bot.textOnAvatar : 'rgba(255,255,255,0.3)',
-                  fontWeight: 800, fontSize: 18, flexShrink: 0,
+                  color: selected ? bot.textOnAvatar : alpha(C.ink.classic, 0.3),
+                  fontWeight: 700, fontSize: 18, flexShrink: 0,
                   transition: 'background 200ms, color 200ms',
                 }}>
                   {bot.name[0]}
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span style={{ fontWeight: 800, fontSize: 15, color: selected ? bot.color : 'rgba(255,255,255,0.35)', transition: 'color 200ms' }}>
+                    <span style={{ fontWeight: 700, fontSize: 15, color: selected ? bot.color : alpha(C.ink.classic, 0.35), transition: 'color 200ms' }}>
                       {bot.name}
                     </span>
-                    <span style={{ fontSize: 11, fontWeight: 500, color: selected ? 'rgba(255,255,255,0.6)' : 'rgba(255,255,255,0.25)', transition: 'color 200ms' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: selected ? alpha(C.ink.classic, 0.6) : alpha(C.ink.classic, 0.25), transition: 'color 200ms' }}>
                       {bot.label}
                     </span>
                   </div>
-                  <span style={{ fontSize: 11, color: selected ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)', fontStyle: 'italic', transition: 'color 200ms' }}>
+                  <span style={{ fontSize: 11, color: selected ? alpha(C.ink.classic, 0.5) : alpha(C.ink.classic, 0.2), fontStyle: 'italic', transition: 'color 200ms' }}>
                     {locked ? 'Beat The Run World 4 to unlock' : bot.flavor}
                   </span>
                 </div>
                 {locked && (
                   <span style={{
                     position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)',
-                    fontSize: 14, color: 'rgba(255,255,255,0.45)',
-                  }}>&#128274;</span>
+                    fontSize: 14, color: alpha(C.ink.classic, 0.45),
+                  }}>{'\u{1F512}'}</span>
                 )}
               </motion.button>
             );
@@ -161,12 +160,12 @@ export function ClassicSetup({ onStart, onBack }: Props) {
         whileTap={canStart ? { scale: 0.97 } : undefined} transition={getTransition('snappy')}
         style={{
           width: '100%', height: 52, borderRadius: 99, border: 'none',
-          background: canStart ? JADE : 'rgba(6,95,70,0.3)',
-          color: canStart ? '#fff' : 'rgba(255,255,255,0.5)',
-          fontWeight: 800, fontSize: 16, letterSpacing: '0.08em',
+          background: canStart ? C.classicGold : alpha(C.classicGold, 0.3),
+          color: canStart ? C.classicTable : alpha(C.ink.classic, 0.5),
+          fontWeight: 700, fontSize: 16, letterSpacing: '0.08em',
           cursor: canStart ? 'pointer' : 'default',
           marginTop: 16, flexShrink: 0,
-          boxShadow: canStart ? '0 2px 12px rgba(6,95,70,0.45), inset 0 1px 0 rgba(255,255,255,0.08)' : 'none',
+          boxShadow: canStart ? `0 2px 12px ${alpha(C.classicGold, 0.45)}, inset 0 1px 0 ${alpha(C.ink.classic, 0.08)}` : 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
         }}
       >

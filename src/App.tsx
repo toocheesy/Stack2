@@ -13,6 +13,8 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { useTutorial } from './tutorial/useTutorial';
 import { loadTutorialSeen } from './tutorial/tutorialStorage';
 import { trackGameStart, trackTutorialComplete, trackGameEnd, trackRunComplete } from './analytics/track';
+import { C, alpha } from './config/colors';
+import { FONTS } from './config/fonts';
 
 type Screen = 'home' | 'setup' | 'worldMap' | 'game' | 'cardtest';
 
@@ -180,12 +182,15 @@ function App() {
   );
 }
 
-// ─── Homepage constants (LOCKED) ────────────────────
+// ─── The page base ──────────────────────────────────
+// index.css paints html and body from these two variables, so every colour
+// stays in src/config/colors.ts (D-007). The page around the game wears the
+// brand theme.
 
-const JADE = '#065F46';
-const TAN = '#E8C577';
-const BROWN = '#72571C';
-const HOME_BG = '#0A0A0A';
+if (typeof document !== 'undefined') {
+  document.documentElement.style.setProperty('--page-ground', C.ground.brand);
+  document.documentElement.style.setProperty('--page-ink', C.ink.brand);
+}
 
 // ─── Animation keyframes (injected once) ────────────
 
@@ -229,10 +234,10 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
 
   return (
     <div style={{
-      position: 'absolute', inset: 0, background: HOME_BG, color: '#fff',
+      position: 'absolute', inset: 0, background: C.ground.brand, color: C.ink.brand,
       padding: '74px 24px 54px', display: 'flex', flexDirection: 'column',
-      fontFamily: 'Inter, system-ui, sans-serif',
-      backgroundImage: 'radial-gradient(circle at 30% 10%, rgba(6,95,70,0.10) 0%, transparent 50%), radial-gradient(circle at 80% 90%, rgba(232,197,119,0.05) 0%, transparent 50%)',
+      fontFamily: FONTS.sans,
+      backgroundImage: `radial-gradient(circle at 30% 10%, ${alpha(C.accent.brand, 0.10)} 0%, transparent 50%), radial-gradient(circle at 80% 90%, ${alpha(C.accent.brand, 0.05)} 0%, transparent 50%)`,
       overflow: 'hidden',
     }}>
       {/* Hero — STACKED! brand mark, centered at ~3.5× scale. The subtitle
@@ -243,13 +248,13 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
         gap: 6, flexShrink: 0, marginBottom: 28,
       }}>
         <div style={{
-          fontWeight: 900, fontSize: 64, letterSpacing: '-0.02em', lineHeight: 1,
+          fontFamily: FONTS.display, fontWeight: 400, fontSize: 64, letterSpacing: '-0.02em', lineHeight: 1,
         }}>
-          STACKED<span style={{ color: JADE }}>!</span>
+          STACKED<span style={{ color: C.accent.brand }}>!</span>
         </div>
         <div style={{
-          fontFamily: "'JetBrains Mono', monospace",
-          fontSize: 10, color: '#7a8580', letterSpacing: '0.22em', fontWeight: 500,
+          fontFamily: FONTS.sans,
+          fontSize: 10, color: C.muted.brand, letterSpacing: '0.22em', fontWeight: 600,
         }}>
           CHOOSE YOUR GAME
         </div>
@@ -263,7 +268,7 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
       </div>
 
       {/* S-020: the privacy notice, a static page opened in a new tab. */}
-      <a href="/privacy.html" target="_blank" rel="noopener" style={{ position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)', fontSize: 11, color: 'rgba(255,255,255,0.4)', textDecoration: 'none', fontFamily: 'Inter, sans-serif', letterSpacing: '0.04em', padding: '6px 10px' }}>Privacy</a>
+      <a href="/privacy.html" target="_blank" rel="noopener" style={{ position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)', fontSize: 11, color: alpha(C.ink.brand, 0.4), textDecoration: 'none', fontFamily: FONTS.sans, letterSpacing: '0.04em', padding: '6px 10px' }}>Privacy</a>
 
       {/* Top-right gear — opens Settings modal. Absolute-positioned so
           it sits outside the card flow and can't squeeze the layout. */}
@@ -274,8 +279,8 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
           position: 'absolute', top: 16, right: 16,
           width: 36, height: 36, borderRadius: 99,
           border: 'none', cursor: 'pointer',
-          background: 'rgba(255,255,255,0.06)',
-          color: 'rgba(255,255,255,0.7)',
+          background: alpha(C.ink.brand, 0.06),
+          color: alpha(C.ink.brand, 0.7),
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 18, lineHeight: 1, padding: 0,
         }}
@@ -289,7 +294,7 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
         <div
           onClick={() => setShowNewRunConfirm(false)}
           style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)',
+            position: 'fixed', inset: 0, background: alpha(C.surface.brand, 0.7),
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             zIndex: 250, padding: 20,
           }}
@@ -297,15 +302,15 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
-              background: '#1a1a1a', borderRadius: 12, padding: 24,
+              background: C.ground.brand, borderRadius: 12, padding: 24,
               maxWidth: 320, width: '100%',
               display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
             }}
           >
-            <h3 style={{ fontWeight: 700, fontSize: 18, color: '#fff', margin: 0 }}>
+            <h3 style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 18, color: C.ink.brand, margin: 0 }}>
               Start a new Run?
             </h3>
-            <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', textAlign: 'center', margin: 0 }}>
+            <p style={{ fontSize: 13, color: alpha(C.ink.brand, 0.6), textAlign: 'center', margin: 0 }}>
               Your existing Run is complete. Starting a new Run wipes progress and stars. Jett stays unlocked in Classic.
             </p>
             <div style={{ display: 'flex', gap: 10, marginTop: 4, width: '100%' }}>
@@ -313,9 +318,9 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
                 onClick={() => setShowNewRunConfirm(false)}
                 style={{
                   flex: 1, padding: '10px 16px', borderRadius: 8,
-                  border: '1.5px solid rgba(255,255,255,0.4)', background: 'transparent',
-                  color: 'rgba(255,255,255,0.9)', fontSize: 14, fontWeight: 600,
-                  fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                  border: `1.5px solid ${alpha(C.ink.brand, 0.4)}`, background: 'transparent',
+                  color: alpha(C.ink.brand, 0.9), fontSize: 14, fontWeight: 600,
+                  fontFamily: FONTS.sans, cursor: 'pointer',
                 }}
               >
                 CANCEL
@@ -324,9 +329,9 @@ function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings
                 onClick={confirmNewRun}
                 style={{
                   flex: 1, padding: '10px 16px', borderRadius: 8,
-                  border: 'none', background: TAN,
-                  color: HOME_BG, fontSize: 14, fontWeight: 700,
-                  fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+                  border: 'none', background: C.accent.brand,
+                  color: C.ground.brand, fontSize: 14, fontWeight: 700,
+                  fontFamily: FONTS.sans, cursor: 'pointer',
                 }}
               >
                 START NEW RUN
@@ -345,14 +350,13 @@ function MiniCardFace({ w, rank, suit }: { w: number; rank: string; suit: string
   const h = w * (3.5 / 2.5);
   const bottomR = Math.max(4, Math.round(w * 0.03));
   const isRed = suit === '♥' || suit === '♦';
-  const rankColor = isRed ? TAN : BROWN;
-  const suitColor = isRed ? BROWN : TAN;
+  const suitColor = isRed ? C.suitRed : C.suitDark;
   return (
-    <div style={{ width: w, height: h, borderRadius: Math.round(w * 0.06), background: '#FFFFFF', position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
-      <div style={{ position: 'absolute', left: '10%', top: 0, width: '18%', height: '70%', background: JADE, borderRadius: `0 0 ${bottomR}px ${bottomR}px`, zIndex: 1 }} />
+    <div style={{ width: w, height: h, borderRadius: Math.round(w * 0.06), background: C.cardFace, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ position: 'absolute', left: '10%', top: 0, width: '18%', height: '70%', background: C.classicTable, borderRadius: `0 0 ${bottomR}px ${bottomR}px`, zIndex: 1 }} />
       <div style={{ position: 'absolute', left: '34%', right: '6%', top: 0, bottom: 0, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: w * 0.01 }}>
-        <div style={{ fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 900, fontSize: w * 0.50, lineHeight: 0.85, letterSpacing: '-0.05em', color: rankColor }}>{rank}</div>
-        <div style={{ fontFamily: "'Noto Sans Symbols 2', Inter, system-ui, sans-serif", fontSize: w * 0.30, lineHeight: 1, color: suitColor, fontVariantEmoji: 'text' as any }}>{suit}&#xFE0E;</div>
+        <div style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: w * 0.50, lineHeight: 0.85, letterSpacing: '-0.05em', color: suitColor }}>{rank}</div>
+        <div style={{ fontFamily: FONTS.sans, fontSize: w * 0.30, lineHeight: 1, color: suitColor, fontVariantEmoji: 'text' as any }}>{suit}&#xFE0E;</div>
       </div>
     </div>
   );
@@ -363,9 +367,9 @@ function MiniCardBack({ w }: { w: number }) {
   const bottomR = Math.max(4, Math.round(w * 0.03));
   const wordSize = Math.max(5, Math.round(w * 0.18 * 0.55));
   return (
-    <div style={{ width: w, height: h, borderRadius: Math.round(w * 0.06), background: JADE, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
-      <div style={{ position: 'absolute', left: '10%', top: 0, width: '18%', height: '70%', background: TAN, borderRadius: `0 0 ${bottomR}px ${bottomR}px`, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        <div style={{ transform: 'rotate(-90deg)', whiteSpace: 'nowrap' as const, fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 900, fontSize: wordSize, lineHeight: 1, letterSpacing: '0.18em', color: JADE, opacity: 0.65, userSelect: 'none' as const }}>STACKED!</div>
+    <div style={{ width: w, height: h, borderRadius: Math.round(w * 0.06), background: C.surface.classic, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+      <div style={{ position: 'absolute', left: '10%', top: 0, width: '18%', height: '70%', background: C.classicGold, borderRadius: `0 0 ${bottomR}px ${bottomR}px`, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+        <div style={{ transform: 'rotate(-90deg)', whiteSpace: 'nowrap' as const, fontFamily: FONTS.sans, fontWeight: 700, fontSize: wordSize, lineHeight: 1, letterSpacing: '0.18em', color: C.classicTable, opacity: 0.65, userSelect: 'none' as const }}>STACKED!</div>
       </div>
     </div>
   );
@@ -381,57 +385,57 @@ function ClassicHeroCard({ onPlay, onContinue }: { onPlay: () => void; onContinu
 
   return (
     <div onClick={onPlay} style={{
-      flex: 1, background: 'linear-gradient(180deg, #0f2620 0%, #0a1f1a 100%)',
+      flex: 1, background: C.surface.classic,
       borderRadius: 20, padding: 22, position: 'relative',
-      border: '1px solid rgba(126,209,179,0.15)',
+      border: `1px solid ${alpha(C.line.classic, 0.15)}`,
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
       overflow: 'hidden', cursor: 'pointer',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04)',
+      boxShadow: `0 4px 24px ${alpha(C.classicTable, 0.3)}, inset 0 1px 0 ${alpha(C.ink.classic, 0.04)}`,
     }}>
       {/* Suit watermark */}
       {/* Scattered suit watermarks */}
-      <div style={{ position: 'absolute', right: -20, bottom: -30, fontSize: 200, color: 'rgba(126,209,179,0.04)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none' }}>{'\u2665\uFE0E'}</div>
-      <div style={{ position: 'absolute', left: -30, bottom: 10, fontSize: 140, color: 'rgba(126,209,179,0.03)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(-15deg)' }}>{'\u2660\uFE0E'}</div>
-      <div style={{ position: 'absolute', right: 30, top: -20, fontSize: 120, color: 'rgba(126,209,179,0.03)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(10deg)' }}>{'\u2666\uFE0E'}</div>
-      <div style={{ position: 'absolute', left: 40, top: -10, fontSize: 100, color: 'rgba(126,209,179,0.025)', fontFamily: 'Inter', fontWeight: 900, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(-8deg)' }}>{'\u2663\uFE0E'}</div>
+      <div style={{ position: 'absolute', right: -20, bottom: -30, fontSize: 200, color: alpha(C.line.classic, 0.04), fontFamily: FONTS.sans, fontWeight: 700, lineHeight: 1, pointerEvents: 'none' }}>{'\u2665\uFE0E'}</div>
+      <div style={{ position: 'absolute', left: -30, bottom: 10, fontSize: 140, color: alpha(C.line.classic, 0.03), fontFamily: FONTS.sans, fontWeight: 700, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(-15deg)' }}>{'\u2660\uFE0E'}</div>
+      <div style={{ position: 'absolute', right: 30, top: -20, fontSize: 120, color: alpha(C.line.classic, 0.03), fontFamily: FONTS.sans, fontWeight: 700, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(10deg)' }}>{'\u2666\uFE0E'}</div>
+      <div style={{ position: 'absolute', left: 40, top: -10, fontSize: 100, color: alpha(C.line.classic, 0.025), fontFamily: FONTS.sans, fontWeight: 700, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(-8deg)' }}>{'\u2663\uFE0E'}</div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', flex: 1 }}>
         <div style={{ flexShrink: 0, paddingRight: 8 }}>
-          <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: '#7ed1b3', letterSpacing: '0.22em', fontWeight: 600 }}>QUICK MATCH · 5 MIN</div>
-          <div style={{ fontWeight: 900, fontSize: 36, color: '#fff', marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>Classic</div>
+          <div style={{ fontFamily: FONTS.sans, fontSize: 9, color: C.muted.classic, letterSpacing: '0.22em', fontWeight: 600 }}>QUICK MATCH · 5 MIN</div>
+          <div style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 36, color: C.ink.classic, marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>Classic</div>
         </div>
 
         {/* V5 stagger: back + Q♥ */}
         <div style={{ position: 'relative', width: totalSpan, height: tallest + 16, marginRight: -totalSpan * 0.10 }}>
-          <div className="breathe" style={{ '--tilt': '-2deg', position: 'absolute', left: 0, top: (tallest - W * (3.5/2.5)) / 2 + 8, zIndex: 1, filter: 'drop-shadow(0 0 18px rgba(20,184,154,0.35)) drop-shadow(0 8px 18px rgba(0,0,0,0.5))' } as React.CSSProperties}>
+          <div className="breathe" style={{ '--tilt': '-2deg', position: 'absolute', left: 0, top: (tallest - W * (3.5/2.5)) / 2 + 8, zIndex: 1, filter: `drop-shadow(0 0 18px ${alpha(C.accent.classic, 0.35)}) drop-shadow(0 8px 18px ${alpha(C.classicTable, 0.5)})` } as React.CSSProperties}>
             <MiniCardBack w={W} />
           </div>
-          <div className="breathe-2" style={{ '--tilt': '4deg', position: 'absolute', left: STEP, top: (tallest - W * 1.08 * (3.5/2.5)) / 2 + 8, zIndex: 2, filter: 'drop-shadow(0 0 18px rgba(20,184,154,0.35)) drop-shadow(0 8px 18px rgba(0,0,0,0.5))' } as React.CSSProperties}>
+          <div className="breathe-2" style={{ '--tilt': '4deg', position: 'absolute', left: STEP, top: (tallest - W * 1.08 * (3.5/2.5)) / 2 + 8, zIndex: 2, filter: `drop-shadow(0 0 18px ${alpha(C.accent.classic, 0.35)}) drop-shadow(0 8px 18px ${alpha(C.classicTable, 0.5)})` } as React.CSSProperties}>
             <MiniCardFace w={W * 1.08} rank="Q" suit="♥" />
           </div>
         </div>
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: 14 }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.6)', fontWeight: 400, lineHeight: 1.4, maxWidth: onContinue ? '50%' : '60%' }}>
+        <div style={{ fontSize: 13, color: alpha(C.ink.classic, 0.6), fontWeight: 400, lineHeight: 1.4, maxWidth: onContinue ? '50%' : '60%' }}>
           Capture · Combo · Win.<br/>
-          <span style={{ color: 'rgba(255,255,255,0.4)' }}>Play to the score you pick.</span>
+          <span style={{ color: alpha(C.ink.classic, 0.4) }}>Play to the score you pick.</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
           {onContinue && (
             <button
               onClick={(e) => { e.stopPropagation(); onContinue(); }}
               style={{
-                fontWeight: 700, fontSize: 11, color: TAN, background: 'transparent',
+                fontWeight: 700, fontSize: 11, color: C.accent.classic, background: 'transparent',
                 padding: '8px 14px', borderRadius: 99, letterSpacing: '0.06em',
-                border: `1px solid ${TAN}66`, cursor: 'pointer',
-                fontFamily: 'Inter, sans-serif',
+                border: `1px solid ${alpha(C.accent.classic, 0.4)}`, cursor: 'pointer',
+                fontFamily: FONTS.sans,
               }}
             >
               CONTINUE
             </button>
           )}
-          <button onClick={(e) => { e.stopPropagation(); onPlay(); }} style={{ fontWeight: 800, fontSize: 12, color: TAN, background: JADE, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(6,95,70,0.45), inset 0 1px 0 rgba(255,255,255,0.08)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 'inherit' }}>
+          <button onClick={(e) => { e.stopPropagation(); onPlay(); }} style={{ fontWeight: 700, fontSize: 12, color: C.classicTable, background: C.classicGold, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: `0 2px 12px ${alpha(C.classicGold, 0.45)}, inset 0 1px 0 ${alpha(C.ink.classic, 0.08)}`, border: 'none', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 'inherit' }}>
             PLAY <span style={{ fontSize: 14 }}>→</span>
           </button>
         </div>
@@ -453,25 +457,25 @@ function AdventureHeroCard({ onPlay, runStatus }: { onPlay: () => void; runStatu
 
   return (
     <div onClick={onPlay} style={{
-      flex: 1.1, background: 'linear-gradient(180deg, #1a1410 0%, #0d0805 100%)',
+      flex: 1.1, background: C.surface.classic,
       borderRadius: 20, padding: 22, position: 'relative',
-      border: '1px solid rgba(184,134,47,0.25)',
+      border: `1px solid ${alpha(C.accent.classic, 0.25)}`,
       display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
       overflow: 'hidden', cursor: 'pointer',
-      boxShadow: '0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03)',
+      boxShadow: `0 4px 24px ${alpha(C.classicTable, 0.3)}, inset 0 1px 0 ${alpha(C.ink.classic, 0.03)}`,
     }}>
       {/* Chapter map peek */}
       <div style={{ position: 'absolute', inset: 0, opacity: 0.32, pointerEvents: 'none' }}>
         <svg viewBox="0 0 380 290" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}>
-          <path d={pathD} fill="none" stroke={BROWN} strokeWidth="1.5" strokeDasharray="4 6" strokeLinecap="round" className="draw-path" />
+          <path d={pathD} fill="none" stroke={C.classicGoldDeep} strokeWidth="1.5" strokeDasharray="4 6" strokeLinecap="round" className="draw-path" />
           {nodes.map(([x, y], i) => {
             const isCurrent = i === currentIdx;
             const isPast = i < currentIdx;
             return (
               <g key={i} className="node-fade" style={{ animationDelay: `${i * 0.08}s` }}>
-                {isCurrent && <circle cx={x} cy={y} r="10" fill="none" stroke={TAN} strokeWidth="1.5" opacity="0.5" />}
-                <circle cx={x} cy={y} r={isCurrent ? 5 : 4} fill={isPast ? BROWN : isCurrent ? TAN : 'transparent'} stroke={BROWN} strokeWidth="1.5" />
-                {isCurrent && <text x={x} y={y + 2} textAnchor="middle" fontSize="6" fill="#1a1410" fontFamily="Inter" fontWeight="800">★</text>}
+                {isCurrent && <circle cx={x} cy={y} r="10" fill="none" stroke={C.accent.classic} strokeWidth="1.5" opacity="0.5" />}
+                <circle cx={x} cy={y} r={isCurrent ? 5 : 4} fill={isPast ? C.classicGoldDeep : isCurrent ? C.accent.classic : 'transparent'} stroke={C.classicGoldDeep} strokeWidth="1.5" />
+                {isCurrent && <text x={x} y={y + 2} textAnchor="middle" fontSize="6" fill={C.classicTable} fontFamily={FONTS.sans} fontWeight="700">★</text>}
               </g>
             );
           })}
@@ -479,29 +483,29 @@ function AdventureHeroCard({ onPlay, runStatus }: { onPlay: () => void; runStatu
       </div>
 
       <div style={{ position: 'relative' }}>
-        <div style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 9, color: TAN, letterSpacing: '0.22em', fontWeight: 600 }}>
+        <div style={{ fontFamily: FONTS.sans, fontSize: 9, color: C.accent.classic, letterSpacing: '0.22em', fontWeight: 600 }}>
           {returning ? 'CAMPAIGN · CH. 1' : 'CAMPAIGN · NEW'}
         </div>
-        <div style={{ fontWeight: 900, fontSize: 36, color: '#fff', marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>The Run</div>
+        <div style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 36, color: C.ink.classic, marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>The Run</div>
       </div>
 
       {!returning && (
-        <div style={{ fontSize: 11, color: TAN, fontWeight: 500, position: 'relative', marginTop: 10 }}>
+        <div style={{ fontSize: 11, color: C.accent.classic, fontWeight: 600, position: 'relative', marginTop: 10 }}>
           New here? The Run starts with a tutorial.
         </div>
       )}
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: returning ? 14 : 8 }}>
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', fontWeight: 400, lineHeight: 1.4 }}>
+        <div style={{ fontSize: 13, color: alpha(C.ink.classic, 0.65), fontWeight: 400, lineHeight: 1.4 }}>
           {runStatus === 'complete' ? (
-            <><span style={{ color: TAN, fontWeight: 600 }}>Run complete</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>Start a fresh run</span></>
+            <><span style={{ color: C.accent.classic, fontWeight: 600 }}>Run complete</span><br/><span style={{ color: alpha(C.ink.classic, 0.5) }}>Start a fresh run</span></>
           ) : runStatus === 'in-progress' ? (
-            <><span style={{ color: TAN, fontWeight: 600 }}>Resume your run</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>{TOTAL_LEVELS} levels · 4 worlds</span></>
+            <><span style={{ color: C.accent.classic, fontWeight: 600 }}>Resume your run</span><br/><span style={{ color: alpha(C.ink.classic, 0.5) }}>{TOTAL_LEVELS} levels · 4 worlds</span></>
           ) : (
-            <><span style={{ color: TAN, fontWeight: 600 }}>{TOTAL_LEVELS} levels</span><br/><span style={{ color: 'rgba(255,255,255,0.5)' }}>4 worlds to conquer</span></>
+            <><span style={{ color: C.accent.classic, fontWeight: 600 }}>{TOTAL_LEVELS} levels</span><br/><span style={{ color: alpha(C.ink.classic, 0.5) }}>4 worlds to conquer</span></>
           )}
         </div>
-        <div style={{ fontWeight: 800, fontSize: 12, color: BROWN, background: TAN, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: '0 2px 12px rgba(232,197,119,0.25), inset 0 1px 0 rgba(255,255,255,0.18)' }}>
+        <div style={{ fontWeight: 700, fontSize: 12, color: C.classicTable, background: C.accent.classic, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: `0 2px 12px ${alpha(C.accent.classic, 0.25)}, inset 0 1px 0 ${alpha(C.ink.classic, 0.18)}` }}>
           {runStatus === 'fresh' ? 'BEGIN' : runStatus === 'complete' ? 'NEW RUN' : 'RESUME'} <span style={{ fontSize: 14 }}>→</span>
         </div>
       </div>

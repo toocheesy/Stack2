@@ -1,14 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import type { CaptureRecord, Difficulty, RoundStats, Scores } from '../engine/types';
-import { C } from '../config/colors';
+import { C, alpha } from '../config/colors';
+import { FONTS } from '../config/fonts';
 import { getTransition } from '../config/motion';
 
 const BOT_DISPLAY: Record<Difficulty, { name: string; color: string }> = {
-  beginner:     { name: 'Calvin', color: C.botCalvin },
-  intermediate: { name: 'Nina',   color: C.botNina },
-  advanced:     { name: 'Rex',    color: C.botRex },
-  expert:       { name: 'Jett',   color: C.botJett },
+  beginner:     { name: 'Calvin', color: C.line.classic },
+  intermediate: { name: 'Nina',   color: C.botAzure },
+  advanced:     { name: 'Rex',    color: C.botWisteria },
+  expert:       { name: 'Jett',   color: C.line.classic },
 };
 
 const AUTO_ADVANCE_SEC = 10;
@@ -22,8 +23,7 @@ interface Props {
   bot1Personality: Difficulty;
   bot2Personality: Difficulty;
   onContinue: () => void;
-  // Adventure overlays use tan CTAs, Classic uses jade. Defaults
-  // to Classic if unset (safe fallback for any caller missing the prop).
+  // Both sides' CONTINUE is Classic's gold in release 1 (D-007); the prop stays for the caller.
   adventureMode?: boolean;
 }
 
@@ -36,7 +36,7 @@ function formatHighest(record: CaptureRecord | null): string | null {
 
 export function RoundEndOverlay({
   visible, roundNumber, roundStats, overallScores, targetScore,
-  bot1Personality, bot2Personality, onContinue, adventureMode = false,
+  bot1Personality, bot2Personality, onContinue,
 }: Props) {
   const [countdown, setCountdown] = useState(AUTO_ADVANCE_SEC);
   const onContinueRef = useRef(onContinue);
@@ -62,7 +62,7 @@ export function RoundEndOverlay({
   const bot2 = BOT_DISPLAY[bot2Personality];
 
   const players = [
-    { name: 'YOU', color: C.amber, rs: roundStats[0], total: overallScores.player },
+    { name: 'YOU', color: C.accent.classic, rs: roundStats[0], total: overallScores.player },
     { name: bot1.name, color: bot1.color, rs: roundStats[1], total: overallScores.bot1 },
     { name: bot2.name, color: bot2.color, rs: roundStats[2], total: overallScores.bot2 },
   ];
@@ -77,16 +77,16 @@ export function RoundEndOverlay({
           transition={{ duration: 0.2 }}
           style={{
             position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.78)',
+            background: alpha(C.classicTable, 0.78),
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             gap: 12, zIndex: 200, padding: '24px 16px',
           }}
         >
           <h2 style={{
-            fontSize: 18, fontWeight: 700,
-            fontFamily: 'Inter, sans-serif',
-            color: C.textPrimary,
+            fontSize: 18, fontWeight: 400,
+            fontFamily: FONTS.display,
+            color: C.ink.classic,
             letterSpacing: 1.5, textTransform: 'uppercase',
             margin: 0,
           }}>
@@ -99,36 +99,36 @@ export function RoundEndOverlay({
               <div key={i} style={{
                 width: '100%', maxWidth: 300, padding: '10px 14px',
                 borderRadius: 8,
-                background: 'rgba(255,255,255,0.04)',
+                background: alpha(C.ink.classic, 0.04),
                 borderLeft: `3px solid ${p.color}`,
                 display: 'flex', flexDirection: 'column', gap: 4,
               }}>
                 <span style={{
                   fontSize: 12, fontWeight: 700, color: p.color,
-                  fontFamily: 'Inter, sans-serif', textTransform: 'uppercase',
+                  fontFamily: FONTS.sans, textTransform: 'uppercase',
                   letterSpacing: 0.5,
                 }}>{p.name}</span>
 
                 <div style={{
                   display: 'flex', justifyContent: 'space-between',
-                  fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 12, fontFamily: FONTS.sans,
                 }}>
-                  <span style={{ color: C.textSecondary }}>
-                    Total: <span style={{ color: C.textPrimary, fontWeight: 600 }}>{p.total}</span>
+                  <span style={{ color: C.muted.classic }}>
+                    Total: <span style={{ color: C.ink.classic, fontWeight: 600 }}>{p.total}</span>
                     <span style={{ opacity: 0.5 }}>/{targetScore}</span>
-                    {' · +'}<span style={{ color: C.textPrimary, fontWeight: 600 }}>{p.rs.pointsThisRound}</span>{' this round'}
+                    {' · +'}<span style={{ color: C.ink.classic, fontWeight: 600 }}>{p.rs.pointsThisRound}</span>{' this round'}
                   </span>
                 </div>
 
                 <span style={{
-                  fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
-                  color: best ? C.textSecondary : C.disabledText,
+                  fontSize: 11, fontFamily: FONTS.sans,
+                  color: C.muted.classic,
                   fontStyle: best ? 'normal' : 'italic',
                 }}>
                   {best ? (
                     <>
                       {best}
-                      <span style={{ color: C.amber, fontWeight: 600 }}> +{p.rs.highestCapture!.points}</span>
+                      <span style={{ color: C.accent.classic, fontWeight: 600 }}> +{p.rs.highestCapture!.points}</span>
                     </>
                   ) : 'No captures this round'}
                 </span>
@@ -143,10 +143,10 @@ export function RoundEndOverlay({
             style={{
               padding: '10px 28px', borderRadius: 6,
               border: 'none',
-              background: adventureMode ? C.tan : C.jade,
-              color: adventureMode ? C.bgNearBlack : C.card,
+              background: C.classicGold,
+              color: C.classicTable,
               fontSize: 14, fontWeight: 700,
-              fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+              fontFamily: FONTS.sans, cursor: 'pointer',
               marginTop: 4,
             }}
           >
@@ -154,8 +154,8 @@ export function RoundEndOverlay({
           </motion.button>
 
           <span style={{
-            fontSize: 11, color: C.textSecondary,
-            fontFamily: 'Inter, sans-serif',
+            fontSize: 11, color: C.muted.classic,
+            fontFamily: FONTS.sans,
           }}>
             Next round in {countdown}s...
           </span>

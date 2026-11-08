@@ -100,7 +100,7 @@ describe('quitting keeps the save (S-006)', () => {
       expect.objectContaining({ mode: 'classic', resumed: true, seed: CLASSIC_SEED }),
     );
 
-    fireEvent.click(screen.getByText('←'));
+    fireEvent.click(screen.getByRole('button', { name: 'Leave game' }));
     expect(screen.getByText('Quit Game?')).toBeTruthy();
     expect(screen.getByText('Your game is saved. Tap Continue on the home screen to pick it up.')).toBeTruthy();
     fireEvent.click(screen.getByText('QUIT'));
@@ -132,7 +132,7 @@ describe('quitting keeps the save (S-006)', () => {
       expect.objectContaining({ mode: 'run', level_id: RUN_LEVEL, resumed: true, seed: RUN_SEED }),
     );
 
-    fireEvent.click(screen.getByText('←'));
+    fireEvent.click(screen.getByRole('button', { name: 'Leave game' }));
     expect(screen.getByText('Return to The Run Map?')).toBeTruthy();
     expect(screen.getByText('Your level is saved. Resume it from The Run map. Star progress is safe.')).toBeTruthy();
     fireEvent.click(screen.getByText('BACK'));

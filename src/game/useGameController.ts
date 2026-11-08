@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
+  Card,
+  CardSource,
   Combination,
   ComboSlot,
   GameSettings,
   GameState,
   PlayerIndex,
+  Rank,
+  Suit,
 } from '../engine/types';
 import {
   createInitialState,
@@ -16,16 +20,15 @@ import {
   applyJackpot,
   startNewRound,
 } from '../engine/core/gameState';
-import { botCaptureToCombination, validateFullCombo } from '../engine/core/captureValidator';
-import { determineTurnResult } from '../engine/core/turnManager';
+import { botCaptureToCombination, validateComboSlot, validateFullCombo } from '../engine/core/captureValidator';
+import { determineTurnResult, findNextPlayerWithCards } from '../engine/core/turnManager';
+import { calculateCardPoints, calculateCardsPoints } from '../engine/core/scoring';
 import { botStreamSeed, createPRNG, type PRNG } from '../engine/utils/prng';
 import { readCardMemory } from '../engine/ai/cardTracker';
 import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../engine/ai/botDecision';
 import { evaluateAllActions } from '../engine/ai/evaluator';
 import { saveGame, loadGame, clearSavedGame, saveModeFor } from './persistence';
 import { trackFirstCapture } from '../analytics/track';
-
-type CardSource = 'hand' | 'board';
 
 export interface GameActions {
   addToCombo: (cardId: string, source: CardSource, slot: ComboSlot) => void;
@@ -41,27 +44,72 @@ export interface BotVizStep {
   playerIndex: PlayerIndex;
 }
 
+/** Kept for src/components/LastCapture.tsx (dead code, S-032). Nothing has
+ *  produced one since D-007 release 2 replaced it with LastMove. */
 export interface LastCaptureInfo {
   playerIndex: PlayerIndex;
   playerName: string;
-  baseCard: import('../engine/types').Card | null;
-  comboCards: import('../engine/types').Card[];
-  areas: import('../engine/types').Card[][];
-  allCards: import('../engine/types').Card[];
+  baseCard: Card | null;
+  comboCards: Card[];
+  areas: Card[][];
+  allCards: Card[];
   points: number;
   timestamp: number;
 }
 
+/** An opponent's capture on show in the tray (GB2 phone C): the Combination
+ *  the opponent built, slot by slot, its points (RULES.md Law 6) and every
+ *  captured card, base first. */
 export interface BotComboDisplay {
   playerIndex: PlayerIndex;
-  baseCard: import('../engine/types').Card;
-  comboCards: import('../engine/types').Card[];
+  combination: Combination;
+  points: number;
+  cards: Card[];
 }
 
-const PLAYER_DISPLAY_NAMES: Record<number, string> = { 0: 'You', 1: 'Bot 1', 2: 'Bot 2' };
+/** One capture in a turn: the Combination as built and its points. */
+export interface MoveCapture {
+  combination: Combination;
+  points: number;
+}
+
+/** The last move made, for the board's message line (D-007 ruling 95) and the
+ *  opponents' speech bubbles (GB2). A turn's captures build up until the turn
+ *  ends with a place or an empty hand; another player's move replaces it, a
+ *  new deal or round clears it, and so does your staging a card. App.tsx
+ *  passes it to GameView under its name from before release 2, lastCapture. */
+export interface LastMove {
+  player: PlayerIndex;
+  captures: MoveCapture[];
+  /** The card placed to end the turn; null while the turn goes on. */
+  placed: Card | null;
+  /** RULES.md Law 8: the rest of the hand the game placed after `placed`. */
+  rest: Card[];
+  /** The round and hand the move was made in. */
+  round: number;
+  hand: number;
+  /** After a capture that emptied your hand: the next player holding cards
+   *  (RULES.md Law 12); null otherwise. */
+  next: PlayerIndex | null;
+}
 
 function wait(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+// The captures made so far in the turn `prev` records, when that turn is
+// this player's and still going; otherwise none.
+function turnCaptures(prev: LastMove | null, player: PlayerIndex, s: GameState): MoveCapture[] {
+  return prev && prev.player === player && prev.placed === null && prev.round === s.currentRound && prev.hand === s.handNumber
+    ? prev.captures
+    : [];
+}
+
+// RULES.md Law 8: when every other hand is empty, a place also puts the rest
+// of the placer's hand on the table. The rest, for the message line.
+function restAfterPlace(s: GameState, player: PlayerIndex, placedId: string): Card[] {
+  const othersEmpty = s.hands.every((h, i) => i === player || h.length === 0);
+  return othersEmpty ? s.hands[player].filter((c) => c.id !== placedId) : [];
 }
 
 export function useGameController(seed: number, settings: GameSettings, currentLevelId: number | null, tutorialActive: boolean = false) {
@@ -138,13 +186,22 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     winner: PlayerIndex;
     winnerName: string;
   } | null>(null);
-  const [lastCapture, setLastCapture] = useState<LastCaptureInfo | null>(null);
   const [botCombo, setBotCombo] = useState<BotComboDisplay | null>(null);
   const [jackpotInfo, setJackpotInfo] = useState<{
     winner: PlayerIndex;
     points: number;
     cardCount: number;
   } | null>(null);
+
+  // The last move (D-007 release 2): a derived read for the board, not saved.
+  // A reload starts with none, and the message line falls back to the rules
+  // that read the state alone.
+  const [lastMove, setLastMove] = useState<LastMove | null>(null);
+  const lastMoveRef = useRef<LastMove | null>(null);
+  const recordMove = useCallback((m: LastMove | null) => {
+    lastMoveRef.current = m;
+    setLastMove(m);
+  }, []);
 
   // Always-fresh ref to current state (avoids stale closures)
   const stateRef = useRef(state);
@@ -175,6 +232,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         let next = dealNewHand(current);
         next = { ...next, currentPlayer: result.startingPlayer };
         setAndPersist(next);
+        // A new hand: the last cards line and the after-move lines end here.
+        recordMove(null);
         if (result.startingPlayer !== 0) {
           await runBotTurn(next);
         }
@@ -291,6 +350,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     // Bot captures go through the same capture check as the player's.
     // A refused capture falls through to the place branch below.
     let botCombo: Combination | null = null;
+    let botPoints = 0;
+    let botCards: Card[] = [];
     if (decision.action === 'capture' && decision.captureDetails) {
       const combo = botCaptureToCombination(
         decision.handCard,
@@ -300,6 +361,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       const validation = validateFullCombo(current, combo);
       if (validation.isValid) {
         botCombo = combo;
+        botPoints = validation.totalPoints;
+        botCards = validation.allCapturedCards;
       } else if (import.meta.env.DEV) {
         console.warn(
           `[BOT ${player}] capture refused by validateFullCombo`,
@@ -310,35 +373,43 @@ export function useGameController(seed: number, settings: GameSettings, currentL
 
     let next: GameState;
     if (botCombo && decision.captureDetails) {
-      // Show bot's combo in the slots for the player to read
-      const botBase = decision.handCard;
-      const botComboCards = decision.captureDetails.capturedCards.filter(
-        (c) => c.id !== botBase.id,
-      );
-      setBotCombo({ playerIndex: player, baseCard: botBase, comboCards: botComboCards });
+      // Show the opponent's capture in the tray as it built it, slot by slot,
+      // for the player to read; its speech bubble recaps it from here on.
+      const moveBefore = lastMoveRef.current;
+      recordMove({
+        player,
+        captures: [...turnCaptures(moveBefore, player, current), { combination: botCombo, points: botPoints }],
+        placed: null,
+        rest: [],
+        round: current.currentRound,
+        hand: current.handNumber,
+        next: null,
+      });
+      setBotCombo({ playerIndex: player, combination: botCombo, points: botPoints, cards: botCards });
       await wait(2000);
       if (!mountedRef.current) return;
       setBotCombo(null);
       // Freeze gate after bot-combo display — tutorial opened mid-show.
       if (tutorialActiveRef.current) {
+        recordMove(moveBefore);
         setBotViz(null);
         botBusyRef.current = false;
         return;
       }
 
       next = executeCapture(current, botCombo);
-      setLastCapture({
-        playerIndex: player,
-        playerName: PLAYER_DISPLAY_NAMES[player] ?? `Bot ${player}`,
-        baseCard: botBase,
-        comboCards: botComboCards,
-        areas: decision.captureDetails.slots.map(s => s.cards),
-        allCards: decision.captureDetails.capturedCards,
-        points: decision.captureDetails.totalPoints,
-        timestamp: Date.now(),
-      });
     } else {
+      const rest = restAfterPlace(current, player, decision.handCard.id);
       next = placeCard(current, decision.handCard.id);
+      recordMove({
+        player,
+        captures: turnCaptures(lastMoveRef.current, player, current),
+        placed: decision.handCard,
+        rest,
+        round: current.currentRound,
+        hand: current.handNumber,
+        next: null,
+      });
     }
 
     setAndPersist(next);
@@ -437,9 +508,11 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       }
 
       const next = { ...s, combination: combo };
+      // Staging a card ends the after-your-move line (D-007 ruling 95).
+      if (lastMoveRef.current?.player === 0) recordMove(null);
       setAndPersist(next);
     },
-    [setAndPersist],
+    [setAndPersist, recordMove],
   );
 
   const submitCombo = useCallback((): string | null => {
@@ -461,26 +534,20 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         seed: seedRef.current,
       });
     }
-    setLastCapture({
-      playerIndex: 0,
-      playerName: 'You',
-      baseCard: s.combination.base,
-      comboCards: validation.allCapturedCards.filter(
-        (c) => c.id !== s.combination.base?.id,
-      ),
-      areas: [
-        s.combination.combo1.map(g => g.card),
-        s.combination.combo2.map(g => g.card),
-        s.combination.combo3.map(g => g.card),
-      ].filter(a => a.length > 0),
-      allCards: validation.allCapturedCards,
-      points: validation.totalPoints,
-      timestamp: Date.now(),
+    recordMove({
+      player: 0,
+      captures: [...turnCaptures(lastMoveRef.current, 0, s), { combination: s.combination, points: validation.totalPoints }],
+      placed: null,
+      rest: [],
+      round: s.currentRound,
+      hand: s.handNumber,
+      // RULES.md Law 12: when the capture emptied your hand, the next player holding cards.
+      next: next.hands[0].length === 0 ? findNextPlayerWithCards(next, false) : null,
     });
     setAndPersist(next);
     void advanceRef.current(next);
     return null;
-  }, [setAndPersist]);
+  }, [setAndPersist, recordMove]);
 
   const doPlaceCard = useCallback((cardId: string) => {
     if (botBusyRef.current) return;
@@ -489,11 +556,21 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     const card = s.hands[0].find((c) => c.id === cardId);
     if (!card) return;
 
+    const rest = restAfterPlace(s, 0, cardId);
     let next = resetCombination(s);
     next = placeCard(next, cardId);
+    recordMove({
+      player: 0,
+      captures: turnCaptures(lastMoveRef.current, 0, s),
+      placed: card,
+      rest,
+      round: s.currentRound,
+      hand: s.handNumber,
+      next: null,
+    });
     setAndPersist(next);
     void advanceRef.current(next);
-  }, [setAndPersist]);
+  }, [setAndPersist, recordMove]);
 
   const doRemoveFromCombo = useCallback((cardId: string) => {
     const s = stateRef.current;
@@ -520,6 +597,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     if (s.gamePhase !== 'roundEnd') return;
     const next = startNewRound(s, prngRef.current);
     setAndPersist(next);
+    recordMove(null);
     if (next.currentPlayer !== 0) {
       void runBotTurn(next);
     }
@@ -533,7 +611,9 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     isPlayerTurn,
     botViz,
     botCombo,
-    lastCapture,
+    // The last move, under the name App.tsx has passed to GameView since
+    // before release 2 (App.tsx is outside this part's fence).
+    lastCapture: lastMove,
     jackpotInfo,
     gameOver,
     wasResumed: wasResumedRef.current,
@@ -548,4 +628,212 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       continueRound: doContinueRound,
     } as GameActions,
   };
+}
+
+// ─── Board reads (D-007 release 2) ─────────────────
+// Pure functions over the game state for the board. The screen reaches the
+// game only through this file (architecture rule 1), so they live here, and
+// GameView calls them with the values App.tsx hands it.
+
+const FACE_RANKS = new Set<Rank>(['J', 'Q', 'K']);
+const SUIT_GLYPHS: Record<Suit, string> = {
+  hearts: '♥', diamonds: '♦', clubs: '♣', spades: '♠',
+};
+
+/** A card in words: "6♥", "J♣". */
+export function cardLabel(card: Card): string {
+  return card.rank + SUIT_GLYPHS[card.suit];
+}
+
+/** A card's points from the scoring table (RULES.md). */
+export function cardPoints(card: Card): number {
+  return calculateCardPoints(card);
+}
+
+/** An opponent's name, from the personality in its seat. */
+export function opponentName(state: GameState, player: 1 | 2): string {
+  const difficulty = player === 1 ? state.settings.bot1Personality : state.settings.bot2Personality;
+  return getPersonalityProfile(difficulty).name;
+}
+
+/** A player's name in a sentence: "You", "Nina", "Rex". */
+export function playerName(state: GameState, player: PlayerIndex): string {
+  return player === 0 ? 'You' : opponentName(state, player);
+}
+
+function stagedCards(build: Combination): Card[] {
+  const cards = build.base ? [build.base] : [];
+  for (const slot of [build.combo1, build.combo2, build.combo3]) {
+    for (const g of slot) cards.push(g.card);
+  }
+  return cards;
+}
+
+function hasStaged(build: Combination): boolean {
+  return build.base !== null || build.combo1.length > 0 || build.combo2.length > 0 || build.combo3.length > 0;
+}
+
+/** The points preview beside SUBMIT: the scoring table's points of every
+ *  staged card, base included (RULES.md Law 6). */
+export function stagedPoints(build: Combination): number {
+  return calculateCardsPoints(stagedCards(build));
+}
+
+/** Where a build's base came from: the current player's hand or the table. */
+export function baseSourceOf(state: GameState, build: Combination): CardSource | null {
+  if (!build.base) return null;
+  const id = build.base.id;
+  return state.hands[state.currentPlayer].some((c) => c.id === id) ? 'hand' : 'board';
+}
+
+/** A filled combo is valid when it matches the base or sums to it (RULES.md
+ *  Laws 2, 4, 5) and holds a card from the other side of the base (Law 3). */
+export function comboIsValid(state: GameState, build: Combination, slot: Exclude<ComboSlot, 'base'>): boolean {
+  const groups = build[slot];
+  if (!build.base || groups.length === 0) return false;
+  if (!validateComboSlot(groups, build.base).isValid) return false;
+  const baseSide = baseSourceOf(state, build);
+  return groups.some((g) => g.source !== baseSide);
+}
+
+/** While you build, a table card no combo could use (GB2, rulings 19 and 23b):
+ *  the base is K, Q or J and the card's rank differs; the base is a number
+ *  card and the card is K, Q or J; or the base is a number card and the
+ *  card's value is above the base's with a different rank. Hand cards are
+ *  never shaded. */
+export function cannotJoin(base: Card, card: Card): boolean {
+  if (FACE_RANKS.has(base.rank)) return card.rank !== base.rank;
+  if (FACE_RANKS.has(card.rank)) return true;
+  return card.value > base.value && card.rank !== base.rank;
+}
+
+/** The ids of the table cards shaded during your build; empty without a base. */
+export function tableCardsThatCannotJoin(state: GameState): Set<string> {
+  const base = state.combination.base;
+  if (!base) return new Set();
+  return new Set(state.board.filter((c) => cannotJoin(base, c)).map((c) => c.id));
+}
+
+export interface TakeTheTableRead {
+  /** In line to take it now: the round's last capturer so far. */
+  player: PlayerIndex;
+  cards: Card[];
+  points: number;
+}
+
+/** RULES.md Law 10 in the last hand (the deck is empty): who is in line to take
+ *  the table and what it is worth. Null outside the last hand, and null when
+ *  nobody has captured this round (nobody takes the table). */
+export function takeTheTable(state: GameState): TakeTheTableRead | null {
+  if (state.gamePhase !== 'playing' || state.deck.length > 0 || state.lastCapturer === null) return null;
+  return { player: state.lastCapturer, cards: state.board, points: calculateCardsPoints(state.board) };
+}
+
+// The message line's words (D-007 ruling 95). Names, counts, cards and hand
+// numbers follow the game.
+const LINE = {
+  yourTurn: 'Your turn. Pick a base card to start a capture.',
+  baseFromHand: 'Base from your hand: every combo you fill needs a table card.',
+  baseFromTable: 'Base from the table: every combo you fill needs a card from your hand.',
+  kings: 'Kings, queens and jacks only match their own kind.',
+  mixed: 'Each combo matches the base or sums to it, never both.',
+  aces: 'Aces count as 1 in a sum.',
+  tens: '10s sum like any number.',
+  lastHand: 'Last hand: the deck is empty. When the round ends, the last player to capture takes every card left on the table.',
+} as const;
+
+// The Run's hint strip, its words unchanged. In a level with it on, it shows
+// in place of the after-your-move, building and whose-turn lines.
+const HINT = {
+  watch: 'Watch the opponents play their turn',
+  invalid: 'Combo groups must sum (or match) the base card value',
+  valid: 'Tap SUBMIT to capture, or RESET to clear',
+  start: 'Drag a card to start your turn',
+} as const;
+
+function article(rank: Rank): string {
+  return rank === '8' || rank === 'A' ? 'an' : 'a';
+}
+
+function runHint(state: GameState, build: Combination): string {
+  if (state.currentPlayer !== 0) return HINT.watch;
+  if (hasStaged(build)) return validateFullCombo(state, build).isValid ? HINT.valid : HINT.invalid;
+  return HINT.start;
+}
+
+function buildLine(state: GameState, build: Combination): string {
+  const base = build.base!;
+  const filled = [build.combo1, build.combo2, build.combo3].filter((s) => s.length > 0);
+  const baseSide = baseSourceOf(state, build);
+  const sourceLine = baseSide === 'hand' ? LINE.baseFromHand : LINE.baseFromTable;
+  // (a) a combo mixes a match and a sum
+  if (filled.some((s) => s.some((g) => g.card.rank === base.rank) && s.some((g) => g.card.rank !== base.rank))) return LINE.mixed;
+  // (b) the base is K, Q or J
+  if (FACE_RANKS.has(base.rank)) return LINE.kings;
+  // (c) a filled combo has no card from the other side of the base
+  if (filled.some((s) => !s.some((g) => g.source !== baseSide))) return sourceLine;
+  // (d) an ace sits in a combo whose base isn't an ace
+  if (base.rank !== 'A' && filled.some((s) => s.some((g) => g.card.rank === 'A'))) return LINE.aces;
+  // (e) the base is a 10
+  if (base.rank === '10') return LINE.tens;
+  // (f) otherwise, where the base came from
+  return sourceLine;
+}
+
+// RULES.md Law 8, for the player who placed last.
+function lastCardsLine(state: GameState, last: LastMove): string {
+  const others = ([0, 1, 2] as PlayerIndex[]).filter((p) => p !== last.player).map((p) => playerName(state, p));
+  const placer = playerName(state, last.player);
+  const whose = last.player === 0 ? 'your' : `${placer}'s`;
+  const rest = last.rest.map(cardLabel).join(', ');
+  return `${others[0]} and ${others[1]} are out of cards. ${placer} placed ${cardLabel(last.placed!)}, so the rest of ${whose} hand (${rest}) goes onto the table. Hand ${last.hand} is over.`;
+}
+
+/** The message line (D-007 ruling 95): the rule that matters now, from the
+ *  game state, the build in the tray, the last move and the opponent's
+ *  capture on show. First match wins, in this order:
+ *  1. the last cards (RULES.md Law 8), until the next hand is dealt;
+ *  2. after your move, until you stage a card or the next player moves;
+ *  3. an opponent's capture replays;
+ *  4. while you build: mixed, kings, base source, aces, 10s, base source;
+ *  5. the last hand;
+ *  6. whose turn it is.
+ *  In a Run level with its hint strip on, the strip's text shows in place of
+ *  2, 4 and 6. */
+export function messageLine(state: GameState, build: Combination, last: LastMove | null, replay: BotComboDisplay | null): string {
+  const hint = state.settings.hintStripEnabled && state.gamePhase === 'playing' ? runHint(state, build) : null;
+  const sameHand = last !== null && last.round === state.currentRound && last.hand === state.handNumber;
+
+  // 1. The last cards, from the moment Law 8 places the rest of a hand until the next hand is dealt.
+  if (last && sameHand && last.placed && last.rest.length > 0) {
+    return lastCardsLine(state, last);
+  }
+
+  // 2. After your move, until you stage a card or the next player moves.
+  if (last && sameHand && last.player === 0 && !hasStaged(build)) {
+    if (last.placed) {
+      return hint ?? `You placed ${article(last.placed.rank)} ${last.placed.rank}. Placing ends your turn; there is no pass.`;
+    }
+    const held = state.hands[0].length;
+    if (held > 0) return hint ?? `Your turn continues: you still hold ${held} ${held === 1 ? 'card' : 'cards'}.`;
+    if (last.next !== null) return hint ?? `Your turn ends: your hand is empty. ${playerName(state, last.next)} is next.`;
+  }
+
+  // 3. An opponent's capture replays.
+  if (replay && replay.playerIndex !== 0) {
+    const name = opponentName(state, replay.playerIndex);
+    return baseSourceOf(state, replay.combination) === 'hand'
+      ? `Base from ${name}'s hand: every combo has a table card.`
+      : `Base from the table: every combo has a card from ${name}'s hand.`;
+  }
+
+  // 4. While you build.
+  if (build.base && state.currentPlayer === 0) return hint ?? buildLine(state, build);
+
+  // 5. The last hand.
+  if (state.gamePhase === 'playing' && state.deck.length === 0) return LINE.lastHand;
+
+  // 6. Whose turn it is.
+  if (hint) return hint;
+  return state.currentPlayer === 0 ? LINE.yourTurn : `${opponentName(state, state.currentPlayer)}'s turn.`;
 }

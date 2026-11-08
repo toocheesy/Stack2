@@ -1,4 +1,5 @@
 import type { Difficulty } from '../engine/types';
+import { C } from '../config/colors';
 
 export type PersonalityKey =
   | 'calvin'
@@ -15,7 +16,6 @@ export interface PersonalityProfile {
   label: string;
   flavor: string;
   color: string;
-  colorHex: number;
 }
 
 export const PERSONALITY_PROFILES: readonly PersonalityProfile[] = [
@@ -25,8 +25,7 @@ export const PERSONALITY_PROFILES: readonly PersonalityProfile[] = [
     difficulty: 'beginner',
     label: 'Beginner',
     flavor: 'Still learning the ropes',
-    color: '#60A5FA',
-    colorHex: 0x60a5fa,
+    color: C.line.classic,
   },
   {
     key: 'talia',
@@ -34,8 +33,7 @@ export const PERSONALITY_PROFILES: readonly PersonalityProfile[] = [
     difficulty: 'beginner',
     label: 'Teacher',
     flavor: "I'll show you some new tricks",
-    color: '#60A5FA',
-    colorHex: 0x60a5fa,
+    color: C.line.classic,
   },
   {
     key: 'nina',
@@ -43,8 +41,7 @@ export const PERSONALITY_PROFILES: readonly PersonalityProfile[] = [
     difficulty: 'intermediate',
     label: 'Intermediate',
     flavor: "Don't underestimate me",
-    color: '#A78BFA',
-    colorHex: 0xa78bfa,
+    color: C.botAzure,
   },
   {
     key: 'rex',
@@ -52,8 +49,7 @@ export const PERSONALITY_PROFILES: readonly PersonalityProfile[] = [
     difficulty: 'advanced',
     label: 'Advanced',
     flavor: 'I read every card you play',
-    color: '#EF4444',
-    colorHex: 0xef4444,
+    color: C.botWisteria,
   },
   {
     key: 'jett',
@@ -61,8 +57,7 @@ export const PERSONALITY_PROFILES: readonly PersonalityProfile[] = [
     difficulty: 'expert',
     label: 'Expert',
     flavor: 'Patient, relentless',
-    color: '#8B5CF6',
-    colorHex: 0x8b5cf6,
+    color: C.line.classic,
   },
   {
     key: 'mira',
@@ -70,8 +65,7 @@ export const PERSONALITY_PROFILES: readonly PersonalityProfile[] = [
     difficulty: 'advanced',
     label: 'Advanced',
     flavor: 'Nothing gets past me',
-    color: '#EF4444',
-    colorHex: 0xef4444,
+    color: C.line.classic,
   },
 ];
 

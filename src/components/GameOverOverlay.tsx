@@ -1,14 +1,15 @@
 import { AnimatePresence, motion } from 'motion/react';
 import type { CaptureRecord, Difficulty, GamePlayerStats, GameState, PlayerIndex } from '../engine/types';
 import { SCORE_KEYS } from '../engine/types';
-import { C } from '../config/colors';
+import { C, alpha } from '../config/colors';
+import { FONTS } from '../config/fonts';
 import { getTransition } from '../config/motion';
 
 const BOT_DISPLAY: Record<Difficulty, { name: string; color: string }> = {
-  beginner:     { name: 'Calvin', color: C.botCalvin },
-  intermediate: { name: 'Nina',   color: C.botNina },
-  advanced:     { name: 'Rex',    color: C.botRex },
-  expert:       { name: 'Jett',   color: C.botJett },
+  beginner:     { name: 'Calvin', color: C.line.classic },
+  intermediate: { name: 'Nina',   color: C.botAzure },
+  advanced:     { name: 'Rex',    color: C.botWisteria },
+  expert:       { name: 'Jett',   color: C.line.classic },
 };
 
 interface Props {
@@ -20,7 +21,7 @@ interface Props {
 }
 
 function getPlayerDisplay(idx: PlayerIndex, state: GameState): { name: string; color: string } {
-  if (idx === 0) return { name: 'YOU', color: C.amber };
+  if (idx === 0) return { name: 'YOU', color: C.accent.classic };
   const d = idx === 1 ? state.settings.bot1Personality : state.settings.bot2Personality;
   const b = BOT_DISPLAY[d];
   return { name: b.name, color: b.color };
@@ -65,7 +66,7 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
         transition={{ duration: 0.3 }}
         style={{
           position: 'fixed', inset: 0,
-          background: 'rgba(0,0,0,0.85)',
+          background: alpha(C.classicTable, 0.85),
           display: 'flex', flexDirection: 'column',
           alignItems: 'center', justifyContent: 'center',
           gap: 16, zIndex: 200, padding: '24px 16px',
@@ -74,7 +75,7 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
         {/* Winner section */}
         <span style={{
           fontSize: 11, fontWeight: 600, letterSpacing: 2,
-          color: C.textSecondary, fontFamily: 'Inter, sans-serif',
+          color: C.muted.classic, fontFamily: FONTS.sans,
           textTransform: 'uppercase',
         }}>
           {isHumanWin ? 'VICTORY' : 'GAME OVER'}
@@ -85,8 +86,8 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 22 }}
           style={{
-            fontSize: 28, fontWeight: 800, margin: 0,
-            fontFamily: 'Inter, sans-serif',
+            fontSize: 28, fontWeight: 400, margin: 0,
+            fontFamily: FONTS.display,
             color: winnerDisplay.color,
           }}
         >
@@ -95,19 +96,19 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
 
         <span style={{
           fontSize: 24, fontWeight: 700,
-          fontFamily: "'JetBrains Mono', monospace",
-          color: C.textPrimary,
+          fontFamily: FONTS.sans,
+          color: C.ink.classic,
         }}>
-          {players[0].score}<span style={{ fontSize: 14, color: C.textSecondary, opacity: 0.6 }}>/{target}</span>
+          {players[0].score}<span style={{ fontSize: 14, color: C.muted.classic, opacity: 0.6 }}>/{target}</span>
         </span>
 
         {bestEver && (
           <span style={{
-            fontSize: 11, color: C.textSecondary,
-            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: 11, color: C.muted.classic,
+            fontFamily: FONTS.sans,
           }}>
             Best capture: {bestEver}
-            <span style={{ color: C.amber, fontWeight: 600 }}> +{winnerStats.highestCapture!.points}</span>
+            <span style={{ color: C.accent.classic, fontWeight: 600 }}> +{winnerStats.highestCapture!.points}</span>
           </span>
         )}
 
@@ -118,22 +119,22 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
             return (
               <div key={p.idx} style={{
                 padding: '8px 12px', borderRadius: 6,
-                background: isWinner ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.02)',
+                background: isWinner ? alpha(C.ink.classic, 0.06) : alpha(C.ink.classic, 0.02),
                 borderLeft: `3px solid ${p.color}`,
                 opacity: isWinner ? 1 : 0.7,
                 display: 'flex', justifyContent: 'space-between', alignItems: 'center',
               }}>
                 <span style={{
                   fontSize: isWinner ? 13 : 12, fontWeight: isWinner ? 700 : 500,
-                  color: p.color, fontFamily: 'Inter, sans-serif',
+                  color: p.color, fontFamily: FONTS.sans,
                   textTransform: 'uppercase',
                 }}>
                   {p.name}
                 </span>
                 <span style={{
                   fontSize: isWinner ? 18 : 14, fontWeight: 700,
-                  fontFamily: "'JetBrains Mono', monospace",
-                  color: isWinner ? C.textPrimary : C.textSecondary,
+                  fontFamily: FONTS.sans,
+                  color: isWinner ? C.ink.classic : C.muted.classic,
                 }}>
                   {p.score}
                 </span>
@@ -151,10 +152,10 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
             style={{
               padding: '12px 28px', borderRadius: 6,
               border: 'none',
-              background: adventureMode ? C.tan : C.jade,
-              color: adventureMode ? C.bgNearBlack : C.card,
+              background: C.classicGold,
+              color: C.classicTable,
               fontSize: 15, fontWeight: 700,
-              fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+              fontFamily: FONTS.sans, cursor: 'pointer',
             }}
           >
             PLAY AGAIN
@@ -165,10 +166,10 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
             transition={getTransition('snappy')}
             style={{
               padding: '12px 24px', borderRadius: 6,
-              border: `1.5px solid rgba(255,255,255,0.4)`,
+              border: `1.5px solid ${alpha(C.ink.classic, 0.4)}`,
               background: 'transparent',
-              color: 'rgba(255,255,255,0.9)', fontSize: 15, fontWeight: 600,
-              fontFamily: 'Inter, sans-serif', cursor: 'pointer',
+              color: alpha(C.ink.classic, 0.9), fontSize: 15, fontWeight: 600,
+              fontFamily: FONTS.sans, cursor: 'pointer',
             }}
           >
             {adventureMode ? 'WORLD MAP' : 'HOME'}

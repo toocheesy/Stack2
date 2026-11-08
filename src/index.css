@@ -1,49 +1,19 @@
 @import "tailwindcss";
 
 @theme {
-  --color-slate-bg: #1E1E2E;
-  --color-board: #252538;
-  --color-card: #FFFFFF;
-  --color-indigo-primary: #4F46E5;
-  --color-indigo-hover: #6366F1;
-  --color-amber-accent: #F59E0B;
-  --color-text-primary: #F1F1F3;
-  --color-text-secondary: #8B8BA3;
-  --color-success: #10B981;
-  --color-error: #EF4444;
-  --color-divider: #3A3A50;
-  --color-slot-empty: #4A4A5A;
-  --color-disabled: #2A2A3D;
-  --color-disabled-text: #5A5A70;
-  /* Bot colors locked May 14, 2026 per Visual Paint Brief Section 7. */
-  --color-bot-calvin: #3B82F6;
-  --color-bot-talia: #F472B6;
-  --color-bot-nina: #DBEAFE;
-  --color-bot-mira: #34D399;
-  --color-bot-jett: #8B5CF6;
-  --color-bot-rex: #DC2626;
-  /* Brand palette (locked May 1, 2026). */
-  --color-jade: #065F46;
-  --color-tan: #E8C577;
-  --color-brown: #72571C;
-  --color-bg-near-black: #0A0A0A;
-
-  --shadow-card-rest: 0 2px 12px rgba(0,0,0,0.3), inset 1px 1px 0 rgba(255,255,255,0.06);
-  --shadow-card-selected: 0 4px 20px rgba(79,70,229,0.35);
-  --shadow-card-lifted: 0 8px 24px rgba(0,0,0,0.4);
-  --shadow-combo-ready: 0 0 12px rgba(79,70,229,0.2);
-
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  /* The two STACKED v2 families; their other home is src/config/fonts.ts. */
+  --font-display: "Abril Fatface", Georgia, serif;
+  --font-sans: "Josefin Sans", system-ui, sans-serif;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
+/* The page base wears the brand theme. Every colour lives in
+   src/config/colors.ts; App.tsx writes these two variables from it. */
 html, body {
-  background: #1E1E2E;
-  color: #F1F1F3;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  background: var(--page-ground);
+  color: var(--page-ink);
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
   height: 100dvh;

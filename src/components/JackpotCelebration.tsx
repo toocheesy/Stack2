@@ -1,12 +1,13 @@
 import { AnimatePresence, motion } from 'motion/react';
 import type { Difficulty, PlayerIndex } from '../engine/types';
-import { C } from '../config/colors';
+import { C, alpha } from '../config/colors';
+import { FONTS } from '../config/fonts';
 
 const BOT_DISPLAY: Record<Difficulty, { name: string; color: string }> = {
-  beginner:     { name: 'Calvin', color: C.botCalvin },
-  intermediate: { name: 'Nina',   color: C.botNina },
-  advanced:     { name: 'Rex',    color: C.botRex },
-  expert:       { name: 'Jett',   color: C.botJett },
+  beginner:     { name: 'Calvin', color: C.line.classic },
+  intermediate: { name: 'Nina',   color: C.botAzure },
+  advanced:     { name: 'Rex',    color: C.botWisteria },
+  expert:       { name: 'Jett',   color: C.line.classic },
 };
 
 export interface JackpotDisplay {
@@ -27,7 +28,7 @@ export function JackpotCelebration({ info, bot1Personality, bot2Personality }: P
   //   Bot:    "[BOT] TOOK THE TABLE!" (name-first, all-caps, parallels FIRST BLOOD — JINX)
   const isPlayer = !info || info.winner === 0;
   let botName = '';
-  let winnerColor: string = C.amber;
+  let winnerColor: string = C.accent.classic;
   if (info && !isPlayer) {
     const b = info.winner === 1 ? BOT_DISPLAY[bot1Personality] : BOT_DISPLAY[bot2Personality];
     botName = b.name;
@@ -45,7 +46,7 @@ export function JackpotCelebration({ info, bot1Personality, bot2Personality }: P
           transition={{ duration: 0.25 }}
           style={{
             position: 'fixed', inset: 0,
-            background: 'rgba(0,0,0,0.7)',
+            background: alpha(C.classicTable, 0.7),
             display: 'flex', flexDirection: 'column',
             alignItems: 'center', justifyContent: 'center',
             gap: 10, zIndex: 190, padding: '0 24px', textAlign: 'center',
@@ -56,9 +57,9 @@ export function JackpotCelebration({ info, bot1Personality, bot2Personality }: P
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 300, damping: 20 }}
             style={{
-              fontSize: isPlayer ? 32 : 26, fontWeight: 800,
-              fontFamily: 'Inter, sans-serif',
-              color: isPlayer ? C.amber : winnerColor,
+              fontSize: isPlayer ? 32 : 26, fontWeight: 400,
+              fontFamily: FONTS.display,
+              color: isPlayer ? C.accent.classic : winnerColor,
               letterSpacing: 2, textTransform: 'uppercase',
               lineHeight: 1.1,
             }}
@@ -68,15 +69,15 @@ export function JackpotCelebration({ info, bot1Personality, bot2Personality }: P
 
           <span style={{
             fontSize: 22, fontWeight: 700,
-            fontFamily: "'JetBrains Mono', monospace",
-            color: C.amber,
+            fontFamily: FONTS.sans,
+            color: C.accent.classic,
           }}>
             +{info.points}
           </span>
 
           <span style={{
-            fontSize: 11, color: C.textSecondary,
-            fontFamily: 'Inter, sans-serif',
+            fontSize: 11, color: C.muted.classic,
+            fontFamily: FONTS.sans,
           }}>
             {info.cardCount} card{info.cardCount !== 1 ? 's' : ''} captured
           </span>

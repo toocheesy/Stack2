@@ -26,9 +26,9 @@ import type { GameSettings } from '../../src/engine/types';
 // The home screen, HS15 Citrus Press (D-007 release 3, rulings 32, 35, 37,
 // 38, 39, 65, 65b, 105), through the whole app: the words from the board,
 // CONTINUE only with a saved game, the three buttons the keyboard can reach
-// (S-021), nothing naming The Run, SET THE TABLE through DD2 to Classic
-// Setup with nothing picked, Setup's back home at once, and the buttons
-// ignoring taps while DD2 plays.
+// (S-021), the "How to play" pill (release 4, ruling 111), nothing naming
+// The Run, SET THE TABLE through DD2 to Classic Setup with nothing picked,
+// Setup's back home at once, and the buttons ignoring taps while DD2 plays.
 
 const classicSettings: GameSettings = {
   targetScore: 300,
@@ -104,7 +104,7 @@ describe('the home screen (HS15)', () => {
     vi.restoreAllMocks();
   });
 
-  it('without a saved game: the words from the board, QUICK MATCH and SET THE TABLE, no CONTINUE, no How to play', () => {
+  it('without a saved game: the words from the board, QUICK MATCH and SET THE TABLE, no CONTINUE, and the How to play pill', () => {
     render(<App />);
     expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('STACKED');
     expect(screen.getByText('TAKE A SEAT')).toBeTruthy();
@@ -113,12 +113,12 @@ describe('the home screen (HS15)', () => {
     expect(within(card).getByRole('heading', { level: 2 }).textContent).toBe('Classic');
     expect(within(card).getByText('Race to the Score')).toBeTruthy();
     expect(within(card).getAllByRole('button').map((b) => b.textContent)).toEqual(['QUICK MATCH', 'SET THE TABLE']);
-    // The gear and the card's two buttons are the only buttons on the screen.
-    expect(buttonNames()).toEqual(['Settings', 'QUICK MATCH', 'SET THE TABLE']);
+    // The gear, the card's two buttons and the How to play pill (release 4) are the only buttons on the screen.
+    expect(buttonNames()).toEqual(['Settings', 'QUICK MATCH', 'SET THE TABLE', 'How to play']);
     const link = screen.getByRole('link', { name: 'Privacy' });
     expect(link.getAttribute('href')).toBe('/privacy.html');
     expect(link.getAttribute('target')).toBe('_blank');
-    expect(screen.queryByText('How to play')).toBeNull();
+    expect(screen.getByRole('button', { name: 'How to play' })).toBeTruthy();
     // The old home's words are gone.
     expect(screen.queryByText('Play to the score you pick.')).toBeNull();
     expect(screen.queryByText('CHOOSE YOUR GAME')).toBeNull();
@@ -147,7 +147,7 @@ describe('the home screen (HS15)', () => {
     expect(save).not.toBeNull();
     render(<App />);
     expect(screen.queryByText(RUN_WORDS)).toBeNull();
-    expect(buttonNames()).toEqual(['Settings', 'QUICK MATCH', 'SET THE TABLE']);
+    expect(buttonNames()).toEqual(['Settings', 'QUICK MATCH', 'SET THE TABLE', 'How to play']);
     expect(localStorage.getItem('stacked-save-run')).toBe(save);
     expect(localStorage.getItem('stacked_v2_adventure_progress')).toBe(progress);
   });

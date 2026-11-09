@@ -6,6 +6,7 @@ import { HomeScreen } from './components/HomeScreen';
 import { CurtainDeal } from './components/CurtainDeal';
 import { NewGameSheet } from './components/NewGameSheet';
 import { HomeSettingsSheet } from './components/HomeSettingsSheet';
+import { RulesScreen } from './components/RulesScreen';
 import { useGameController } from './game/useGameController';
 import type { Difficulty, GameSettings } from './engine/types';
 import { loadGame, clearSavedGame, saveModeFor } from './game/persistence';
@@ -18,7 +19,7 @@ import { loadTutorialSeen } from './tutorial/tutorialStorage';
 import { trackGameStart, trackTutorialComplete, trackGameEnd, trackRunComplete } from './analytics/track';
 import { C } from './config/colors';
 
-type Screen = 'home' | 'setup' | 'worldMap' | 'game' | 'cardtest';
+type Screen = 'home' | 'setup' | 'worldMap' | 'game' | 'cardtest' | 'rules';
 
 const DEFAULT_SETTINGS: GameSettings = {
   targetScore: 300,
@@ -99,6 +100,23 @@ function App() {
 
   const endCurtain = useCallback(() => setCurtain(null), []);
 
+  // The rules page (RP1, rulings 107 and 111): "How to play" opens it with one
+  // history entry, so the phone's back gesture closes it; the back button goes
+  // back through that same entry. Both ways home are instant.
+  const openRules = useCallback(() => {
+    window.history.pushState({ stackedRules: true }, '');
+    setScreen('rules');
+  }, []);
+  const closeRules = useCallback(() => {
+    setScreen('home');
+    if ((window.history.state as { stackedRules?: boolean } | null)?.stackedRules) window.history.back();
+  }, []);
+  useEffect(() => {
+    const onPopState = () => setScreen((s) => (s === 'rules' ? 'home' : s));
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
   const settingsForLevel = useCallback((levelId: number): GameSettings => {
     const level = getLevel(levelId)!;
     return {
@@ -176,6 +194,8 @@ function App() {
         onResumeRun={continueRunFromMap}
       />
     );
+  } else if (screen === 'rules') {
+    view = <RulesScreen onBack={closeRules} />;
   } else if (screen === 'setup') {
     view = (
       <ClassicSetup
@@ -207,6 +227,7 @@ function App() {
         onQuickMatch={askQuickMatch}
         onSetTheTable={setTheTable}
         onOpenSettings={() => setSettingsOpen(true)}
+        onHowToPlay={openRules}
       />
     );
   }
@@ -217,7 +238,7 @@ function App() {
       {/* DD2: the home as it was at the tap leaves over the screen it opened. The curtain takes every tap. */}
       {curtain && (
         <CurtainDeal onDone={endCurtain}>
-          <HomeScreen hasSave={curtain.hadSave} leaving onContinue={noop} onQuickMatch={noop} onSetTheTable={noop} onOpenSettings={noop} />
+          <HomeScreen hasSave={curtain.hadSave} leaving onContinue={noop} onQuickMatch={noop} onSetTheTable={noop} onOpenSettings={noop} onHowToPlay={noop} />
         </CurtainDeal>
       )}
       <NewGameSheet open={newGameAsk} onKeepPlaying={() => setNewGameAsk(false)} onNewGame={() => { setNewGameAsk(false); quickMatch(); }} />

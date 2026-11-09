@@ -146,7 +146,8 @@ describe('Quick Match', () => {
     expect(screen.getByText('TAKE A SEAT')).toBeTruthy();
     expect(botCardCounts()).toEqual(['4 CARDS', '4 CARDS']);
     expect(screen.queryByText('THINKING ···')).toBeNull();
-    expect(savedSeed()).toBeNull();
+    // Saved the moment it was dealt (release 4, ruling 110), before anyone has moved.
+    expect(savedSeed()).toBe(seed);
 
     await advance(1);
     expect(screen.queryByText('TAKE A SEAT')).toBeNull();
@@ -183,8 +184,10 @@ describe('Quick Match', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByText('New game'));
     await advance(0);
     expect(screen.queryByRole('dialog')).toBeNull();
-    // The save is gone, the new game is dealt under the curtain, and the leaving home still shows CONTINUE as it did at the tap.
-    expect(savedSeed()).toBeNull();
+    // The old save is gone: the new game is dealt under the curtain and saved at the deal (release 4,
+    // ruling 110), and the leaving home still shows CONTINUE as it did at the tap.
+    expect(savedSeed()).not.toBeNull();
+    expect(savedSeed()).not.toBe(CLASSIC_SEED);
     expect(screen.getByText('TAKE A SEAT')).toBeTruthy();
     expect(screen.getByText('CONTINUE')).toBeTruthy();
     expect(screen.getAllByText('CLASSIC · 300 · R1 · H1').length).toBeGreaterThanOrEqual(1);

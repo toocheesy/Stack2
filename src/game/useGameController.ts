@@ -253,6 +253,22 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   const stateRef = useRef(state);
   stateRef.current = state;
 
+  // A new Classic game is saved the moment it is dealt (D-007 ruling 110), so
+  // leaving before anyone has moved keeps it for CONTINUE. The save is the
+  // one setAndPersist writes, written now instead of at the first move. A
+  // resumed game is left as it was loaded; The Run's games save as they did.
+  useEffect(() => {
+    if (mount.saved !== null || currentLevelIdRef.current !== null) return;
+    saveGame('classic', {
+      game: stateRef.current,
+      currentLevelId: null,
+      seed: seedRef.current,
+      dealStream: prngRef.current.getSeed(),
+      botStream: botPrngRef.current.getSeed(),
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ─── Core flow: advance after any action ──────────
 
   const advanceRef = useRef<(s: GameState) => Promise<void>>(null!);

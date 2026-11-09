@@ -26,9 +26,10 @@ import type { GameSettings, GameState } from '../../src/engine/types';
 
 // The game board, GB2 (D-007 release 2, part 1), through the whole app: the
 // top bar's mode line, the seats, the message line, the table's deck count,
-// your bar and the tray's absence until you build. And The Run still plays
-// on it: its mode line, its hint strip on the message line, and its
-// level-complete overlay at the end.
+// your bar and the tray's absence until you build. The Run's two tests
+// reached its board from the old home's Run card; release 3 took that way in
+// off the home screen (ruling 32), so they are skipped until S-032 deletes
+// The Run and them.
 
 const SEED = 1;
 
@@ -117,7 +118,7 @@ describe('the game board (GB2)', () => {
     expect(screen.getByText('Round 1 is over')).toBeTruthy();
   });
 
-  it('The Run: a level starts on the board, with its mode line and its hint strip on the message line', () => {
+  it.skip('The Run: a level starts on the board, with its mode line and its hint strip on the message line', () => {
     setTutorialSeen(true);
     const level = 1;
     saveGame('run', { game: yourTurn(runSettings(level)), currentLevelId: level, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
@@ -131,7 +132,7 @@ describe('the game board (GB2)', () => {
     expect(screen.getByText('Calvin · 2')).toBeTruthy();
   });
 
-  it('The Run: a level ends with its level-complete overlay', async () => {
+  it.skip('The Run: a level ends with its level-complete overlay', async () => {
     const level = 3;
     const base = createInitialState(runSettings(level), createPRNG(SEED));
     // Bot 1 holds the last card, the deck is out, and bot 1 is at the target: its move ends the level.

@@ -2,19 +2,21 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { GameView, type PauseSheet } from './components/GameView';
 import { ClassicSetup } from './components/ClassicSetup';
 import { ChapterMap } from './components/ChapterMap';
+import { HomeScreen } from './components/HomeScreen';
+import { CurtainDeal } from './components/CurtainDeal';
+import { NewGameSheet } from './components/NewGameSheet';
+import { HomeSettingsSheet } from './components/HomeSettingsSheet';
 import { useGameController } from './game/useGameController';
 import type { Difficulty, GameSettings } from './engine/types';
 import { loadGame, clearSavedGame, saveModeFor } from './game/persistence';
 import { getLevel, TOTAL_LEVELS } from './engine/adventure/levelConfig';
-import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked, unlockJettInClassic, isFinalLevel, getRunStatus, clearProgress, type RunStatus } from './engine/adventure/progressManager';
+import { calculateStars, recordLevelCompletion, loadProgress, saveProgress, getLevelWorld, isWorldUnlocked, unlockJettInClassic, isFinalLevel } from './engine/adventure/progressManager';
 import { LevelCompleteOverlay } from './components/LevelCompleteOverlay';
 import { CardAtomTest } from './components/CardAtomTest';
-import { SettingsScreen } from './components/SettingsScreen';
 import { useTutorial } from './tutorial/useTutorial';
 import { loadTutorialSeen } from './tutorial/tutorialStorage';
 import { trackGameStart, trackTutorialComplete, trackGameEnd, trackRunComplete } from './analytics/track';
-import { C, alpha } from './config/colors';
-import { FONTS } from './config/fonts';
+import { C } from './config/colors';
 
 type Screen = 'home' | 'setup' | 'worldMap' | 'game' | 'cardtest';
 
@@ -24,21 +26,32 @@ const DEFAULT_SETTINGS: GameSettings = {
   bot2Personality: 'intermediate',
 };
 
+// Quick Match (D-007 ruling 106, S-033): a Classic game to 300 against two of
+// the four opponents (Calvin, Nina, Rex, Jett), any pair, six possible tables.
+const QUICK_MATCH_TARGET = 300;
+const QUICK_MATCH_PAIRS: [Difficulty, Difficulty][] = [
+  ['beginner', 'intermediate'], ['beginner', 'advanced'], ['beginner', 'expert'],
+  ['intermediate', 'advanced'], ['intermediate', 'expert'], ['advanced', 'expert'],
+];
+
+const noop = () => {};
+
 function App() {
   const [screen, setScreen] = useState<Screen>('home');
   const [seed, setSeed] = useState(() => Math.floor(Math.random() * 1_000_000));
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [currentLevelId, setCurrentLevelId] = useState<number | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  // QD1 phone B: QUICK MATCH with a saved game asks first.
+  const [newGameAsk, setNewGameAsk] = useState(false);
+  // DD2 is playing: the home leaves over the screen it opened, which waits
+  // underneath. `hadSave` keeps the leaving home as it was at the tap.
+  const [curtain, setCurtain] = useState<{ hadSave: boolean } | null>(null);
 
-  // The Run tutorial — Settings "Replay tutorial" bumps this counter.
-  // GameView watches the dep and re-opens the overlay (token >0 gate avoids
-  // firing on the initial mount where token === 0).
-  const [tutorialReplayToken, setTutorialReplayToken] = useState(0);
-  const replayTutorial = useCallback(() => {
-    setTutorialReplayToken((t) => t + 1);
-    setSettingsOpen(false);
-  }, []);
+  // The tutorial's replay token. The home's "Replay tutorial" went with the
+  // old SettingsScreen (D-007 release 3, ruling 104), so nothing bumps it now;
+  // GameWrapper still reads it. S-032 removes it.
+  const [tutorialReplayToken] = useState(0);
 
   // Per-mode saved games (S-006): one slot each, read once per render. Classic
   // CONTINUE reads the Classic slot; the Run map's Resume reads the Run slot.
@@ -54,9 +67,11 @@ function App() {
     try { localStorage.removeItem('stacked.audio.v1'); } catch { /* ignore */ }
   }, []);
 
-  const goToSetup = useCallback(() => {
+  // SET THE TABLE: DD2 plays over Classic Setup (ruling 46).
+  const setTheTable = useCallback(() => {
+    setCurtain({ hadSave: savedIsClassic });
     setScreen('setup');
-  }, []);
+  }, [savedIsClassic]);
 
   const startWithSettings = useCallback((targetScore: number, bot1: Difficulty, bot2: Difficulty) => {
     clearSavedGame('classic');
@@ -65,6 +80,24 @@ function App() {
     setSettings({ targetScore, bot1Personality: bot1, bot2Personality: bot2 });
     setScreen('game');
   }, []);
+
+  // QUICK MATCH (ruling 106, S-033): the pair is picked with the seed's random
+  // source; the engine seats the two by its coin flip (RULES.md Classic rule
+  // 5). The game is dealt now and held paused under DD2 until the board has
+  // faded in, so an opponent seated first moves in view.
+  const quickMatch = useCallback(() => {
+    const [bot1, bot2] = QUICK_MATCH_PAIRS[Math.floor(Math.random() * QUICK_MATCH_PAIRS.length)];
+    setCurtain({ hadSave: savedIsClassic });
+    startWithSettings(QUICK_MATCH_TARGET, bot1, bot2);
+  }, [savedIsClassic, startWithSettings]);
+
+  // With a saved game QUICK MATCH asks first (QD1 phone B); without one it starts at once.
+  const askQuickMatch = useCallback(() => {
+    if (savedIsClassic) setNewGameAsk(true);
+    else quickMatch();
+  }, [savedIsClassic, quickMatch]);
+
+  const endCurtain = useCallback(() => setCurtain(null), []);
 
   const settingsForLevel = useCallback((levelId: number): GameSettings => {
     const level = getLevel(levelId)!;
@@ -97,7 +130,9 @@ function App() {
   }, [settingsForLevel]);
 
   // Quitting keeps the save (S-006): CONTINUE on the Classic card picks it up.
+  // Every way back home is instant (ruling 107); a curtain still playing goes with it.
   const goHome = useCallback(() => {
+    setCurtain(null);
     setCurrentLevelId(null);
     setScreen('home');
   }, []);
@@ -160,14 +195,17 @@ function App() {
         onPlayAgain={playAgain}
         onNextLevel={nextLevel}
         tutorialReplayToken={tutorialReplayToken}
+        held={curtain !== null}
       />
     );
   } else {
     view = (
-      <TitleScreen
-        onNewGame={goToSetup}
-        onAdventure={() => setScreen('worldMap')}
-        onContinueClassic={savedIsClassic ? continueClassic : undefined}
+      <HomeScreen
+        hasSave={savedIsClassic}
+        leaving={false}
+        onContinue={continueClassic}
+        onQuickMatch={askQuickMatch}
+        onSetTheTable={setTheTable}
         onOpenSettings={() => setSettingsOpen(true)}
       />
     );
@@ -176,11 +214,14 @@ function App() {
   return (
     <>
       {view}
-      <SettingsScreen
-        visible={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        onReplayTutorial={replayTutorial}
-      />
+      {/* DD2: the home as it was at the tap leaves over the screen it opened. The curtain takes every tap. */}
+      {curtain && (
+        <CurtainDeal onDone={endCurtain}>
+          <HomeScreen hasSave={curtain.hadSave} leaving onContinue={noop} onQuickMatch={noop} onSetTheTable={noop} onOpenSettings={noop} />
+        </CurtainDeal>
+      )}
+      <NewGameSheet open={newGameAsk} onKeepPlaying={() => setNewGameAsk(false)} onNewGame={() => { setNewGameAsk(false); quickMatch(); }} />
+      <HomeSettingsSheet open={settingsOpen} onDone={() => setSettingsOpen(false)} />
     </>
   );
 }
@@ -196,6 +237,9 @@ if (typeof document !== 'undefined') {
 }
 
 // ─── Animation keyframes (injected once) ────────────
+// The old home's keyframes. The home no longer uses them (HS15, D-007 release
+// 3), but ChapterMap (The Run, frozen) still names `breathe`; S-032 removes
+// the block with The Run.
 
 const styleId = 'stacked-home-anims';
 if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
@@ -212,308 +256,6 @@ if (typeof document !== 'undefined' && !document.getElementById(styleId)) {
     .node-fade { opacity: 0; animation: nodeFade 0.4s ease forwards; }
   `;
   document.head.appendChild(s);
-}
-
-// ─── Title Screen (LOCKED) ──────────────────────────
-
-function TitleScreen({ onNewGame, onAdventure, onContinueClassic, onOpenSettings }: { onNewGame: () => void; onAdventure: () => void; onContinueClassic?: () => void; onOpenSettings: () => void }) {
-  // Entry verb hierarchy: BEGIN / RESUME / NEW RUN.
-  const runStatus: RunStatus = getRunStatus();
-  const [showNewRunConfirm, setShowNewRunConfirm] = useState(false);
-
-  const onRunCardTap = () => {
-    if (runStatus === 'complete') {
-      setShowNewRunConfirm(true);
-    } else {
-      onAdventure();
-    }
-  };
-
-  const confirmNewRun = () => {
-    clearProgress();
-    setShowNewRunConfirm(false);
-    onAdventure();
-  };
-
-  return (
-    <div style={{
-      position: 'absolute', inset: 0, background: C.ground.brand, color: C.ink.brand,
-      padding: '74px 24px 54px', display: 'flex', flexDirection: 'column',
-      fontFamily: FONTS.sans,
-      backgroundImage: `radial-gradient(circle at 30% 10%, ${alpha(C.accent.brand, 0.10)} 0%, transparent 50%), radial-gradient(circle at 80% 90%, ${alpha(C.accent.brand, 0.05)} 0%, transparent 50%)`,
-      overflow: 'hidden',
-    }}>
-      {/* Hero — STACKED! brand mark, centered at ~3.5× scale. The subtitle
-            underneath gives the player a verb for what's below without
-            competing with the brand mark. */}
-      <div style={{
-        display: 'flex', flexDirection: 'column', alignItems: 'center',
-        gap: 6, flexShrink: 0, marginBottom: 28,
-      }}>
-        <div style={{
-          fontFamily: FONTS.display, fontWeight: 400, fontSize: 64, letterSpacing: '-0.02em', lineHeight: 1,
-        }}>
-          STACKED<span style={{ color: C.accent.brand }}>!</span>
-        </div>
-        <div style={{
-          fontFamily: FONTS.sans,
-          fontSize: 10, color: C.muted.brand, letterSpacing: '0.22em', fontWeight: 600,
-        }}>
-          CHOOSE YOUR GAME
-        </div>
-      </div>
-
-      {/* Hero cards — Continue lives on the Classic card now (Per-Mode Split,
-          May 24). Global footer Continue link is gone. */}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 0 }}>
-        <ClassicHeroCard onPlay={onNewGame} onContinue={onContinueClassic} />
-        <AdventureHeroCard onPlay={onRunCardTap} runStatus={runStatus} />
-      </div>
-
-      {/* S-020: the privacy notice, a static page opened in a new tab. */}
-      <a href="/privacy.html" target="_blank" rel="noopener" style={{ position: 'absolute', bottom: 18, left: '50%', transform: 'translateX(-50%)', fontSize: 11, color: alpha(C.ink.brand, 0.4), textDecoration: 'none', fontFamily: FONTS.sans, letterSpacing: '0.04em', padding: '6px 10px' }}>Privacy</a>
-
-      {/* Top-right gear — opens Settings modal. Absolute-positioned so
-          it sits outside the card flow and can't squeeze the layout. */}
-      <button
-        onClick={onOpenSettings}
-        aria-label="Settings"
-        style={{
-          position: 'absolute', top: 16, right: 16,
-          width: 36, height: 36, borderRadius: 99,
-          border: 'none', cursor: 'pointer',
-          background: alpha(C.ink.brand, 0.06),
-          color: alpha(C.ink.brand, 0.7),
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 18, lineHeight: 1, padding: 0,
-        }}
-      >
-        <span style={{ fontVariantEmoji: 'text' as React.CSSProperties['fontVariantEmoji'] }}>{'⚙︎'}</span>
-      </button>
-
-      {/* NEW RUN confirmation dialog — fires when the Run card is tapped
-          while runStatus === 'complete'. Wipes progress on confirm. */}
-      {showNewRunConfirm && (
-        <div
-          onClick={() => setShowNewRunConfirm(false)}
-          style={{
-            position: 'fixed', inset: 0, background: alpha(C.surface.brand, 0.7),
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            zIndex: 250, padding: 20,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: C.ground.brand, borderRadius: 12, padding: 24,
-              maxWidth: 320, width: '100%',
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12,
-            }}
-          >
-            <h3 style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 18, color: C.ink.brand, margin: 0 }}>
-              Start a new Run?
-            </h3>
-            <p style={{ fontSize: 13, color: alpha(C.ink.brand, 0.6), textAlign: 'center', margin: 0 }}>
-              Your existing Run is complete. Starting a new Run wipes progress and stars. Jett stays unlocked in Classic.
-            </p>
-            <div style={{ display: 'flex', gap: 10, marginTop: 4, width: '100%' }}>
-              <button
-                onClick={() => setShowNewRunConfirm(false)}
-                style={{
-                  flex: 1, padding: '10px 16px', borderRadius: 8,
-                  border: `1.5px solid ${alpha(C.ink.brand, 0.4)}`, background: 'transparent',
-                  color: alpha(C.ink.brand, 0.9), fontSize: 14, fontWeight: 600,
-                  fontFamily: FONTS.sans, cursor: 'pointer',
-                }}
-              >
-                CANCEL
-              </button>
-              <button
-                onClick={confirmNewRun}
-                style={{
-                  flex: 1, padding: '10px 16px', borderRadius: 8,
-                  border: 'none', background: C.accent.brand,
-                  color: C.ground.brand, fontSize: 14, fontWeight: 700,
-                  fontFamily: FONTS.sans, cursor: 'pointer',
-                }}
-              >
-                START NEW RUN
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ─── Mini card primitives (proportional to locked spec) ──
-
-function MiniCardFace({ w, rank, suit }: { w: number; rank: string; suit: string }) {
-  const h = w * (3.5 / 2.5);
-  const bottomR = Math.max(4, Math.round(w * 0.03));
-  const isRed = suit === '♥' || suit === '♦';
-  const suitColor = isRed ? C.suitRed : C.suitDark;
-  return (
-    <div style={{ width: w, height: h, borderRadius: Math.round(w * 0.06), background: C.cardFace, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
-      <div style={{ position: 'absolute', left: '10%', top: 0, width: '18%', height: '70%', background: C.classicTable, borderRadius: `0 0 ${bottomR}px ${bottomR}px`, zIndex: 1 }} />
-      <div style={{ position: 'absolute', left: '34%', right: '6%', top: 0, bottom: 0, zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: w * 0.01 }}>
-        <div style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: w * 0.50, lineHeight: 0.85, letterSpacing: '-0.05em', color: suitColor }}>{rank}</div>
-        <div style={{ fontFamily: FONTS.sans, fontSize: w * 0.30, lineHeight: 1, color: suitColor, fontVariantEmoji: 'text' as any }}>{suit}&#xFE0E;</div>
-      </div>
-    </div>
-  );
-}
-
-function MiniCardBack({ w }: { w: number }) {
-  const h = w * (3.5 / 2.5);
-  const bottomR = Math.max(4, Math.round(w * 0.03));
-  const wordSize = Math.max(5, Math.round(w * 0.18 * 0.55));
-  return (
-    <div style={{ width: w, height: h, borderRadius: Math.round(w * 0.06), background: C.surface.classic, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
-      <div style={{ position: 'absolute', left: '10%', top: 0, width: '18%', height: '70%', background: C.classicGold, borderRadius: `0 0 ${bottomR}px ${bottomR}px`, zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-        <div style={{ transform: 'rotate(-90deg)', whiteSpace: 'nowrap' as const, fontFamily: FONTS.sans, fontWeight: 700, fontSize: wordSize, lineHeight: 1, letterSpacing: '0.18em', color: C.classicTable, opacity: 0.65, userSelect: 'none' as const }}>STACKED!</div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Classic Hero Card (LOCKED V5 stagger) ──────────
-
-function ClassicHeroCard({ onPlay, onContinue }: { onPlay: () => void; onContinue?: () => void }) {
-  const W = 88;
-  const STEP = W * 0.5;
-  const totalSpan = STEP + W * 1.08;
-  const tallest = W * 1.08 * (3.5 / 2.5);
-
-  return (
-    <div onClick={onPlay} style={{
-      flex: 1, background: C.surface.classic,
-      borderRadius: 20, padding: 22, position: 'relative',
-      border: `1px solid ${alpha(C.line.classic, 0.15)}`,
-      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-      overflow: 'hidden', cursor: 'pointer',
-      boxShadow: `0 4px 24px ${alpha(C.classicTable, 0.3)}, inset 0 1px 0 ${alpha(C.ink.classic, 0.04)}`,
-    }}>
-      {/* Suit watermark */}
-      {/* Scattered suit watermarks */}
-      <div style={{ position: 'absolute', right: -20, bottom: -30, fontSize: 200, color: alpha(C.line.classic, 0.04), fontFamily: FONTS.sans, fontWeight: 700, lineHeight: 1, pointerEvents: 'none' }}>{'\u2665\uFE0E'}</div>
-      <div style={{ position: 'absolute', left: -30, bottom: 10, fontSize: 140, color: alpha(C.line.classic, 0.03), fontFamily: FONTS.sans, fontWeight: 700, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(-15deg)' }}>{'\u2660\uFE0E'}</div>
-      <div style={{ position: 'absolute', right: 30, top: -20, fontSize: 120, color: alpha(C.line.classic, 0.03), fontFamily: FONTS.sans, fontWeight: 700, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(10deg)' }}>{'\u2666\uFE0E'}</div>
-      <div style={{ position: 'absolute', left: 40, top: -10, fontSize: 100, color: alpha(C.line.classic, 0.025), fontFamily: FONTS.sans, fontWeight: 700, lineHeight: 1, pointerEvents: 'none', transform: 'rotate(-8deg)' }}>{'\u2663\uFE0E'}</div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', flex: 1 }}>
-        <div style={{ flexShrink: 0, paddingRight: 8 }}>
-          <div style={{ fontFamily: FONTS.sans, fontSize: 9, color: C.muted.classic, letterSpacing: '0.22em', fontWeight: 600 }}>QUICK MATCH · 5 MIN</div>
-          <div style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 36, color: C.ink.classic, marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>Classic</div>
-        </div>
-
-        {/* V5 stagger: back + Q♥ */}
-        <div style={{ position: 'relative', width: totalSpan, height: tallest + 16, marginRight: -totalSpan * 0.10 }}>
-          <div className="breathe" style={{ '--tilt': '-2deg', position: 'absolute', left: 0, top: (tallest - W * (3.5/2.5)) / 2 + 8, zIndex: 1, filter: `drop-shadow(0 0 18px ${alpha(C.accent.classic, 0.35)}) drop-shadow(0 8px 18px ${alpha(C.classicTable, 0.5)})` } as React.CSSProperties}>
-            <MiniCardBack w={W} />
-          </div>
-          <div className="breathe-2" style={{ '--tilt': '4deg', position: 'absolute', left: STEP, top: (tallest - W * 1.08 * (3.5/2.5)) / 2 + 8, zIndex: 2, filter: `drop-shadow(0 0 18px ${alpha(C.accent.classic, 0.35)}) drop-shadow(0 8px 18px ${alpha(C.classicTable, 0.5)})` } as React.CSSProperties}>
-            <MiniCardFace w={W * 1.08} rank="Q" suit="♥" />
-          </div>
-        </div>
-      </div>
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: 14 }}>
-        <div style={{ fontSize: 13, color: alpha(C.ink.classic, 0.6), fontWeight: 400, lineHeight: 1.4, maxWidth: onContinue ? '50%' : '60%' }}>
-          Capture · Combo · Win.<br/>
-          <span style={{ color: alpha(C.ink.classic, 0.4) }}>Play to the score you pick.</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          {onContinue && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onContinue(); }}
-              style={{
-                fontWeight: 700, fontSize: 11, color: C.accent.classic, background: 'transparent',
-                padding: '8px 14px', borderRadius: 99, letterSpacing: '0.06em',
-                border: `1px solid ${alpha(C.accent.classic, 0.4)}`, cursor: 'pointer',
-                fontFamily: FONTS.sans,
-              }}
-            >
-              CONTINUE
-            </button>
-          )}
-          <button onClick={(e) => { e.stopPropagation(); onPlay(); }} style={{ fontWeight: 700, fontSize: 12, color: C.classicTable, background: C.classicGold, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: `0 2px 12px ${alpha(C.classicGold, 0.45)}, inset 0 1px 0 ${alpha(C.ink.classic, 0.08)}`, border: 'none', cursor: 'pointer', fontFamily: 'inherit', lineHeight: 'inherit' }}>
-            PLAY <span style={{ fontSize: 14 }}>→</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Adventure Hero Card ────────────────────────────
-
-function AdventureHeroCard({ onPlay, runStatus }: { onPlay: () => void; runStatus: RunStatus }) {
-  const returning = runStatus === 'in-progress' || runStatus === 'complete';
-  const nodes: [number, number][] = [
-    [22,268],[78,250],[40,222],[110,208],[170,220],[130,178],
-    [220,168],[200,130],[275,142],[245,100],[320,88],[355,48],
-  ];
-  const currentIdx = returning ? 2 : 0;
-  const pathD = nodes.reduce((acc, [x, y], i) => i === 0 ? `M ${x} ${y}` : `${acc} L ${x} ${y}`, '');
-
-  return (
-    <div onClick={onPlay} style={{
-      flex: 1.1, background: C.surface.classic,
-      borderRadius: 20, padding: 22, position: 'relative',
-      border: `1px solid ${alpha(C.accent.classic, 0.25)}`,
-      display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
-      overflow: 'hidden', cursor: 'pointer',
-      boxShadow: `0 4px 24px ${alpha(C.classicTable, 0.3)}, inset 0 1px 0 ${alpha(C.ink.classic, 0.03)}`,
-    }}>
-      {/* Chapter map peek */}
-      <div style={{ position: 'absolute', inset: 0, opacity: 0.32, pointerEvents: 'none' }}>
-        <svg viewBox="0 0 380 290" preserveAspectRatio="xMidYMid slice" style={{ width: '100%', height: '100%', position: 'absolute', inset: 0 }}>
-          <path d={pathD} fill="none" stroke={C.classicGoldDeep} strokeWidth="1.5" strokeDasharray="4 6" strokeLinecap="round" className="draw-path" />
-          {nodes.map(([x, y], i) => {
-            const isCurrent = i === currentIdx;
-            const isPast = i < currentIdx;
-            return (
-              <g key={i} className="node-fade" style={{ animationDelay: `${i * 0.08}s` }}>
-                {isCurrent && <circle cx={x} cy={y} r="10" fill="none" stroke={C.accent.classic} strokeWidth="1.5" opacity="0.5" />}
-                <circle cx={x} cy={y} r={isCurrent ? 5 : 4} fill={isPast ? C.classicGoldDeep : isCurrent ? C.accent.classic : 'transparent'} stroke={C.classicGoldDeep} strokeWidth="1.5" />
-                {isCurrent && <text x={x} y={y + 2} textAnchor="middle" fontSize="6" fill={C.classicTable} fontFamily={FONTS.sans} fontWeight="700">★</text>}
-              </g>
-            );
-          })}
-        </svg>
-      </div>
-
-      <div style={{ position: 'relative' }}>
-        <div style={{ fontFamily: FONTS.sans, fontSize: 9, color: C.accent.classic, letterSpacing: '0.22em', fontWeight: 600 }}>
-          {returning ? 'CAMPAIGN · CH. 1' : 'CAMPAIGN · NEW'}
-        </div>
-        <div style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 36, color: C.ink.classic, marginTop: 6, letterSpacing: '-0.025em', lineHeight: 1 }}>The Run</div>
-      </div>
-
-      {!returning && (
-        <div style={{ fontSize: 11, color: C.accent.classic, fontWeight: 600, position: 'relative', marginTop: 10 }}>
-          New here? The Run starts with a tutorial.
-        </div>
-      )}
-
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', position: 'relative', marginTop: returning ? 14 : 8 }}>
-        <div style={{ fontSize: 13, color: alpha(C.ink.classic, 0.65), fontWeight: 400, lineHeight: 1.4 }}>
-          {runStatus === 'complete' ? (
-            <><span style={{ color: C.accent.classic, fontWeight: 600 }}>Run complete</span><br/><span style={{ color: alpha(C.ink.classic, 0.5) }}>Start a fresh run</span></>
-          ) : runStatus === 'in-progress' ? (
-            <><span style={{ color: C.accent.classic, fontWeight: 600 }}>Resume your run</span><br/><span style={{ color: alpha(C.ink.classic, 0.5) }}>{TOTAL_LEVELS} levels · 4 worlds</span></>
-          ) : (
-            <><span style={{ color: C.accent.classic, fontWeight: 600 }}>{TOTAL_LEVELS} levels</span><br/><span style={{ color: alpha(C.ink.classic, 0.5) }}>4 worlds to conquer</span></>
-          )}
-        </div>
-        <div style={{ fontWeight: 700, fontSize: 12, color: C.classicTable, background: C.accent.classic, padding: '9px 16px', borderRadius: 99, letterSpacing: '0.08em', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: `0 2px 12px ${alpha(C.accent.classic, 0.25)}, inset 0 1px 0 ${alpha(C.ink.classic, 0.18)}` }}>
-          {runStatus === 'fresh' ? 'BEGIN' : runStatus === 'complete' ? 'NEW RUN' : 'RESUME'} <span style={{ fontSize: 14 }}>→</span>
-        </div>
-      </div>
-    </div>
-  );
 }
 
 // ─── Game Wrapper ───────────────────────────────────
@@ -534,6 +276,7 @@ function GameWrapper({
   onPlayAgain,
   onNextLevel,
   tutorialReplayToken,
+  held,
 }: {
   seed: number;
   settings: GameSettings;
@@ -543,6 +286,8 @@ function GameWrapper({
   onPlayAgain: () => void;
   onNextLevel: () => void;
   tutorialReplayToken: number;
+  /** DD2 is still playing over the board (ruling 106): the game waits under the curtain. */
+  held: boolean;
 }) {
   // Tutorial state lives here (not in GameView) so useGameController can see
   // the pause from its first render — required for the freeze ticket so
@@ -553,7 +298,8 @@ function GameWrapper({
   const tutorial = useTutorial(9, tutorialShouldAutoOpen);
 
   // The other two pauses (D-007 release 2 part 3): the leave sheet and the
-  // in-game Settings. Any of the three pauses the controller.
+  // in-game Settings. Any of the three pauses the controller, and so does a
+  // Quick Match's curtain (release 3, ruling 106).
   const [pause, setPause] = useState<PauseSheet>(null);
 
   // Replay-from-Settings: App bumps the token; reopen the overlay.
@@ -565,7 +311,7 @@ function GameWrapper({
   }, [tutorialReplayToken]);
 
   const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, wasResumed, seed: gameSeed, actions } =
-    useGameController(seed, settings, currentLevelId, tutorial.visible || pause !== null);
+    useGameController(seed, settings, currentLevelId, tutorial.visible || pause !== null || held);
 
   // Analytics — game_start fires once per GameWrapper mount. seed change
   // remounts via key={seed} so a new game gets a new event. wasResumed

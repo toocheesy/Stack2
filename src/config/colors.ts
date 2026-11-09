@@ -14,6 +14,13 @@ export const C = {
   accent:       { brand: '#1E5BD8', classic: '#FFC53A' },
   line:         { brand: '#6B7390', classic: '#B8F0D2' },
 
+  // The brand's two stack colours (HS15, ST3, DD2; D-007 rulings 39, 46, 81):
+  // the layers behind Classic's card on the home screen and behind the home
+  // Settings, and the curtains of the move into Classic. Decoration, never
+  // under text.
+  stackUpper: '#FF8A2A',
+  stackLower: '#1E5BD8',
+
   // Classic's named colours. Gold is the player's and the board's; text on it is the table colour.
   classicGold: '#FFC53A',
   classicGoldDeep: '#A36A00',

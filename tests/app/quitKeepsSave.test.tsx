@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 
 // jsdom has no matchMedia, and the app asks for it as its modules load.
 vi.hoisted(() => {
@@ -100,10 +100,11 @@ describe('quitting keeps the save (S-006)', () => {
       expect.objectContaining({ mode: 'classic', resumed: true, seed: CLASSIC_SEED }),
     );
 
+    // The back arrow opens QD1's leave sheet (D-007 release 2 part 3); Leave game keeps the save.
     fireEvent.click(screen.getByRole('button', { name: 'Leave game' }));
-    expect(screen.getByText('Quit Game?')).toBeTruthy();
-    expect(screen.getByText('Your game is saved. Tap Continue on the home screen to pick it up.')).toBeTruthy();
-    fireEvent.click(screen.getByText('QUIT'));
+    expect(screen.getByText('Leave this game?')).toBeTruthy();
+    expect(screen.getByText('Your game is saved. Tap CONTINUE on the home screen to pick it up right where you left off.')).toBeTruthy();
+    fireEvent.click(within(screen.getByRole('dialog')).getByText('Leave game'));
 
     expect(screen.getByText('CONTINUE')).toBeTruthy();
     const kept = loadGame('classic', 0)!;

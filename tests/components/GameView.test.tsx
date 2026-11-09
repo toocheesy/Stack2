@@ -101,6 +101,22 @@ describe('the game board (GB2)', () => {
     expect(screen.queryByText(/NICE COMBO|FRESH DECK|LAST ·/)).toBeNull();
   });
 
+  it("while Take the Table plays, your bar's turn label shows nothing", async () => {
+    // Your hand is empty, the deck is out and Rex captured last: at mount play
+    // moves on and Rex takes the table (TT1).
+    const base = yourTurn(classicSettings);
+    const game: GameState = { ...base, deck: [], hands: [[], [], []], board: base.board, lastAction: 'place', lastCapturer: 2, handNumber: 4 };
+    saveGame('classic', { game, currentLevelId: null, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
+    render(<App />);
+    fireEvent.click(screen.getByText('CONTINUE'));
+    await advance(300);
+    expect(screen.getByText('Rex took the table')).toBeTruthy();
+    expect(screen.queryByText('YOUR TURN')).toBeNull();
+    expect(screen.queryByText(/WAITING/)).toBeNull();
+    await advance(3000);
+    expect(screen.getByText('Round 1 is over')).toBeTruthy();
+  });
+
   it('The Run: a level starts on the board, with its mode line and its hint strip on the message line', () => {
     setTutorialSeen(true);
     const level = 1;

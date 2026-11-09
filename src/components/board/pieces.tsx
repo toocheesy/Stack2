@@ -1,11 +1,28 @@
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode, type Ref } from 'react';
+import type { Card } from '../../engine/types';
 import { C } from '../../config/colors';
 import { FONTS } from '../../config/fonts';
 import { getTransition } from '../../config/motion';
+import { CardComponent } from '../Card';
 import { centreOf, type Point } from './moments';
+import { overlap } from './tableFit';
 
-// Small pieces shared by the game board (GB2), its moments and Classic Setup (CS1).
+// Small pieces shared by the game board (GB2), its moments, the sheets and Classic Setup (CS1).
+
+/** A still stack of capture-slot cards, overlapped (RE1p's best capture row). */
+export function CardStack({ cards }: { cards: readonly Card[] }) {
+  const o = overlap(cards.length);
+  return (
+    <div style={{ display: 'flex', padding: 2, flexShrink: 0 }}>
+      {cards.map((c, i) => (
+        <div key={c.id} style={{ marginLeft: i > 0 ? -o : 0, position: 'relative', zIndex: i }}>
+          <CardComponent card={c} size="slot" />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** The wordmark: STACKED in Abril Fatface at 0.04em, with the "A" in gold. */
 export function Wordmark({ size }: { size: number }) {

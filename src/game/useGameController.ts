@@ -151,7 +151,12 @@ function restAfterPlace(s: GameState, player: PlayerIndex, placedId: string): Ca
   return othersEmpty ? s.hands[player].filter((c) => c.id !== placedId) : [];
 }
 
-export function useGameController(seed: number, settings: GameSettings, currentLevelId: number | null, tutorialActive: boolean = false) {
+/** The game controller. `paused` is the pause (D-007 release 2 part 3,
+ *  section D): true while the tutorial, the leave sheet or the in-game
+ *  Settings is open. While it is, no opponent moves and no moment carries
+ *  on; closing the sheet carries on from where the game stood. It began as
+ *  the tutorial's freeze and keeps that freeze's gates. */
+export function useGameController(seed: number, settings: GameSettings, currentLevelId: number | null, paused: boolean = false) {
   // Set up once, on mount (S-006): the save for this mode if there is one, the
   // game seed (the seed prop for a new game, the save's own for a resumed one)
   // and the two streams from it: prngRef deals, botPrngRef feeds the bots. A
@@ -167,14 +172,18 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   const botPrngRef = useRef<PRNG>(mount.botPrng);
   const botBusyRef = useRef(false);
   const mountedRef = useRef(true);
-  // Tutorial freeze (May 26) — runBotTurn and its in-flight checkpoints
-  // read this ref every loop iteration. Bot suppression is binary: while
-  // tutorialActive, no bot turn starts and in-flight turns gate-out at
-  // the next await boundary (clean cleanup, no state mutation past the
-  // last setAndPersist). Resume effect (deps [tutorialActive]) re-fires
-  // runBotTurn when the player dismisses.
-  const tutorialActiveRef = useRef(tutorialActive);
-  tutorialActiveRef.current = tutorialActive;
+  // The pause (the tutorial freeze of May 26, widened to every pause sheet).
+  // runBotTurn and its in-flight checkpoints read this ref: while paused, no
+  // bot turn starts and an in-flight turn gates out at its next await (no
+  // state change past the last setAndPersist). A moment's wait that ends
+  // while paused holds in waitThrough until the sheet closes. The resume
+  // effect (deps [paused]) lets held moments carry on, or re-fires
+  // runBotTurn from the frozen state.
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  // Moments waiting through a pause: how many, and how to let them carry on.
+  const holdRef = useRef(0);
+  const resumersRef = useRef<(() => void)[]>([]);
 
   // Analytics: set during state init so game_start can emit resumed:true
   // and first_capture is suppressed on resumed games (player isn't making
@@ -289,14 +298,14 @@ export function useGameController(seed: number, settings: GameSettings, currentL
             cards: current.board,
             scoresBefore: current.overallScores,
           });
-          await wait(MOMENTS.takeTheTable.sheet);
+          await waitThrough(MOMENTS.takeTheTable.sheet);
           if (!mountedRef.current) return;
           setAndPersist({ ...stateRef.current, gamePhase: 'roundEnd' as const, isOvertime: result.isOvertime });
-          await wait(MOMENTS.takeTheTable.end - MOMENTS.takeTheTable.sheet);
+          await waitThrough(MOMENTS.takeTheTable.end - MOMENTS.takeTheTable.sheet);
           if (!mountedRef.current) return;
           setJackpotInfo(null);
         } else {
-          await wait(500);
+          await waitThrough(500);
           if (!mountedRef.current) return;
           setAndPersist({ ...stateRef.current, gamePhase: 'roundEnd' as const, isOvertime: result.isOvertime });
         }
@@ -315,7 +324,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
             cards: current.board,
             scoresBefore: current.overallScores,
           });
-          await wait(MOMENTS.takeTheTable.end);
+          await waitThrough(MOMENTS.takeTheTable.end);
           if (!mountedRef.current) return;
           setJackpotInfo(null);
         }
@@ -331,13 +340,28 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     }
   };
 
+  // A moment's wait that holds through a pause (section D): when the time is
+  // up and a sheet is open, play carries on once the sheet closes. The resume
+  // effect sees the hold and starts nothing of its own meanwhile.
+  async function waitThrough(ms: number): Promise<void> {
+    holdRef.current += 1;
+    try {
+      await wait(ms);
+      if (pausedRef.current && mountedRef.current) {
+        await new Promise<void>((resolve) => { resumersRef.current.push(resolve); });
+      }
+    } finally {
+      holdRef.current -= 1;
+    }
+  }
+
   // Moves play on after a wait: when your capture empties your hand (YC1's
   // land), and when the last cards land (Law 8). If play has moved on another
-  // way meanwhile, or the tutorial is open, the wait ends quietly.
+  // way meanwhile, the wait ends quietly.
   function advanceLater(next: GameState, ms: number) {
     void (async () => {
-      await wait(ms);
-      if (!mountedRef.current || tutorialActiveRef.current) return;
+      await waitThrough(ms);
+      if (!mountedRef.current) return;
       if (stateRef.current !== next) return;
       await advanceRef.current(next);
     })();
@@ -346,7 +370,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   // ─── Bot turn execution ───────────────────────────
 
   async function runBotTurn(current: GameState): Promise<void> {
-    if (!mountedRef.current || botBusyRef.current || tutorialActiveRef.current) return;
+    if (!mountedRef.current || botBusyRef.current || pausedRef.current) return;
     const player = current.currentPlayer;
     if (player === 0) return;
     if (current.hands[player].length === 0) {
@@ -366,8 +390,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     const delay = getBotThinkingDelay(difficulty, botPrngRef.current);
     await wait(delay);
     if (!mountedRef.current) return;
-    // Freeze gate after thinking delay — tutorial opened mid-think.
-    if (tutorialActiveRef.current) {
+    // Pause gate after the thinking delay: a sheet opened mid-think.
+    if (pausedRef.current) {
       setBotViz(null);
       botBusyRef.current = false;
       return;
@@ -459,8 +483,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       await wait(2000);
       if (!mountedRef.current) return;
       setBotCombo(null);
-      // Freeze gate after bot-combo display — tutorial opened mid-show.
-      if (tutorialActiveRef.current) {
+      // Pause gate after the capture replay: a sheet opened mid-show.
+      if (pausedRef.current) {
         lastMoveRef.current = moveBefore;
         setLastMove(moveBefore);
         setBotViz(null);
@@ -489,37 +513,45 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     setBotViz(null);
     botBusyRef.current = false;
 
-    // The last cards land and the line holds (Law 8) before play moves on.
-    await wait(restPlaced > 0 ? landingMs(restPlaced) : 500);
+    // The last cards land and the line holds (Law 8) before play moves on;
+    // a pause opened meanwhile holds it until the sheet closes.
+    await waitThrough(restPlaced > 0 ? landingMs(restPlaced) : 500);
     if (!mountedRef.current) return;
-    // Freeze gate before recursive advance — tutorial opened after bot's
-    // move resolved. State is already persisted; just stop the chain.
-    // Resume effect picks up the next turn from this exact state.
-    if (tutorialActiveRef.current) return;
     await advanceRef.current(next);
   }
 
   // Mount/unmount tracker — separate from the bot trigger so the lifecycle
-  // flag is set/cleared exactly once.
+  // flag is set/cleared exactly once. A moment held through a pause at
+  // unmount is let go, and finds the controller gone.
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      const held = resumersRef.current;
+      resumersRef.current = [];
+      held.forEach((resume) => resume());
     };
   }, []);
 
-  // ─── Bot turn trigger: mount + tutorial-close resume ───
-  // Single effect covers (a) initial mount when tutorial isn't blocking,
-  // (b) resumption when the tutorial closes mid-game. The tutorial gate
-  // inside runBotTurn handles the mid-turn freeze (in-flight bot turn
-  // cleans up at next await boundary).
+  // ─── Bot turn trigger: mount + pause-close resume ───
+  // Single effect covers (a) initial mount when nothing is paused, (b)
+  // resumption when a sheet closes mid-game. The pause gates inside
+  // runBotTurn handle the mid-turn freeze (an in-flight bot turn cleans up
+  // at its next await); a moment held in waitThrough carries on itself.
   useEffect(() => {
-    if (!tutorialActive && pendingAdvanceRef.current) {
+    if (paused) return;
+    if (holdRef.current > 0) {
+      const held = resumersRef.current;
+      resumersRef.current = [];
+      held.forEach((resume) => resume());
+      return;
+    }
+    if (pendingAdvanceRef.current) {
       pendingAdvanceRef.current = false;
       void advanceRef.current(stateRef.current);
       return;
     }
-    if (tutorialActive || botBusyRef.current || gameOver) return;
+    if (botBusyRef.current || gameOver) return;
     const s = stateRef.current;
     if (s.currentPlayer !== 0) {
       void runBotTurn(s);
@@ -531,7 +563,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
       void advanceRef.current(s);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tutorialActive]);
+  }, [paused]);
 
   // ─── Player actions ───────────────────────────────
 

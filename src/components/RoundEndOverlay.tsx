@@ -4,8 +4,7 @@ import type { Difficulty, GameState, PlayerIndex, RoundStats, Scores } from '../
 import { C } from '../config/colors';
 import { FONTS } from '../config/fonts';
 import { getTransition } from '../config/motion';
-import { CardComponent } from './Card';
-import { RaceBar } from './board/pieces';
+import { CardStack, RaceBar } from './board/pieces';
 import { SHEET_DIM, SHEET_GLOW, sheetColourOf } from './board/sheet';
 import { captureLine } from './board/words';
 
@@ -14,7 +13,8 @@ import { captureLine } from './board/words';
 // gold edge and the gold glow. One row per player in finishing order; the
 // round's top scorer sits on deep plum in a gold frame with TOP ROUND; the
 // taker's row carries "Took the Table" (RULES.md Law 10). The next round
-// deals itself after 10 seconds or on CONTINUE.
+// deals itself after 10 seconds or on CONTINUE; the countdown holds while a
+// pause sheet is open over the game.
 
 const AUTO_ADVANCE_SEC = 10;
 
@@ -31,6 +31,8 @@ interface Props {
   isOvertime: boolean;
   /** "CLASSIC" or "THE RUN", for the line above the title. */
   modeWord: string;
+  /** A pause sheet is open over the game (D-007 release 2 part 3): the countdown holds. */
+  paused?: boolean;
   /** The Run's games use the same sheet (the prop stays for the caller). */
   adventureMode?: boolean;
 }
@@ -46,17 +48,34 @@ interface Row {
   stats: RoundStats;
 }
 
-export function RoundEndOverlay({
-  visible, roundNumber, roundStats, overallScores, targetScore, bot1Personality, bot2Personality, onContinue, isOvertime, modeWord,
+export function RoundEndOverlay(props: Props) {
+  return (
+    <AnimatePresence>
+      {props.visible && (
+        <motion.div key="round-end" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
+          style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
+          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: SHEET_DIM }} />
+          <Sheet {...props} />
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// The sheet mounts when the round ends, so its countdown starts over each time.
+function Sheet({
+  roundNumber, roundStats, overallScores, targetScore, bot1Personality, bot2Personality, onContinue, isOvertime, modeWord, paused = false,
 }: Props) {
   const calm = useReducedMotion();
   const [countdown, setCountdown] = useState(AUTO_ADVANCE_SEC);
   const onContinueRef = useRef(onContinue);
-  onContinueRef.current = onContinue;
-
   useEffect(() => {
-    if (!visible) { setCountdown(AUTO_ADVANCE_SEC); return; }
-    setCountdown(AUTO_ADVANCE_SEC);
+    onContinueRef.current = onContinue;
+  }, [onContinue]);
+
+  // The countdown runs while nothing is paused over the sheet; a pause holds it where it stands.
+  useEffect(() => {
+    if (paused) return;
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
@@ -68,7 +87,7 @@ export function RoundEndOverlay({
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [visible]);
+  }, [paused]);
 
   // The sheet's colours follow the seats' personalities.
   const forColour = { settings: { bot1Personality, bot2Personality } } as GameState;
@@ -94,104 +113,93 @@ export function RoundEndOverlay({
     : `${tiedNames.slice(0, -1).join(', ')} and ${tiedNames[tiedNames.length - 1]} all have ${topTotal}.`;
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div key="round-end" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2 }}
-          style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
-          <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: SHEET_DIM }} />
-          <motion.section
-            aria-label="Round end"
-            initial={calm ? { opacity: 0 } : { y: '100%' }}
-            animate={calm ? { opacity: 1 } : { y: 0 }}
-            exit={calm ? { opacity: 0 } : { y: '100%' }}
-            transition={calm ? { duration: 0.3, ease: 'linear' } : { duration: 0.38, ease: [0.2, 0.8, 0.2, 1] }}
-            style={{
-              position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(100% - ${isOvertime ? 96 : 190}px)`, boxSizing: 'border-box',
-              padding: '20px 20px 24px', background: C.classicSheet, borderTop: `2px solid ${C.classicGold}`, borderRadius: '24px 24px 0 0',
-              boxShadow: SHEET_GLOW, display: 'flex', flexDirection: 'column', gap: 10, fontFamily: FONTS.sans, color: C.classicSheetInk,
-            }}
-          >
-            <div style={{ flexShrink: 0 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.16em', color: C.classicSheetMuted }}>{modeWord} · TARGET {targetScore}</div>
-              <h2 style={{ margin: '2px 0 0', fontFamily: FONTS.display, fontWeight: 400, fontSize: 32, lineHeight: 1.1, color: C.classicSheetInk }}>Round {roundNumber} is over</h2>
-            </div>
+    <motion.section
+      aria-label="Round end"
+      initial={calm ? { opacity: 0 } : { y: '100%' }}
+      animate={calm ? { opacity: 1 } : { y: 0 }}
+      exit={calm ? { opacity: 0 } : { y: '100%' }}
+      transition={calm ? { duration: 0.3, ease: 'linear' } : { duration: 0.38, ease: [0.2, 0.8, 0.2, 1] }}
+      style={{
+        position: 'absolute', left: 0, right: 0, bottom: 0, height: `calc(100% - ${isOvertime ? 96 : 190}px)`, boxSizing: 'border-box',
+        padding: '20px 20px 24px', background: C.classicSheet, borderTop: `2px solid ${C.classicGold}`, borderRadius: '24px 24px 0 0',
+        boxShadow: SHEET_GLOW, display: 'flex', flexDirection: 'column', gap: 10, fontFamily: FONTS.sans, color: C.classicSheetInk,
+      }}
+    >
+      <div style={{ flexShrink: 0 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.16em', color: C.classicSheetMuted }}>{modeWord} · TARGET {targetScore}</div>
+        <h2 style={{ margin: '2px 0 0', fontFamily: FONTS.display, fontWeight: 400, fontSize: 32, lineHeight: 1.1, color: C.classicSheetInk }}>Round {roundNumber} is over</h2>
+      </div>
 
-            <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', touchAction: 'pan-y', display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {isOvertime && (
-                <div role="status" style={{ padding: '12px 14px', borderRadius: 8, border: `2px solid ${C.classicGold}`, background: C.classicSheetDeep, display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
-                  <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 22, lineHeight: 1.15, color: C.classicGold }}>Tied at the top.</span>
-                  <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 22, lineHeight: 1.15, color: C.classicSheetInk }}>One more round.</span>
-                  <span style={{ fontSize: 12, color: C.classicSheetMuted }}>{tiedSentence} Round {roundNumber + 1} is next.</span>
+      <div style={{ flex: '1 1 auto', minHeight: 0, overflowY: 'auto', touchAction: 'pan-y', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {isOvertime && (
+          <div role="status" style={{ padding: '12px 14px', borderRadius: 8, border: `2px solid ${C.classicGold}`, background: C.classicSheetDeep, display: 'flex', flexDirection: 'column', gap: 2, flexShrink: 0 }}>
+            <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 22, lineHeight: 1.15, color: C.classicGold }}>Tied at the top.</span>
+            <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 22, lineHeight: 1.15, color: C.classicSheetInk }}>One more round.</span>
+            <span style={{ fontSize: 12, color: C.classicSheetMuted }}>{tiedSentence} Round {roundNumber + 1} is next.</span>
+          </div>
+        )}
+
+        <div>
+          {rows.map((row) => {
+            const framed = row.idx === topRound;
+            const best = row.stats.highestCapture;
+            return (
+              <div key={row.idx} style={framed
+                ? { padding: '10px 8px', margin: '2px -8px', borderRadius: 10, background: C.classicSheetDeep, border: `2px solid ${C.classicGold}`, display: 'flex', flexDirection: 'column', gap: 8 }
+                : { padding: '12px 0', borderTop: `1px solid ${C.classicSheetLine}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+                    <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 22, color: row.colour, whiteSpace: 'nowrap' }}>{row.name}</span>
+                    {framed && <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: C.classicGold, whiteSpace: 'nowrap' }}>TOP ROUND</span>}
+                  </span>
+                  <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: 15, fontWeight: 700, color: C.classicSheetInk }}>+{row.points}</span>
+                    <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 26, color: C.classicSheetInk }}>{row.total}</span>
+                    <span style={{ fontSize: 13, color: C.classicSheetMuted }}>/ {targetScore}</span>
+                  </span>
                 </div>
-              )}
-
-              <div>
-                {rows.map((row) => {
-                  const framed = row.idx === topRound;
-                  const best = row.stats.highestCapture;
-                  return (
-                    <div key={row.idx} style={framed
-                      ? { padding: '10px 8px', margin: '2px -8px', borderRadius: 10, background: C.classicSheetDeep, border: `2px solid ${C.classicGold}`, display: 'flex', flexDirection: 'column', gap: 8 }
-                      : { padding: '12px 0', borderTop: `1px solid ${C.classicSheetLine}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 }}>
-                        <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
-                          <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 22, color: row.colour, whiteSpace: 'nowrap' }}>{row.name}</span>
-                          {framed && <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', color: C.classicGold, whiteSpace: 'nowrap' }}>TOP ROUND</span>}
-                        </span>
-                        <span style={{ display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap' }}>
-                          <span style={{ fontSize: 15, fontWeight: 700, color: C.classicSheetInk }}>+{row.points}</span>
-                          <span style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 26, color: C.classicSheetInk }}>{row.total}</span>
-                          <span style={{ fontSize: 13, color: C.classicSheetMuted }}>/ {targetScore}</span>
-                        </span>
-                      </div>
-                      <div style={{ position: 'relative', display: 'flex' }}>
-                        <RaceBar value={row.total} max={barMax} colour={row.colour} height={10} track={C.classicSheetLine} />
-                        {barMax !== targetScore && (
-                          <div aria-hidden="true" style={{ position: 'absolute', left: `${(targetScore / barMax) * 100}%`, top: -4, width: 2, height: 18, background: C.classicSheetInk }} />
-                        )}
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 60 }}>
-                        {best && (
-                          <div style={{ display: 'flex', gap: 6, padding: 2 }}>
-                            {best.cards.map((c) => <CardComponent key={c.id} card={c} size="slot" />)}
-                          </div>
-                        )}
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
-                          {best
-                            ? <span style={{ fontSize: 13, color: C.classicSheetMuted }}>Best capture <b style={{ color: C.classicSheetInk }}>{captureLine(best)}</b>, +{best.points}</span>
-                            : <span style={{ fontSize: 13, color: C.classicSheetMuted }}>No captures this round</span>}
-                          {row.stats.tookTheTable && (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 6px', borderRadius: 999, border: `1px solid ${C.classicSheetLine}`, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', color: C.classicSheetInk }}>Took the Table</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div style={{ marginTop: 'auto', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: C.classicSheetMuted }}>
-                  <span>Round {roundNumber + 1} deals in <b style={{ color: C.classicSheetInk }}>{countdown}</b></span>
-                  <span>{AUTO_ADVANCE_SEC}s</span>
+                <div style={{ position: 'relative', display: 'flex' }}>
+                  <RaceBar value={row.total} max={barMax} colour={row.colour} height={10} track={C.classicSheetLine} />
+                  {barMax !== targetScore && (
+                    <div aria-hidden="true" style={{ position: 'absolute', left: `${(targetScore / barMax) * 100}%`, top: -4, width: 2, height: 18, background: C.classicSheetInk }} />
+                  )}
                 </div>
-                <div aria-hidden="true" style={{ height: 4, borderRadius: 2, background: C.classicSheetDeep, overflow: 'hidden' }}>
-                  <motion.div animate={{ scaleX: countdown / AUTO_ADVANCE_SEC }} transition={calm ? { duration: 0 } : { duration: 1, ease: 'linear' }}
-                    style={{ width: '100%', height: '100%', background: C.classicGold, transformOrigin: 'left center' }} />
+                {/* The best capture's cards overlap as the tray's do, so the line keeps its room for a capture of any size. */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 60 }}>
+                  {best && <CardStack cards={best.cards} />}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start', minWidth: 0 }}>
+                    {best
+                      ? <span style={{ fontSize: 13, color: C.classicSheetMuted }}>Best capture <b style={{ color: C.classicSheetInk }}>{captureLine(best)}</b>, +{best.points}</span>
+                      : <span style={{ fontSize: 13, color: C.classicSheetMuted }}>No captures this round</span>}
+                    {row.stats.tookTheTable && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', height: 20, padding: '0 6px', borderRadius: 999, border: `1px solid ${C.classicSheetLine}`, fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', color: C.classicSheetInk }}>Took the Table</span>
+                    )}
+                  </div>
                 </div>
               </div>
-              <motion.button type="button" onClick={onContinue} whileTap={{ scale: 0.98 }} transition={getTransition('snappy')} style={{
-                width: '100%', height: 52, borderRadius: 6, border: 'none', background: C.classicGold, fontFamily: FONTS.sans,
-                fontSize: 15, fontWeight: 700, letterSpacing: '0.18em', color: C.classicTable, cursor: 'pointer',
-              }}>
-                CONTINUE
-              </motion.button>
-            </div>
-          </motion.section>
-        </motion.div>
-      )}
-    </AnimatePresence>
+            );
+          })}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 'auto', flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: C.classicSheetMuted }}>
+            <span>Round {roundNumber + 1} deals in <b style={{ color: C.classicSheetInk }}>{countdown}</b></span>
+            <span>{AUTO_ADVANCE_SEC}s</span>
+          </div>
+          <div aria-hidden="true" style={{ height: 4, borderRadius: 2, background: C.classicSheetDeep, overflow: 'hidden' }}>
+            <motion.div animate={{ scaleX: countdown / AUTO_ADVANCE_SEC }} transition={calm ? { duration: 0 } : { duration: 1, ease: 'linear' }}
+              style={{ width: '100%', height: '100%', background: C.classicGold, transformOrigin: 'left center' }} />
+          </div>
+        </div>
+        <motion.button type="button" onClick={onContinue} whileTap={{ scale: 0.98 }} transition={getTransition('snappy')} style={{
+          width: '100%', height: 52, borderRadius: 6, border: 'none', background: C.classicGold, fontFamily: FONTS.sans,
+          fontSize: 15, fontWeight: 700, letterSpacing: '0.18em', color: C.classicTable, cursor: 'pointer',
+        }}>
+          CONTINUE
+        </motion.button>
+      </div>
+    </motion.section>
   );
 }

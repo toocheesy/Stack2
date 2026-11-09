@@ -114,7 +114,10 @@ describe('quitting keeps the save (S-006)', () => {
     expect(ids(kept.game.hands[0])).toEqual(ids(game.hands[0]));
   });
 
-  it('the Run: Resume on the map resumes with the saved seed, quitting keeps the save, and Resume shows again', () => {
+  // This test reached The Run's map from the old home's Run card; release 3
+  // took that way in off the home screen (D-007 ruling 32), so it is skipped
+  // until S-032 deletes The Run and it.
+  it.skip('the Run: Resume on the map resumes with the saved seed, quitting keeps the save, and Resume shows again', () => {
     const game = createInitialState(runSettings(), createPRNG(RUN_SEED));
     saveGame('run', {
       game,

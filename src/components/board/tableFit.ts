@@ -4,8 +4,17 @@ import { TABLE_CARD_W } from '../Card';
 // release 2 part 2, ruling 99): cards at 54 x 76 with an 8px gap across and
 // 10px between rows, inside 12px side padding, the deck pill's row above and
 // a little room below. On a short screen the pill's row and the room below
-// shrink.
+// shrink. And the capture-slot stacks' overlap, shared by the tray and the
+// round end sheet.
 export const TABLE_CARD_H = 76;
+const SLOT_CARD_W = 40;
+
+/** How far each capture-slot card in a stack sits over the one before, so a
+ *  capture of any size stays about one tray box wide (GB2's tray, RE1p's best
+ *  capture): two cards overlap by 16px; more share the 32px past the first. */
+export function overlap(n: number): number {
+  return n <= 2 ? 16 : Math.ceil(SLOT_CARD_W - 32 / (n - 1));
+}
 export const TABLE_GAP_X = 8;
 export const TABLE_GAP_Y = 10;
 export const TABLE_PAD_X = 12;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { GameView } from './components/GameView';
+import { GameView, type PauseSheet } from './components/GameView';
 import { ClassicSetup } from './components/ClassicSetup';
 import { ChapterMap } from './components/ChapterMap';
 import { useGameController } from './game/useGameController';
@@ -80,10 +80,14 @@ function App() {
   // Per-mode resume — Classic Continue affordance on the Classic card.
   // useGameController loads the snapshot on mount and uses it as initial state;
   // setting currentLevelId here ensures GameWrapper renders the right frame.
+  // The saved game's opponents and target become App's settings, so PLAY
+  // AGAIN deals what was being played (D-007 rulings 72 and 102).
   const continueClassic = useCallback(() => {
+    const saved = loadGame('classic', seed);
+    if (saved) setSettings(saved.game.settings);
     setCurrentLevelId(null);
     setScreen('game');
-  }, []);
+  }, [seed]);
 
   // Per-mode resume — ChapterMap "Resume Level N" callout dispatches here.
   const continueRunFromMap = useCallback((levelId: number) => {
@@ -155,7 +159,6 @@ function App() {
         onHome={currentLevelId ? goToWorldMap : goHome}
         onPlayAgain={playAgain}
         onNextLevel={nextLevel}
-        onOpenSettings={() => setSettingsOpen(true)}
         tutorialReplayToken={tutorialReplayToken}
       />
     );
@@ -530,7 +533,6 @@ function GameWrapper({
   onHome,
   onPlayAgain,
   onNextLevel,
-  onOpenSettings,
   tutorialReplayToken,
 }: {
   seed: number;
@@ -540,15 +542,19 @@ function GameWrapper({
   onHome: () => void;
   onPlayAgain: () => void;
   onNextLevel: () => void;
-  onOpenSettings: () => void;
   tutorialReplayToken: number;
 }) {
   // Tutorial state lives here (not in GameView) so useGameController can see
-  // tutorialActive from its first render — required for the freeze ticket so
+  // the pause from its first render — required for the freeze ticket so
   // the bot-turn mount effect knows to gate. Initial visible is computed
   // synchronously from loadTutorialSeen() to avoid an effect round-trip race.
+  // TU2 has nine steps; The Run's level 1 still opens it by itself.
   const tutorialShouldAutoOpen = currentLevelId === 1 && !loadTutorialSeen();
-  const tutorial = useTutorial(8, tutorialShouldAutoOpen);
+  const tutorial = useTutorial(9, tutorialShouldAutoOpen);
+
+  // The other two pauses (D-007 release 2 part 3): the leave sheet and the
+  // in-game Settings. Any of the three pauses the controller.
+  const [pause, setPause] = useState<PauseSheet>(null);
 
   // Replay-from-Settings: App bumps the token; reopen the overlay.
   // Token starts at 0 (no-op on initial mount). Lives here so the auto-fire
@@ -559,7 +565,7 @@ function GameWrapper({
   }, [tutorialReplayToken]);
 
   const { state, isPlayerTurn, botViz, botCombo, lastCapture, jackpotInfo, gameOver, wasResumed, seed: gameSeed, actions } =
-    useGameController(seed, settings, currentLevelId, tutorial.visible);
+    useGameController(seed, settings, currentLevelId, tutorial.visible || pause !== null);
 
   // Analytics — game_start fires once per GameWrapper mount. seed change
   // remounts via key={seed} so a new game gets a new event. wasResumed
@@ -667,7 +673,8 @@ function GameWrapper({
         onQuit={onQuit}
         onHome={onHome}
         onPlayAgain={onPlayAgain}
-        onOpenSettings={onOpenSettings}
+        pause={pause}
+        onPause={setPause}
         tutorial={tutorial}
         suppressToasts={!!levelComplete}
       />

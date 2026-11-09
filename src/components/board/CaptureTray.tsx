@@ -7,6 +7,7 @@ import { MOMENTS } from '../../game/useGameController';
 import { CardComponent } from '../Card';
 import { Fade, FlyingCard, Tag, TextButton, type Flight } from './pieces';
 import { centreOf, type Point } from './moments';
+import { overlap } from './tableFit';
 import { cardPointsLine, sourceTags } from './words';
 
 // The capture tray (GB2): BASE, COMBO 1, COMBO 2, COMBO 3 as capture-slot
@@ -19,7 +20,6 @@ import { cardPointsLine, sourceTags } from './words';
 
 const SLOT_KEYS: ComboSlot[] = ['base', 'combo1', 'combo2', 'combo3'];
 const SLOT_LABELS: Record<ComboSlot, string> = { base: 'BASE', combo1: 'COMBO 1', combo2: 'COMBO 2', combo3: 'COMBO 3' };
-const SLOT_CARD_W = 40;
 
 type ComboKey = Exclude<ComboSlot, 'base'>;
 
@@ -39,6 +39,8 @@ interface BuildProps {
   onReset: () => void;
   onSubmit: () => void;
   slotRefs: RefObject<(HTMLDivElement | null)[]>;
+  /** Each slot's column, label included (TU2's HAND and TABLE step lights the first two). */
+  columnRefs?: RefObject<(HTMLDivElement | null)[]>;
   submitWrapRef: Ref<HTMLDivElement>;
   resetWrapRef: Ref<HTMLDivElement>;
 }
@@ -67,11 +69,6 @@ interface CaptureProps {
 }
 
 export type CaptureTrayProps = BuildProps | ReplayProps | CaptureProps;
-
-/** Staged cards overlap so a combo of any size stays inside its box. */
-function overlap(n: number): number {
-  return n <= 2 ? 16 : Math.ceil(SLOT_CARD_W - 32 / (n - 1));
-}
 
 function StagedCards({ cards, onTap, flyTo }: { cards: Card[]; onTap?: (id: string) => void; flyTo: Point | null }) {
   const calm = useReducedMotion();
@@ -118,9 +115,11 @@ function CapturedCards({ cards, startIndex, count, target }: { cards: Card[]; st
   );
 }
 
-function SlotColumn({ label, labelColour, fade, compact, children }: { label: string; labelColour: string; fade?: number; compact?: boolean; children: ReactNode }) {
+function SlotColumn({ label, labelColour, fade, compact, columnRef, children }: {
+  label: string; labelColour: string; fade?: number; compact?: boolean; columnRef?: (el: HTMLDivElement | null) => void; children: ReactNode;
+}) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 2 : 4, minWidth: 0 }}>
+    <div ref={columnRef} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: compact ? 2 : 4, minWidth: 0 }}>
       <Fade out={fade !== undefined} duration={fade ?? 0}>
         <span style={{ fontFamily: FONTS.sans, fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: labelColour, whiteSpace: 'nowrap' }}>{label}</span>
       </Fade>
@@ -307,9 +306,10 @@ export function CaptureTray(props: CaptureTrayProps) {
     );
   }
 
-  const { build, baseSide, valid, canSubmit, points, ghost, hoveredSlot, compact, onRemove, onReset, onSubmit, slotRefs, submitWrapRef, resetWrapRef } = props;
+  const { build, baseSide, valid, canSubmit, points, ghost, hoveredSlot, compact, onRemove, onReset, onSubmit, slotRefs, columnRefs, submitWrapRef, resetWrapRef } = props;
   const needs = baseSide === 'board' ? 'needs a hand card' : 'needs a table card';
   const setSlotRef = (i: number) => (el: HTMLDivElement | null) => { slotRefs.current[i] = el; };
+  const setColumnRef = (i: number) => (el: HTMLDivElement | null) => { if (columnRefs) columnRefs.current[i] = el; };
   const nothing = () => {};
 
   return (
@@ -321,7 +321,7 @@ export function CaptureTray(props: CaptureTrayProps) {
           if (key === 'base') {
             const base = build.base;
             return (
-              <SlotColumn key={key} label="BASE" labelColour={C.classicGold} compact={compact}>
+              <SlotColumn key={key} label="BASE" labelColour={C.classicGold} compact={compact} columnRef={setColumnRef(i)}>
                 {base ? (
                   <FilledBox edge={C.classicGold} hovered={hovered} boxRef={setSlotRef(i)}>
                     <StagedCards cards={[base]} onTap={onRemove} flyTo={null} />
@@ -336,7 +336,7 @@ export function CaptureTray(props: CaptureTrayProps) {
           const groups = build[key];
           if (groups.length === 0) {
             return (
-              <SlotColumn key={key} label={SLOT_LABELS[key]} labelColour={C.muted.classic} compact={compact}>
+              <SlotColumn key={key} label={SLOT_LABELS[key]} labelColour={C.muted.classic} compact={compact} columnRef={setColumnRef(i)}>
                 <EmptyBox hovered={hovered} boxRef={setSlotRef(i)}>
                   {ghost || !build.base ? 'Empty' : <>Optional<span style={{ fontWeight: 400 }}>{needs}</span></>}
                 </EmptyBox>
@@ -344,7 +344,7 @@ export function CaptureTray(props: CaptureTrayProps) {
             );
           }
           return (
-            <SlotColumn key={key} label={valid[key] ? `${SLOT_LABELS[key]} ✓` : SLOT_LABELS[key]} labelColour={C.muted.classic} compact={compact}>
+            <SlotColumn key={key} label={valid[key] ? `${SLOT_LABELS[key]} ✓` : SLOT_LABELS[key]} labelColour={C.muted.classic} compact={compact} columnRef={setColumnRef(i)}>
               <FilledBox edge={C.line.classic} hovered={hovered} boxRef={setSlotRef(i)}>
                 <StagedCards cards={groups.map((g) => g.card)} onTap={onRemove} flyTo={null} />
                 <Tags groups={groups} />

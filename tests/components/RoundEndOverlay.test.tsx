@@ -157,6 +157,67 @@ describe('the round end sheet (RE1p)', () => {
     expect(again).toHaveBeenCalledTimes(1);
   });
 
+  // The stack's width from its styles: the first card, then each later card
+  // less its overlap. Each capture-slot card is 40 wide.
+  function stackWidth(): number {
+    const cards = Array.from(document.querySelectorAll<HTMLElement>('div')).filter((d) => d.style.width === '40px' && d.style.height === '56px' && d.style.touchAction === 'none');
+    const wrappers = cards.map((c) => c.parentElement!);
+    return wrappers.reduce((w, el, i) => w + (i === 0 ? 40 : 40 + parseFloat(el.style.marginLeft || '0')), 0);
+  }
+
+  it.each([7, 12])('a best capture of %i cards overlaps as the tray does, so the line keeps its room at 390 wide', (n) => {
+    const combos = n === 7
+      ? [['6C', '4H'], ['8S', '2D'], ['7D', '3C']]
+      : [['6C', '4H'], ['8S', '2D'], ['7D', '3C', 'AH', 'AS', 'AD', 'AC', '5S']];
+    const best = record('10D', combos, 80);
+    expect(best.cards).toHaveLength(n);
+    render(
+      <RoundEndOverlay
+        visible
+        roundNumber={2}
+        roundStats={[stats(80, best), stats(0, null), stats(0, null)]}
+        overallScores={{ player: 80, bot1: 0, bot2: 0 }}
+        targetScore={300}
+        bot1Personality="intermediate"
+        bot2Personality="advanced"
+        onContinue={onContinue}
+        isOvertime={false}
+        modeWord="CLASSIC"
+      />,
+    );
+    const width = stackWidth();
+    expect(width).toBeLessThanOrEqual(72);
+    // At 390 wide the sheet's row is 350 across; past the stack and the 10px gap the line keeps at least 260.
+    expect(350 - width - 10).toBeGreaterThanOrEqual(260);
+    expect(byFullText(`Best capture ${combos.map((c) => c.map((id) => id.slice(0, -1)).join(' + ')).join(' and ').replace(/^/, '10 = ')}, +80`)).toBeTruthy();
+  });
+
+  it('a pause over the sheet holds the countdown where it stands', () => {
+    const props = {
+      roundNumber: 2,
+      roundStats: [stats(0, null), stats(0, null), stats(0, null)] as [RoundStats, RoundStats, RoundStats],
+      overallScores: { player: 0, bot1: 0, bot2: 0 },
+      targetScore: 300,
+      bot1Personality: 'intermediate' as const,
+      bot2Personality: 'advanced' as const,
+      isOvertime: false,
+      modeWord: 'CLASSIC',
+    };
+    const { rerender } = render(<RoundEndOverlay visible onContinue={onContinue} paused {...props} />);
+    act(() => { vi.advanceTimersByTime(3000); });
+    expect(byFullText('Round 3 deals in 10')).toBeTruthy();
+    rerender(<RoundEndOverlay visible onContinue={onContinue} paused={false} {...props} />);
+    act(() => { vi.advanceTimersByTime(2000); });
+    expect(byFullText('Round 3 deals in 8')).toBeTruthy();
+    rerender(<RoundEndOverlay visible onContinue={onContinue} paused {...props} />);
+    act(() => { vi.advanceTimersByTime(5000); });
+    expect(byFullText('Round 3 deals in 8')).toBeTruthy();
+    expect(onContinue).not.toHaveBeenCalled();
+    rerender(<RoundEndOverlay visible onContinue={onContinue} paused={false} {...props} />);
+    act(() => { vi.advanceTimersByTime(8000); });
+    expect(onContinue).toHaveBeenCalledTimes(1);
+  });
+
   it('not visible: nothing is in the page', () => {
     render(
       <RoundEndOverlay visible={false} roundNumber={2} roundStats={[stats(0, null), stats(0, null), stats(0, null)]} overallScores={{ player: 0, bot1: 0, bot2: 0 }}

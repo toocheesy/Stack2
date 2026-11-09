@@ -22,6 +22,8 @@ import { RoundEndOverlay } from './RoundEndOverlay';
 import { TakeTheTableBanner, type JackpotDisplay } from './JackpotCelebration';
 import { GameOverOverlay } from './GameOverOverlay';
 import { TutorialOverlay, type TutorialMark } from './TutorialOverlay';
+import { LeaveSheet } from './LeaveSheet';
+import { GameSettingsSheet } from './GameSettingsSheet';
 import type { TutorialApi } from '../tutorial/useTutorial';
 import { C, alpha } from '../config/colors';
 import { FONTS } from '../config/fonts';
@@ -44,9 +46,16 @@ import { Fade, type Flight } from './board/pieces';
 // capture replays, your race bar and your hand. Gold is yours and the
 // table's; an opponent's things wear its colour. Part 2 adds the moments:
 // your capture (YC1), the last cards landing (Law 8), Take the Table (TT1),
-// and the round end and game over sheets (RE1p, GO2).
+// and the round end and game over sheets (RE1p, GO2). Part 3 adds the
+// pauses: leaving the game (QD1), the in-game Settings (ST3) and the
+// tutorial (TU2), each a plum sheet over the dimmed game, with the game
+// paused underneath.
 
 type CardSource = 'hand' | 'board';
+
+/** The pause sheet open over the game: leaving it (QD1) or Settings (ST3).
+ *  The tutorial is the third pause, held by useTutorial. */
+export type PauseSheet = 'leave' | 'settings' | null;
 
 interface Props {
   state: GameState;
@@ -63,10 +72,13 @@ interface Props {
   onQuit: () => void;
   onHome: () => void;
   onPlayAgain: () => void;
-  onOpenSettings: () => void;
-  // The Run tutorial — state lives in GameWrapper so useGameController
-  // can see tutorialActive from its first render (freeze ticket). GameView
-  // just renders the overlay and shows the tray's ghost for its marks.
+  /** The pause sheet open, and how to open or close one. Its state lives in
+   *  GameWrapper so useGameController is paused from the same render. */
+  pause: PauseSheet;
+  onPause: (sheet: PauseSheet) => void;
+  // The tutorial — state lives in GameWrapper so useGameController can see
+  // the pause from its first render (freeze ticket). GameView renders the
+  // overlay and shows the tray's ghost for its marks.
   tutorial: TutorialApi;
   /** Still passed by App.tsx; the toasts it suppressed went with release 2. */
   suppressToasts?: boolean;
@@ -90,11 +102,12 @@ function useCompact(): boolean {
 }
 
 export function GameView({
-  state, isPlayerTurn, botViz, botCombo, lastCapture: lastMove, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, onOpenSettings, tutorial,
+  state, isPlayerTurn, botViz, botCombo, lastCapture: lastMove, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, pause, onPause, tutorial,
 }: Props) {
   const calm = !!useReducedMotion();
   const compact = useCompact();
   const slotRefs = useRef<(HTMLDivElement | null)[]>([]);
+  const columnRefs = useRef<(HTMLDivElement | null)[]>([]);
   const tableRef = useRef<HTMLDivElement | null>(null);
   // Tutorial zone refs (tableRef above doubles as the Table mark).
   const topBarRef = useRef<HTMLDivElement | null>(null);
@@ -147,6 +160,9 @@ export function GameView({
 
   const momentActive = ycShowing || tt !== null;
   const interactive = isPlayerTurn && !momentActive;
+  // Paused (section D): a sheet is open over the game; taps reach only the sheet.
+  const paused = pause !== null || tutorial.visible;
+  const canAct = interactive && !paused;
 
   const shownState = ycBefore ?? state;
   const shownBuild = ycBefore ? ycBefore.combination : build;
@@ -192,11 +208,14 @@ export function GameView({
   // The base on show has left the opponent's hand (GB2 phone C: 4 → 3).
   const heldBy = (p: 1 | 2) => state.hands[p].length - (replay?.playerIndex === p ? 1 : 0);
   const thinkingBot = botViz?.type === 'thinking' && !replay ? botViz.playerIndex : null;
-  const barLabel = current === 0
-    ? 'YOUR TURN'
-    : thinkingBot === current
-      ? `WAITING FOR ${opponentName(state, current).toUpperCase()}`
-      : `WAITING · ${opponentName(state, current).toUpperCase()}'S TURN`;
+  // While Take the Table plays the label shows nothing (TC's playtest of part 2).
+  const barLabel = tt
+    ? ''
+    : current === 0
+      ? 'YOUR TURN'
+      : thinkingBot === current
+        ? `WAITING FOR ${opponentName(state, current).toUpperCase()}`
+        : `WAITING · ${opponentName(state, current).toUpperCase()}'S TURN`;
   // MODE · TARGET · R[round] · H[hand]; The Run keeps today's level in place of the target.
   const mode = currentLevelId ? 'THE RUN' : 'CLASSIC';
   const detail = currentLevelId ? `${Math.ceil(currentLevelId / 3)}-${((currentLevelId - 1) % 3) + 1}` : String(target);
@@ -250,9 +269,9 @@ export function GameView({
   // dragged onto the table is placed.
 
   const handleTap = useCallback((card: Card, source: CardSource) => {
-    if (!interactive || build.base) return;
+    if (!canAct || build.base) return;
     actions.addToCombo(card.id, source, 'base');
-  }, [interactive, build.base, actions]);
+  }, [canAct, build.base, actions]);
 
   const findDropTarget = useCallback((point: Point): { type: 'slot'; slot: ComboSlot } | { type: 'table' } | null => {
     for (let i = 0; i < slotRefs.current.length; i++) {
@@ -285,22 +304,22 @@ export function GameView({
     setHoveredTable(false);
     // The tray stays only if the drop staged something (the build then holds it open).
     setDragOpen(false);
-    if (!interactive) return;
+    if (!canAct) return;
     const t = findDropTarget(point);
     if (!t) return;
     if (t.type === 'slot') actions.addToCombo(card.id, source, t.slot);
     else if (source === 'hand') actions.placeCard(card.id);
-  }, [interactive, findDropTarget, actions]);
+  }, [canAct, findDropTarget, actions]);
 
   const handleRemove = useCallback((cardId: string) => {
-    if (!interactive) return;
+    if (!canAct) return;
     actions.removeFromCombo(cardId);
-  }, [interactive, actions]);
+  }, [canAct, actions]);
 
   const handleSubmit = useCallback(() => {
-    if (!interactive) return;
+    if (!canAct) return;
     actions.submitCombo();
-  }, [interactive, actions]);
+  }, [canAct, actions]);
 
   // ── Render ─────────────────────────────────────────
 
@@ -317,8 +336,9 @@ export function GameView({
         round={state.currentRound}
         hand={state.handNumber}
         canLeave={!gameOver && !tt && inPlay}
-        onLeave={() => setShowQuitDialog(true)}
-        onSettings={onOpenSettings}
+        // Classic: QD1's leave sheet. The Run keeps its "Return to The Run Map?" dialog until release 3.
+        onLeave={() => (currentLevelId ? setShowQuitDialog(true) : onPause('leave'))}
+        onSettings={() => onPause('settings')}
       />
 
       <div ref={seatsRef} style={{ display: 'flex', gap: 10, marginTop: compact ? 2 : 4, flexShrink: 0 }}>
@@ -349,7 +369,7 @@ export function GameView({
         deckCount={state.deck.length}
         pillSide={bubble?.player === 1 ? 'right' : 'left'}
         highlighted={hoveredTable}
-        draggable={interactive}
+        draggable={canAct}
         landing={landingMove ? {
           ids: landingMove.rest.map((c) => c.id),
           from: landingMove.player === 0 ? handTarget : () => seatTarget(landingMove.player),
@@ -418,6 +438,7 @@ export function GameView({
                 onReset={actions.resetCombo}
                 onSubmit={handleSubmit}
                 slotRefs={slotRefs}
+                columnRefs={columnRefs}
                 submitWrapRef={submitWrapRef}
                 resetWrapRef={resetWrapRef}
               />
@@ -467,14 +488,14 @@ export function GameView({
         cards={shownState.hands[0]}
         ghosts={ghosts}
         ghostFade={ycShowing ? (calm ? YC.calm.out : YC.chromeOut) / 1000 : undefined}
-        draggable={interactive}
+        draggable={canAct}
         emptyWords={inPlay}
         onTap={(card) => handleTap(card, 'hand')}
         onDragMove={(_card, pt) => handleDragMove('hand', pt)}
         onDragEnd={(card, pt) => handleDragEnd(card, 'hand', pt)}
       />
 
-      {/* ═══ QUIT DIALOG (today's, until part 3) ═══ */}
+      {/* ═══ THE RUN'S DIALOG (as it is, until release 3) ═══ */}
       <AnimatePresence>
         {showQuitDialog && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
@@ -484,15 +505,13 @@ export function GameView({
               onClick={(e) => e.stopPropagation()}
               style={{ background: C.surface.classic, borderRadius: 12, padding: 24, maxWidth: 280, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
               <h3 style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 18, color: C.inkOnSurface.classic, margin: 0 }}>
-                {currentLevelId ? 'Return to The Run Map?' : 'Quit Game?'}
+                Return to The Run Map?
               </h3>
               <p style={{ fontSize: 13, color: alpha(C.inkOnSurface.classic, 0.6), textAlign: 'center', margin: 0 }}>
-                {currentLevelId
-                  ? 'Your level is saved. Resume it from The Run map. Star progress is safe.'
-                  : 'Your game is saved. Tap Continue on the home screen to pick it up.'}
+                Your level is saved. Resume it from The Run map. Star progress is safe.
               </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 4, width: '100%' }}>
-                <Btn label={currentLevelId ? 'BACK' : 'QUIT'} onClick={() => { setShowQuitDialog(false); onQuit(); }} />
+                <Btn label="BACK" onClick={() => { setShowQuitDialog(false); onQuit(); }} />
                 <Btn label="RESUME" primary onClick={() => setShowQuitDialog(false)} />
               </div>
             </motion.div>
@@ -512,20 +531,38 @@ export function GameView({
         onContinue={actions.continueRound}
         isOvertime={state.isOvertime}
         modeWord={mode}
+        paused={paused}
         adventureMode={!!currentLevelId}
       />
       <GameOverOverlay winner={gameOver as { winner: PlayerIndex; winnerName: string } | null} state={state} adventureMode={!!currentLevelId} onPlayAgain={onPlayAgain} onHome={onHome} />
 
-      {/* The Run tutorial — 8-mark coach overlay. Auto-fires on first W1L1
-          entry, replayable from Settings. Pure presentation; engine untouched. */}
+      {/* ═══ THE PAUSES (D-007 release 2 part 3) ═══ */}
+      <LeaveSheet
+        open={pause === 'leave'}
+        onKeepPlaying={() => onPause(null)}
+        onLeave={() => { onPause(null); onQuit(); }}
+      />
+      <GameSettingsSheet
+        open={pause === 'settings'}
+        modeWord={mode}
+        round={state.currentRound}
+        hand={state.handNumber}
+        onDone={() => onPause(null)}
+        onTutorial={() => { onPause(null); tutorial.open(); }}
+      />
+      {/* The tutorial, TU2: nine steps over the board's parts. It opens from
+          Settings › Tutorial (and by itself on The Run's level 1); the engine
+          is never touched. */}
       <TutorialOverlay
         visible={tutorial.visible}
         currentStep={tutorial.currentStep}
         totalSteps={tutorial.totalSteps}
         marks={TUTORIAL_MARKS({
-          handZoneRef: handRef, boardRef: tableRef, comboBuilderRef: trayRef, resetWrapRef,
-          submitWrapRef, botZonesRef: seatsRef, msgStripRef: messageRef, headerRef: topBarRef,
+          hand: handRef, table: tableRef, tray: trayRef, columns: columnRefs, submit: submitWrapRef, reset: resetWrapRef,
+          seats: seatsRef, message: messageRef, topBar: topBarRef,
         })}
+        trayRef={trayRef}
+        compact={compact}
         onNext={tutorial.next}
         onPrev={tutorial.prev}
         onSkip={tutorial.dismiss}
@@ -535,35 +572,39 @@ export function GameView({
   );
 }
 
-// ─── Tutorial marks (verbatim copy + zone refs) ─────────
-// Teaching order: bottom (your stuff) → middle (workspace) → controls →
-// upper middle (opponents) → top (context).
+// ─── Tutorial marks: TU2's nine steps (D-007 ruling 79) ───
+// Each step's words, the part it lights, and the edge the sheet docks to,
+// away from the part. Steps 3 to 6 lay the sample capture over the tray.
 
 interface TutorialMarkRefs {
-  handZoneRef: React.RefObject<HTMLDivElement | null>;
-  boardRef: React.RefObject<HTMLDivElement | null>;
-  comboBuilderRef: React.RefObject<HTMLDivElement | null>;
-  resetWrapRef: React.RefObject<HTMLDivElement | null>;
-  submitWrapRef: React.RefObject<HTMLDivElement | null>;
-  botZonesRef: React.RefObject<HTMLDivElement | null>;
-  msgStripRef: React.RefObject<HTMLDivElement | null>;
-  headerRef: React.RefObject<HTMLDivElement | null>;
+  hand: React.RefObject<HTMLDivElement | null>;
+  table: React.RefObject<HTMLDivElement | null>;
+  tray: React.RefObject<HTMLDivElement | null>;
+  /** The tray's slot columns; HAND and TABLE lights the first two. */
+  columns: React.RefObject<(HTMLDivElement | null)[]>;
+  submit: React.RefObject<HTMLDivElement | null>;
+  reset: React.RefObject<HTMLDivElement | null>;
+  seats: React.RefObject<HTMLDivElement | null>;
+  message: React.RefObject<HTMLDivElement | null>;
+  topBar: React.RefObject<HTMLDivElement | null>;
 }
 
 function TUTORIAL_MARKS(refs: TutorialMarkRefs): TutorialMark[] {
+  const column = (i: number): React.RefObject<HTMLDivElement | null> => ({ get current() { return refs.columns.current[i] ?? null; } });
   return [
-    { title: 'Your hand', copy: 'Your hand and your score. Drag a card into the builder to begin.', ref: refs.handZoneRef },
-    { title: 'The table', copy: 'Shared cards. You score by capturing these.', ref: refs.boardRef },
-    { title: 'Combo builder', copy: 'Drag a base card here — from your hand or the table — then add cards that add up to it, or match it.', ref: refs.comboBuilderRef },
-    { title: 'Reset', copy: 'Dragged the wrong card? Reset sends everything in the builder back where it came from.', ref: refs.resetWrapRef, pill: true },
-    { title: 'Submit', copy: 'Hit submit to capture, and your turn keeps going. To place instead, drag a card onto the table — that ends your turn.', ref: refs.submitWrapRef, pill: true },
-    { title: 'The opponents', copy: 'Two opponents are after the same cards. Watch what they leave behind.', ref: refs.botZonesRef },
-    { title: 'Message strip', copy: 'Hints and the last move land here.', ref: refs.msgStripRef },
-    { title: 'Header', copy: "Where you are: your world and level, and the round and hand you're on.", ref: refs.headerRef },
+    { title: 'Your hand.', copy: 'Your cards. Drag one into the capture tray to start a capture, or onto the table to place it.', refs: [refs.hand], side: 'top' },
+    { title: 'The table.', copy: 'The shared cards. Capture them to score.', refs: [refs.table], side: 'bottom' },
+    { title: 'The capture tray.', copy: 'Put a base card here, from your hand or the table. Then fill up to three combos with cards that add up to it, or match it.', refs: [refs.tray], side: 'top', sample: true },
+    { title: 'HAND and TABLE.', copy: 'Every combo needs a card from the other side of your base.', refs: [column(0), column(1)], side: 'top', sample: true },
+    { title: 'SUBMIT.', copy: 'Your points show before you press it. A capture keeps your turn going; placing a card ends it.', refs: [refs.submit], side: 'top', sample: true },
+    { title: 'RESET.', copy: 'Wrong card? RESET sends everything back where it came from.', refs: [refs.reset], side: 'top', sample: true },
+    { title: 'Your opponents.', copy: 'Two opponents race you to the target. Their moves pop up from their seats.', refs: [refs.seats], side: 'bottom' },
+    { title: 'The message line.', copy: 'It tells you the rule that matters right now.', refs: [refs.message], side: 'bottom' },
+    { title: 'The top bar.', copy: "The target score, and the round and hand you're on. The back arrow leaves the game; it stays saved.", refs: [refs.topBar], side: 'bottom' },
   ];
 }
 
-// ─── Button (the quit dialog's, until part 3) ───────
+// ─── Button (The Run's dialog) ──────────────────────
 
 function Btn({ label, primary, onClick }: { label: string; primary?: boolean; onClick: () => void }) {
   // Secondary outlined style: 1.5px ink@40% border, ink@90% text,

@@ -9,10 +9,11 @@ import { Gear } from './board/pieces';
 // and the Stack: Classic's card as the top card of a tilted stack, a
 // tangerine layer tilted left and a cobalt layer tilted right behind it.
 // Classic's card holds CONTINUE (only with a saved game), QUICK MATCH and
-// SET THE TABLE, and grows to hold the third button. Privacy at the bottom.
-// No playing card, no "How to play" yet (release 4), and nothing names The
-// Run (ruling 32). Phone A's values (390 x 844) on phones 760px and taller,
-// phone B's (375 x 667) below that; both show everything with no scrolling.
+// SET THE TABLE, and grows to hold the third button. The "How to play" pill
+// (release 4, rulings 43, 105, 111) sits between the card and Privacy at the
+// bottom. No playing card, and nothing names The Run (ruling 32). Phone A's
+// values (390 x 844) on phones 760px and taller, phone B's (375 x 667) below
+// that; both show everything with no scrolling.
 //
 // `leaving` plays the home's part of DD2 Curtain Deal (ruling 46): Classic's
 // card drops off the bottom of the screen (300ms, ease-in like a fall), the
@@ -28,13 +29,17 @@ interface Props {
   onQuickMatch: () => void;
   onSetTheTable: () => void;
   onOpenSettings: () => void;
+  onHowToPlay: () => void;
 }
 
 // HS15's two phones. The card's height is its minimum: with a saved game it
 // is 24px taller on A and 12px on B to hold CONTINUE, and grows past that
-// only when the three buttons need more.
-const PHONE_A = { gearTop: 18, wordTop: 74, wordSize: 62, pillTop: 150, stackSide: 34, stackTop: 232, cardHeight: 300, grownBy: 24, cardPadTop: 26, titleSize: 48, privacyBottom: 12 };
-const PHONE_B = { gearTop: 12, wordTop: 56, wordSize: 50, pillTop: 116, stackSide: 30, stackTop: 176, cardHeight: 236, grownBy: 12, cardPadTop: 20, titleSize: 40, privacyBottom: 6 };
+// only when the three buttons need more. The "How to play" pill follows the
+// card at the gap the board draws (A with a save: 624 - 556; B without: 458
+// - 412), so it moves down as the card grows and stays between the card and
+// Privacy in both states.
+const PHONE_A = { gearTop: 18, wordTop: 74, wordSize: 62, pillTop: 150, stackSide: 34, stackTop: 232, cardHeight: 300, grownBy: 24, cardPadTop: 26, titleSize: 48, howToGap: 68, privacyBottom: 12 };
+const PHONE_B = { gearTop: 12, wordTop: 56, wordSize: 50, pillTop: 116, stackSide: 30, stackTop: 176, cardHeight: 236, grownBy: 12, cardPadTop: 20, titleSize: 40, howToGap: 46, privacyBottom: 6 };
 // Below this height the home takes phone B's values (GameView's compact rule, ruling 99).
 const COMPACT_BELOW = 760;
 
@@ -62,7 +67,7 @@ const OUTLINED: CSSProperties = {
   fontFamily: FONTS.sans, fontSize: 14, fontWeight: 700, letterSpacing: '0.16em', color: C.ink.classic, cursor: 'pointer',
 };
 
-export function HomeScreen({ hasSave, leaving, onContinue, onQuickMatch, onSetTheTable, onOpenSettings }: Props) {
+export function HomeScreen({ hasSave, leaving, onContinue, onQuickMatch, onSetTheTable, onOpenSettings, onHowToPlay }: Props) {
   const calm = !!useReducedMotion();
   const L = useCompact() ? PHONE_B : PHONE_A;
   // The curtain moves the home only in full motion; calm fades it whole.
@@ -96,51 +101,63 @@ export function HomeScreen({ hasSave, leaving, onContinue, onQuickMatch, onSetTh
 
       {/* The Stack: the two layers fill the card's box, so they grow with it. */}
       <div style={{ position: 'absolute', left: L.stackSide, right: L.stackSide, top: L.stackTop }}>
-        <motion.div
-          aria-hidden="true"
-          initial={{ rotate: -5, x: -6, y: 10 }}
-          animate={falling ? { rotate: -9, x: -6, y: 660 } : { rotate: -5, x: -6, y: 10 }}
-          transition={{ ...FALL, delay: 0.04 }}
-          transformTemplate={rotateThenTranslate}
-          style={{ position: 'absolute', inset: 0, borderRadius: 22, background: C.stackUpper }}
-        />
-        <motion.div
-          aria-hidden="true"
-          initial={{ rotate: 3, x: 6, y: 6 }}
-          animate={falling ? { rotate: 7, x: 6, y: 660 } : { rotate: 3, x: 6, y: 6 }}
-          transition={{ ...FALL, delay: 0.08 }}
-          transformTemplate={rotateThenTranslate}
-          style={{ position: 'absolute', inset: 0, borderRadius: 22, background: C.stackLower }}
-        />
-        <motion.section
-          aria-label="Classic"
-          initial={{ y: 0 }}
-          animate={{ y: falling ? 640 : 0 }}
-          transition={FALL}
-          style={{
-            position: 'relative', minHeight: L.cardHeight + (hasSave ? L.grownBy : 0), boxSizing: 'border-box', padding: `${L.cardPadTop}px 20px 20px`,
-            background: C.classicTable, border: `1.5px solid ${C.classicGold}`, borderRadius: 22,
-            display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10, color: C.ink.classic,
-          }}
-        >
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.2em', color: C.classicGold }}>DEAL ME IN</div>
-            <h2 style={{ margin: '2px 0 0', fontFamily: FONTS.display, fontWeight: 400, fontSize: L.titleSize, lineHeight: 1.08, color: C.ink.classic }}>Classic</h2>
-            <div style={{ fontSize: 14, lineHeight: 1.3, color: C.muted.classic }}>Race to the Score</div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 12 }}>
-            {hasSave && (
-              <button type="button" onClick={onContinue} style={OUTLINED}>CONTINUE</button>
-            )}
-            <button type="button" onClick={onQuickMatch} style={{
-              width: '100%', height: 52, borderRadius: 'inherit', border: 'none', background: C.classicGold,
-              fontFamily: FONTS.sans, fontSize: 15, fontWeight: 700, letterSpacing: '0.18em', color: C.classicTable, cursor: 'pointer',
-            }}>
-              QUICK MATCH
-            </button>
-            <button type="button" onClick={onSetTheTable} style={OUTLINED}>SET THE TABLE</button>
-          </div>
-        </motion.section>
+        <div style={{ position: 'relative' }}>
+          <motion.div
+            aria-hidden="true"
+            initial={{ rotate: -5, x: -6, y: 10 }}
+            animate={falling ? { rotate: -9, x: -6, y: 660 } : { rotate: -5, x: -6, y: 10 }}
+            transition={{ ...FALL, delay: 0.04 }}
+            transformTemplate={rotateThenTranslate}
+            style={{ position: 'absolute', inset: 0, borderRadius: 22, background: C.stackUpper }}
+          />
+          <motion.div
+            aria-hidden="true"
+            initial={{ rotate: 3, x: 6, y: 6 }}
+            animate={falling ? { rotate: 7, x: 6, y: 660 } : { rotate: 3, x: 6, y: 6 }}
+            transition={{ ...FALL, delay: 0.08 }}
+            transformTemplate={rotateThenTranslate}
+            style={{ position: 'absolute', inset: 0, borderRadius: 22, background: C.stackLower }}
+          />
+          <motion.section
+            aria-label="Classic"
+            initial={{ y: 0 }}
+            animate={{ y: falling ? 640 : 0 }}
+            transition={FALL}
+            style={{
+              position: 'relative', minHeight: L.cardHeight + (hasSave ? L.grownBy : 0), boxSizing: 'border-box', padding: `${L.cardPadTop}px 20px 20px`,
+              background: C.classicTable, border: `1.5px solid ${C.classicGold}`, borderRadius: 22,
+              display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10, color: C.ink.classic,
+            }}
+          >
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.2em', color: C.classicGold }}>DEAL ME IN</div>
+              <h2 style={{ margin: '2px 0 0', fontFamily: FONTS.display, fontWeight: 400, fontSize: L.titleSize, lineHeight: 1.08, color: C.ink.classic }}>Classic</h2>
+              <div style={{ fontSize: 14, lineHeight: 1.3, color: C.muted.classic }}>Race to the Score</div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, borderRadius: 12 }}>
+              {hasSave && (
+                <button type="button" onClick={onContinue} style={OUTLINED}>CONTINUE</button>
+              )}
+              <button type="button" onClick={onQuickMatch} style={{
+                width: '100%', height: 52, borderRadius: 'inherit', border: 'none', background: C.classicGold,
+                fontFamily: FONTS.sans, fontSize: 15, fontWeight: 700, letterSpacing: '0.18em', color: C.classicTable, cursor: 'pointer',
+              }}>
+                QUICK MATCH
+              </button>
+              <button type="button" onClick={onSetTheTable} style={OUTLINED}>SET THE TABLE</button>
+            </div>
+          </motion.section>
+        </div>
+
+        {/* "How to play" (RP1, ruling 111): an outlined pill that opens the rules page; it fades with the rest. */}
+        <motion.div {...fade} style={{ display: 'flex', justifyContent: 'center', marginTop: L.howToGap }}>
+          <button type="button" onClick={onHowToPlay} style={{
+            display: 'inline-flex', alignItems: 'center', height: 44, padding: '0 22px', borderRadius: 999, border: `1.5px solid ${C.ink.brand}`, background: 'transparent',
+            fontFamily: FONTS.sans, fontSize: 15, fontWeight: 700, color: C.ink.brand, cursor: 'pointer',
+          }}>
+            How to play
+          </button>
+        </motion.div>
       </div>
 
       {/* S-020: the privacy notice, a static page opened in a new tab. */}

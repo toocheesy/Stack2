@@ -16,9 +16,9 @@ export default defineConfig({
       manifest: {
         name: 'STACKED',
         short_name: 'STACKED',
-        description: 'A card game of stacks and consequences.',
-        theme_color: '#0A0A0A',
-        background_color: '#0A0A0A',
+        description: 'Pull up a chair. Build combos, capture the table, and race two opponents to the score.',
+        theme_color: '#FFF4B8',
+        background_color: '#FFF4B8',
         display: 'standalone',
         start_url: '/',
         scope: '/',

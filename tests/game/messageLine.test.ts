@@ -11,7 +11,6 @@ const settings: GameSettings = {
   targetScore: 300,
   bot1Personality: 'intermediate',
   bot2Personality: 'advanced',
-  disableSeatingSwap: true,
 };
 
 const SUITS: Record<string, Suit> = { H: 'hearts', D: 'diamonds', C: 'clubs', S: 'spades' };

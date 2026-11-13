@@ -22,18 +22,7 @@ export interface Card {
   value: number;
 }
 
-export type PlayerType = 'human' | 'bot';
-
-export interface Player {
-  id: string;
-  name: string;
-  type: PlayerType;
-  hand: Card[];
-  captured: Card[];
-  score: number;
-}
-
-export type GamePhase = 'playing' | 'jackpot' | 'roundEnd' | 'gameOver';
+export type GamePhase = 'playing' | 'roundEnd' | 'gameOver';
 
 export interface CaptureRecord {
   points: number;
@@ -58,16 +47,7 @@ export interface GamePlayerStats {
   highestCapture: CaptureRecord | null;
 }
 
-export type TurnAction = 'CAPTURE' | 'PLACE';
-
 export type ComboSlot = 'base' | 'combo1' | 'combo2' | 'combo3';
-
-export interface CaptureAttempt {
-  base: Card;
-  combo1?: Card[];
-  combo2?: Card[];
-  combo3?: Card[];
-}
 
 export type CardSource = 'hand' | 'board';
 
@@ -95,7 +75,6 @@ export interface GameSettings {
   targetScore: number;
   bot1Personality: Difficulty;
   bot2Personality: Difficulty;
-  disableSeatingSwap?: boolean;
 }
 
 export interface GameState {
@@ -130,7 +109,6 @@ export interface SlotValidation {
 
 export interface ComboValidation {
   isValid: boolean;
-  validSlots: SlotValidation[];
   allCapturedCards: Card[];
   totalPoints: number;
   errors: string[];
@@ -140,7 +118,6 @@ export interface JackpotResult {
   player: PlayerIndex;
   points: number;
   cardCount: number;
-  message: string;
 }
 
 export interface CaptureOption {
@@ -156,7 +133,6 @@ export interface MultiSlotCaptureSlot {
 }
 
 export interface MultiSlotCapture {
-  handCard: Card;
   slots: MultiSlotCaptureSlot[];
   totalPoints: number;
 }
@@ -166,37 +142,18 @@ export type TurnResult =
   | { type: 'DEAL_NEW_HAND'; startingPlayer: PlayerIndex }
   | {
       type: 'END_ROUND';
-      scores: Scores;
-      jackpotResult: JackpotResult | null;
-      newDealer: PlayerIndex;
       isOvertime: boolean; // RULES.md Law 11 — true when round-end was a tie at/above target
     }
   | {
       type: 'END_GAME';
-      scores: Scores;
-      jackpotResult: JackpotResult | null;
       winner: PlayerIndex;
-      winnerName: string;
     };
-
-export const PLAYER_NAMES: Record<PlayerIndex, string> = {
-  0: 'Player',
-  1: 'Bot 1',
-  2: 'Bot 2',
-};
 
 export const SCORE_KEYS: Record<PlayerIndex, keyof Scores> = {
   0: 'player',
   1: 'bot1',
   2: 'bot2',
 };
-
-export interface GameAction {
-  type: string;
-  playerId?: string;
-  payload?: Record<string, unknown>;
-  timestamp?: number;
-}
 
 export type Difficulty = 'beginner' | 'intermediate' | 'advanced' | 'expert';
 

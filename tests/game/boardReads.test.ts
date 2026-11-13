@@ -9,7 +9,7 @@ import { tableFit } from '../../src/components/board/tableFit';
 // The board's reads (D-007 release 2, part 1): the shading rule, the points
 // preview, Take the Table, and the words around them.
 
-const settings: GameSettings = { targetScore: 300, bot1Personality: 'intermediate', bot2Personality: 'advanced', disableSeatingSwap: true };
+const settings: GameSettings = { targetScore: 300, bot1Personality: 'intermediate', bot2Personality: 'advanced' };
 
 const SUITS: Record<string, Suit> = { H: 'hearts', D: 'diamonds', C: 'clubs', S: 'spades' };
 function card(id: string): Card {

@@ -232,7 +232,7 @@ describe('determineTurnResult', () => {
     }
   });
 
-  it('all empty + deck < 12 + scores below target → END_ROUND with jackpot', () => {
+  it('all empty + deck < 12 + scores below target after the take → END_ROUND', () => {
     const s = state({
       hands: [[], [], []],
       deck: [],
@@ -243,12 +243,7 @@ describe('determineTurnResult', () => {
     });
     const r = determineTurnResult(s);
     expect(r.type).toBe('END_ROUND');
-    if (r.type === 'END_ROUND') {
-      expect(r.jackpotResult).not.toBeNull();
-      expect(r.jackpotResult!.points).toBe(25);
-      expect(r.scores.bot1).toBe(45);
-      expect(r.newDealer).toBe(((s.currentDealer + 1) % 3) as PlayerIndex);
-    }
+    if (r.type === 'END_ROUND') expect(r.isOvertime).toBe(false);
   });
 
   it('END_GAME when projected overall score >= target after jackpot', () => {
@@ -269,7 +264,6 @@ describe('determineTurnResult', () => {
     expect(r.type).toBe('END_GAME');
     if (r.type === 'END_GAME') {
       expect(r.winner).toBe(0);
-      expect(r.scores.player).toBeGreaterThanOrEqual(100);
     }
   });
 
@@ -282,6 +276,6 @@ describe('determineTurnResult', () => {
     });
     const r = determineTurnResult(s);
     expect(r.type).toBe('END_ROUND');
-    if (r.type === 'END_ROUND') expect(r.jackpotResult).toBeNull();
+    if (r.type === 'END_ROUND') expect(r.isOvertime).toBe(false);
   });
 });

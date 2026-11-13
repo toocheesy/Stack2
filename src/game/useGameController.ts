@@ -200,10 +200,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
     });
   }, []);
   const [botViz, setBotViz] = useState<BotVizStep | null>(null);
-  const [gameOver, setGameOver] = useState<{
-    winner: PlayerIndex;
-    winnerName: string;
-  } | null>(null);
+  const [gameOver, setGameOver] = useState<{ winner: PlayerIndex } | null>(null);
   const [botCombo, setBotCombo] = useState<BotComboDisplay | null>(null);
   const [jackpotInfo, setJackpotInfo] = useState<TakeTheTableMoment | null>(null);
 
@@ -315,10 +312,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
         const finalState = { ...stateRef.current, gamePhase: 'gameOver' as const };
         setAndPersist(finalState);
         clearSavedGame('classic');
-        setGameOver({
-          winner: result.winner,
-          winnerName: result.winnerName,
-        });
+        setGameOver({ winner: result.winner });
         break;
       }
     }

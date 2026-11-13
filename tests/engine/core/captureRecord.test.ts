@@ -8,7 +8,7 @@ import type { Card, CaptureGroup, Combination, GameSettings, GameState, PlayerIn
 // slot by slot, and Take the Table (RULES.md Law 10) is not a capture for
 // best captures; the taker's round marks it.
 
-const settings: GameSettings = { targetScore: 300, bot1Personality: 'beginner', bot2Personality: 'intermediate', disableSeatingSwap: true };
+const settings: GameSettings = { targetScore: 300, bot1Personality: 'beginner', bot2Personality: 'intermediate' };
 const SEED = 5;
 
 const ids = (cards: readonly Card[]) => cards.map((c) => c.id);

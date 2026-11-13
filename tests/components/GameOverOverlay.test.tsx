@@ -35,7 +35,7 @@ function record(base: string, combos: string[][], points: number): CaptureRecord
 }
 
 function gameOverState(over: Partial<GameState>): GameState {
-  const base = createInitialState({ targetScore: 300, bot1Personality: 'intermediate', bot2Personality: 'advanced', disableSeatingSwap: true }, createPRNG(3));
+  const base = createInitialState({ targetScore: 300, bot1Personality: 'intermediate', bot2Personality: 'advanced' }, createPRNG(3));
   return { ...base, gamePhase: 'gameOver', ...over };
 }
 
@@ -50,7 +50,7 @@ describe('the game over card (GO2)', () => {
       overallScores: { player: 315, bot1: 270, bot2: 245 },
       gameStats: [{ highestCapture: record('AS', [['AH']], 30) }, { highestCapture: record('KS', [['KD']], 20) }, { highestCapture: null }],
     });
-    render(<GameOverOverlay winner={{ winner: 0, winnerName: 'Player' }} state={state} onPlayAgain={onPlayAgain} onHome={onHome} />);
+    render(<GameOverOverlay winner={{ winner: 0 }} state={state} onPlayAgain={onPlayAgain} onHome={onHome} />);
 
     expect(screen.getByText('GAME OVER · 4 ROUNDS')).toBeTruthy();
     expect(screen.getByText('You win!')).toBeTruthy();
@@ -78,7 +78,7 @@ describe('the game over card (GO2)', () => {
       overallScores: { player: 290, bot1: 330, bot2: 210 },
       gameStats: [{ highestCapture: record('AS', [['AH']], 30) }, { highestCapture: record('KS', [['KD']], 20) }, { highestCapture: null }],
     });
-    render(<GameOverOverlay winner={{ winner: 1, winnerName: 'Bot 1' }} state={state} onPlayAgain={() => {}} onHome={() => {}} />);
+    render(<GameOverOverlay winner={{ winner: 1 }} state={state} onPlayAgain={() => {}} onHome={() => {}} />);
     expect(screen.getByText('GAME OVER · 5 ROUNDS')).toBeTruthy();
     expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Nina wins');
     expect(screen.getByText("NINA'S BEST CAPTURE")).toBeTruthy();
@@ -94,7 +94,7 @@ describe('the game over card (GO2)', () => {
       overallScores: { player: 100, bot1: 310, bot2: 90 },
       gameStats: [{ highestCapture: record('AS', [['AH']], 30) }, { highestCapture: null }, { highestCapture: null }],
     });
-    render(<GameOverOverlay winner={{ winner: 1, winnerName: 'Bot 1' }} state={state} onPlayAgain={() => {}} onHome={() => {}} />);
+    render(<GameOverOverlay winner={{ winner: 1 }} state={state} onPlayAgain={() => {}} onHome={() => {}} />);
     expect(screen.queryByText(/BEST CAPTURE/)).toBeNull();
     expect(screen.getByText('GAME OVER · 3 ROUNDS')).toBeTruthy();
   });

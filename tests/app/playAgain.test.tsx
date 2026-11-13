@@ -31,7 +31,6 @@ const settings: GameSettings = {
   targetScore: 100,
   bot1Personality: 'intermediate',
   bot2Personality: 'advanced',
-  disableSeatingSwap: true,
 };
 
 async function advance(ms: number) {

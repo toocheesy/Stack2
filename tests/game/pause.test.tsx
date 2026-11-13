@@ -17,9 +17,8 @@ const settings: GameSettings = {
   targetScore: 100,
   bot1Personality: 'advanced',
   bot2Personality: 'intermediate',
-  disableSeatingSwap: true,
 };
-const SEED = 21;
+const SEED = 22;
 const WELL_PAST = 10_000;
 
 function mount(paused: boolean) {

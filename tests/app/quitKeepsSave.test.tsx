@@ -42,7 +42,6 @@ function ids(cards: readonly { id: string }[]): string[] {
 function saveClassic(game: GameState, seed = CLASSIC_SEED) {
   saveGame('classic', {
     game,
-    currentLevelId: null,
     seed,
     dealStream: DEAL_SEED,
     botStream: botStreamSeed(DEAL_SEED),
@@ -93,7 +92,7 @@ describe('quitting keeps the save (S-006)', () => {
     fireEvent.click(within(screen.getByRole('dialog')).getByText('Leave game'));
 
     expect(screen.getByText('CONTINUE')).toBeTruthy();
-    const kept = loadGame('classic', 0)!;
+    const kept = loadGame('classic')!;
     expect(kept).not.toBeNull();
     expect(kept.seed).toBe(CLASSIC_SEED);
     expect(ids(kept.game.board)).toEqual(ids(game.board));

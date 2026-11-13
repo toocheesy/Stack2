@@ -70,7 +70,7 @@ function arrange(over: {
 }
 
 function save(game: GameState) {
-  saveGame('classic', { game, currentLevelId: null, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
+  saveGame('classic', { game, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
 }
 
 describe('the board reads from the controller', () => {

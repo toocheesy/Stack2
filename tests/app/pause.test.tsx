@@ -45,7 +45,7 @@ const SEED_BOT_FIRST = 6;
 const WELL_PAST = 10_000;
 
 function saveClassic(game: GameState, seed: number) {
-  saveGame('classic', { game, currentLevelId: null, seed, dealStream: seed, botStream: botStreamSeed(seed) });
+  saveGame('classic', { game, seed, dealStream: seed, botStream: botStreamSeed(seed) });
 }
 
 function savedGame(): GameState {

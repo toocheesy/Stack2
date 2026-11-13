@@ -12,7 +12,7 @@ const settings: GameSettings = { targetScore: 300, bot1Personality: 'beginner', 
 const SEED = 5;
 
 const ids = (cards: readonly Card[]) => cards.map((c) => c.id);
-const fromTable = (card: Card): CaptureGroup => ({ card, source: 'board', originalIndex: 0 });
+const fromTable = (card: Card): CaptureGroup => ({ card, source: 'board' });
 
 // A real deal rearranged: the hands and the table the case needs, the deck
 // the rest of the pack, so no card is in two places.

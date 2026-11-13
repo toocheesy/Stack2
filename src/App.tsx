@@ -43,7 +43,7 @@ function App() {
   const [curtain, setCurtain] = useState<{ hadSave: boolean } | null>(null);
 
   // The saved game (S-006), read once per render: CONTINUE reads the Classic slot.
-  const savedClassic = loadGame('classic', seed);
+  const savedClassic = loadGame('classic');
   const savedIsClassic = savedClassic !== null;
 
   useEffect(() => {
@@ -55,6 +55,8 @@ function App() {
     try { localStorage.removeItem('stacked-save-run'); } catch { /* ignore */ }
     try { localStorage.removeItem('stacked_v2_adventure_progress'); } catch { /* ignore */ }
     try { localStorage.removeItem('stacked_v2_jett_unlocked_classic'); } catch { /* ignore */ }
+    // Saves before version 7 are gone (S-032): clear returning players' old single-slot save.
+    try { localStorage.removeItem('stacked-v2-game'); } catch { /* ignore */ }
   }, []);
 
   // SET THE TABLE: DD2 plays over Classic Setup (ruling 46).
@@ -110,10 +112,10 @@ function App() {
   // become App's settings, so PLAY AGAIN deals what was being played (D-007
   // rulings 72 and 102).
   const continueClassic = useCallback(() => {
-    const saved = loadGame('classic', seed);
+    const saved = loadGame('classic');
     if (saved) setSettings(saved.game.settings);
     setScreen('game');
-  }, [seed]);
+  }, []);
 
   // Quitting keeps the save (S-006): CONTINUE on the Classic card picks it up.
   // Every way back home is instant (ruling 107); a curtain still playing goes with it.

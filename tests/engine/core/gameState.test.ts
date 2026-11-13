@@ -88,10 +88,6 @@ describe('createInitialState', () => {
     expect(s.lastAction).toBeNull();
     expect(s.lastCapturer).toBeNull();
   });
-
-  it('Law 8: dumpActive defaults to false', () => {
-    expect(makeState().dumpActive).toBe(false);
-  });
 });
 
 describe('dealNewHand', () => {
@@ -112,12 +108,6 @@ describe('dealNewHand', () => {
     const s = makeState();
     const dealt = dealNewHand(s);
     expect(dealt).not.toBe(s);
-  });
-
-  it('Law 8: clears dumpActive when new cards are dealt', () => {
-    const s: GameState = { ...makeState(), dumpActive: true };
-    const dealt = dealNewHand(s);
-    expect(dealt.dumpActive).toBe(false);
   });
 });
 
@@ -146,7 +136,7 @@ describe('resetCombination', () => {
       ...s,
       combination: {
         base: s.hands[0][0],
-        combo1: [{ card: s.hands[0][1], source: 'hand', originalIndex: 0 }],
+        combo1: [{ card: s.hands[0][1], source: 'hand' }],
         combo2: [],
         combo3: [],
       },
@@ -167,7 +157,7 @@ describe('executeCapture', () => {
     const s: GameState = { ...base, hands, board: [boardCard, ...base.board] };
     const combination = {
       base: handCard,
-      combo1: [{ card: boardCard, source: 'board' as const, originalIndex: 0 }],
+      combo1: [{ card: boardCard, source: 'board' as const }],
       combo2: [],
       combo3: [],
     };
@@ -199,12 +189,12 @@ describe('executeCapture', () => {
     const combination = {
       base: ten,
       combo1: [
-        { card: b6, source: 'board' as const, originalIndex: 0 },
-        { card: b4, source: 'board' as const, originalIndex: 1 },
+        { card: b6, source: 'board' as const },
+        { card: b4, source: 'board' as const },
       ],
       combo2: [
-        { card: h5a, source: 'hand' as const, originalIndex: 1 },
-        { card: h5b, source: 'hand' as const, originalIndex: 2 },
+        { card: h5a, source: 'hand' as const },
+        { card: h5b, source: 'hand' as const },
       ],
       combo3: [],
     };
@@ -354,12 +344,5 @@ describe('startNewRound', () => {
     expect(next.currentRound).toBe(2);
     expect(next.hands[0]).toHaveLength(4);
     expect(next.board).toHaveLength(4);
-  });
-
-  it('Law 8: clears dumpActive at the start of a new round', () => {
-    const s: GameState = { ...makeState(10), dumpActive: true };
-    const prng = createPRNG(99);
-    const next = startNewRound(s, prng);
-    expect(next.dumpActive).toBe(false);
   });
 });

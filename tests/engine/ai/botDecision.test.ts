@@ -59,7 +59,6 @@ function state(overrides: Partial<GameState>): GameState {
       { highestCapture: null },
       { highestCapture: null },
     ],
-    dumpActive: false,
     isOvertime: false,
     ...overrides,
   };

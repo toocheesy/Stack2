@@ -169,14 +169,9 @@ export function validateFullCombo(
 export function botCaptureToCombination(
   handCard: Card,
   slots: readonly MultiSlotCaptureSlot[],
-  board: readonly Card[],
 ): Combination {
   const toGroups = (cards: readonly Card[]): CaptureGroup[] =>
-    cards.map((card) => ({
-      card,
-      source: 'board',
-      originalIndex: board.findIndex((b) => b.id === card.id),
-    }));
+    cards.map((card) => ({ card, source: 'board' }));
   return {
     base: handCard,
     combo1: slots[0] ? toGroups(slots[0].cards) : [],

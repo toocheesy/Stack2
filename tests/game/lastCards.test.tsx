@@ -2,7 +2,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook } from '@testing-library/react';
 import { useGameController } from '../../src/game/useGameController';
-import { loadGame, saveGame } from '../../src/game/persistence';
+import { saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
 import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
 import type { Card, GameSettings, GameState, PlayerIndex } from '../../src/engine/types';
@@ -45,7 +45,7 @@ function ids(cards: readonly Card[]): string[] {
 // cards from the deck in their hand (the first pairs a board card, so a
 // legal capture exists), every other hand empty, 12+ cards still in the
 // deck so the hand that follows is dealt.
-function lastPlayerState(player: PlayerIndex, dumpActive = false): GameState {
+function lastPlayerState(player: PlayerIndex): GameState {
   const base = createInitialState(settings, createPRNG(SEED));
   const pairTarget = base.board[0];
   const match = base.deck.find((c) => c.rank === pairTarget.rank)!;
@@ -54,14 +54,13 @@ function lastPlayerState(player: PlayerIndex, dumpActive = false): GameState {
   const deck = base.deck.filter((c) => !hand.some((h) => h.id === c.id));
   const hands: [Card[], Card[], Card[]] = [[], [], []];
   hands[player] = hand;
-  return { ...base, hands, deck, currentPlayer: player, lastAction: null, dumpActive };
+  return { ...base, hands, deck, currentPlayer: player, lastAction: null };
 }
 
 // A Classic save of `game`, as the controller would write it.
 function saveOf(game: GameState) {
   return {
     game,
-    currentLevelId: null,
     seed: SEED,
     dealStream: SEED,
     botStream: botStreamSeed(SEED),
@@ -136,25 +135,5 @@ describe('Law 8: the last player holding cards', () => {
 
     await advance(WELL_PAST);
     expect(movedOn(result.current.state)).toBe(true);
-  });
-
-  describe('a save made under the old lock (dumpActive true)', () => {
-    for (const player of [0, 1] as PlayerIndex[]) {
-      it(`current player ${player === 0 ? 'human' : 'bot'}: on mount the hand is on the board, dumpActive is false, play moves on`, async () => {
-        const s = lastPlayerState(player, true);
-        const hand = ids(s.hands[player]);
-        saveGame('classic', saveOf(s));
-        const { result } = mount(SEED);
-
-        expect(result.current.state.dumpActive).toBe(false);
-        expect(ids(result.current.state.board)).toEqual(expect.arrayContaining(hand));
-        await advance(WELL_PAST);
-        const after = result.current.state;
-        expect(after.dumpActive).toBe(false);
-        expect(ids(after.board)).toEqual(expect.arrayContaining(hand));
-        expect(movedOn(after)).toBe(true);
-        expect(loadGame('classic', SEED)!.game.dumpActive).toBe(false);
-      });
-    }
   });
 });

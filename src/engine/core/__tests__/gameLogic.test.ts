@@ -110,7 +110,7 @@ describe('executeCapture stat tracking', () => {
       board: [b6],
       combination: {
         base: h6,
-        combo1: [{ card: b6, source: 'board', originalIndex: 0 }],
+        combo1: [{ card: b6, source: 'board' }],
         combo2: [],
         combo3: [],
       },
@@ -135,7 +135,7 @@ describe('executeCapture stat tracking', () => {
       board: [a2, makeCard('3', 'spades', 's3')],
       combination: {
         base: a1,
-        combo1: [{ card: a2, source: 'board', originalIndex: 0 }],
+        combo1: [{ card: a2, source: 'board' }],
         combo2: [],
         combo3: [],
       },
@@ -152,7 +152,7 @@ describe('executeCapture stat tracking', () => {
       board: [c3b],
       combination: {
         base: c3,
-        combo1: [{ card: c3b, source: 'board', originalIndex: 0 }],
+        combo1: [{ card: c3b, source: 'board' }],
         combo2: [],
         combo3: [],
       },

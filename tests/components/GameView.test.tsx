@@ -63,7 +63,7 @@ describe('the game board (GB2)', () => {
   });
 
   it('Classic, your turn: the top bar, the seats, the message line, the table, your bar and hand; no tray', () => {
-    saveGame('classic', { game: yourTurn(classicSettings), currentLevelId: null, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
+    saveGame('classic', { game: yourTurn(classicSettings), seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
     render(<App />);
     fireEvent.click(screen.getByText('CONTINUE'));
 
@@ -91,7 +91,7 @@ describe('the game board (GB2)', () => {
     // moves on and Rex takes the table (TT1).
     const base = yourTurn(classicSettings);
     const game: GameState = { ...base, deck: [], hands: [[], [], []], board: base.board, lastAction: 'place', lastCapturer: 2, handNumber: 4 };
-    saveGame('classic', { game, currentLevelId: null, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
+    saveGame('classic', { game, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
     render(<App />);
     fireEvent.click(screen.getByText('CONTINUE'));
     await advance(300);

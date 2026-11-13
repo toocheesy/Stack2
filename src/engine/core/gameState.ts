@@ -103,7 +103,6 @@ export function createInitialState(
     gamePhase: 'playing',
     roundStats: [emptyRoundStats(), emptyRoundStats(), emptyRoundStats()],
     gameStats: [emptyGameStats(), emptyGameStats(), emptyGameStats()],
-    dumpActive: false,
     isOvertime: false,
   };
 }
@@ -120,8 +119,7 @@ export function dealNewHand(state: GameState): GameState {
     hands[p] = hands[p].concat(taken);
     deck = remaining;
   }
-  // Dealing new cards clears the dump (all 3 players have cards again).
-  return { ...state, deck, hands, handNumber: state.handNumber + 1, dumpActive: false };
+  return { ...state, deck, hands, handNumber: state.handNumber + 1 };
 }
 
 export function nextPlayer(state: GameState): GameState {
@@ -307,7 +305,6 @@ export function startNewRound(
     handNumber: 1,
     gamePhase: 'playing' as const,
     roundStats: [emptyRoundStats(), emptyRoundStats(), emptyRoundStats()],
-    dumpActive: false,
     isOvertime: false,
   };
 }

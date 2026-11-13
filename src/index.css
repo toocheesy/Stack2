@@ -1,7 +1,7 @@
 @import "tailwindcss";
 
 @theme {
-  /* The two STACKED v2 families; their other home is src/config/fonts.ts. */
+  /* The page's family, Josefin Sans; src/config/fonts.ts holds both STACKED v2 families. */
   --font-sans: "Josefin Sans", system-ui, sans-serif;
 }
 

@@ -49,7 +49,6 @@ describe('the seed in analytics (S-006)', () => {
     const game = createInitialState(settings, createPRNG(1));
     saveGame('classic', {
       game,
-      currentLevelId: null,
       seed: SAVED_SEED,
       dealStream: 1,
       botStream: botStreamSeed(1),

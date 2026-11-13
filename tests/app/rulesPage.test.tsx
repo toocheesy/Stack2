@@ -49,7 +49,6 @@ const DEAL_SEED = 1;
 function saveClassic() {
   saveGame('classic', {
     game: createInitialState(classicSettings, createPRNG(DEAL_SEED)),
-    currentLevelId: null,
     seed: DEAL_SEED,
     dealStream: DEAL_SEED,
     botStream: botStreamSeed(DEAL_SEED),

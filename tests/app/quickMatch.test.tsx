@@ -49,7 +49,7 @@ const DEAL_SEED = 1;
 const CLASSIC_SEED = 90210;
 
 function saveClassic(game: GameState) {
-  saveGame('classic', { game, currentLevelId: null, seed: CLASSIC_SEED, dealStream: DEAL_SEED, botStream: botStreamSeed(DEAL_SEED) });
+  saveGame('classic', { game, seed: CLASSIC_SEED, dealStream: DEAL_SEED, botStream: botStreamSeed(DEAL_SEED) });
 }
 
 function savedSeed(): number | null {

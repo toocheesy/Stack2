@@ -157,7 +157,7 @@ function run(r: Run, options: RunOptions): RunResult {
     const result = determineTurnResult(r.state);
     switch (result.type) {
       case 'CONTINUE_TURN':
-        r.state = { ...r.state, currentPlayer: result.nextPlayer, dumpActive: result.dumpActive ?? r.state.dumpActive };
+        r.state = { ...r.state, currentPlayer: result.nextPlayer };
         return;
       case 'DEAL_NEW_HAND':
         r.state = { ...dealNewHand(r.state), currentPlayer: result.startingPlayer };
@@ -194,7 +194,7 @@ function run(r: Run, options: RunOptions): RunResult {
     let combo: Combination | null = null;
     let points = 0;
     if (decision.action === 'capture' && decision.captureDetails) {
-      const candidate = botCaptureToCombination(decision.handCard, decision.captureDetails.slots, r.state.board);
+      const candidate = botCaptureToCombination(decision.handCard, decision.captureDetails.slots);
       const validation = validateFullCombo(r.state, candidate);
       if (validation.isValid) {
         combo = candidate;

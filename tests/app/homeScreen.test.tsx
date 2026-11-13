@@ -43,7 +43,6 @@ const RUN_WORDS = /The Run|BEGIN|RESUME|NEW RUN|New here|CAMPAIGN|Run complete|l
 function saveClassic() {
   saveGame('classic', {
     game: createInitialState(classicSettings, createPRNG(DEAL_SEED)),
-    currentLevelId: null,
     seed: DEAL_SEED,
     dealStream: DEAL_SEED,
     botStream: botStreamSeed(DEAL_SEED),
@@ -126,6 +125,17 @@ describe('the home screen (HS15)', () => {
     for (const key of keys) expect(localStorage.getItem(key)).toBeNull();
     // The Classic save is left as it was.
     expect(localStorage.getItem('stacked-save-classic')).not.toBeNull();
+  });
+
+  it('a save from before version 7 and the old single-slot save are removed on load, so there is no CONTINUE (S-032)', () => {
+    saveClassic();
+    const raw = JSON.parse(localStorage.getItem('stacked-save-classic')!);
+    localStorage.setItem('stacked-save-classic', JSON.stringify({ ...raw, version: 6 }));
+    localStorage.setItem('stacked-v2-game', JSON.stringify({ version: 3, game: raw.game }));
+    render(<App />);
+    expect(buttonNames()).toEqual(['Settings', 'QUICK MATCH', 'SET THE TABLE', 'How to play']);
+    expect(localStorage.getItem('stacked-save-classic')).toBeNull();
+    expect(localStorage.getItem('stacked-v2-game')).toBeNull();
   });
 
   it('SET THE TABLE: DD2 plays over Classic Setup with nothing picked; Back on Setup returns home at once', async () => {

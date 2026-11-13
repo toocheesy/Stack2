@@ -60,28 +60,26 @@ function stateFor(hand: Card[], board: Card[]): GameState {
       { highestCapture: null },
       { highestCapture: null },
     ],
-    dumpActive: false,
     isOvertime: false,
   };
 }
 
 describe('botCaptureToCombination', () => {
-  it('base = the hand card; slots in order, each card from the board with its board index', () => {
+  it('base = the hand card; slots in order, each card labelled from the board', () => {
     const hand = makeCard('5', 'hearts');
     const b5 = makeCard('5', 'clubs');
     const b2 = makeCard('2', 'hearts');
     const b3 = makeCard('3', 'spades');
-    const board = [b2, b5, b3];
     const slots: MultiSlotCaptureSlot[] = [
       { slot: 'combo1', cards: [b5], type: 'pair' },
       { slot: 'combo2', cards: [b2, b3], type: 'sum' },
     ];
-    const combo = botCaptureToCombination(hand, slots, board);
+    const combo = botCaptureToCombination(hand, slots);
     expect(combo.base).toBe(hand);
-    expect(combo.combo1).toEqual([{ card: b5, source: 'board', originalIndex: 1 }]);
+    expect(combo.combo1).toEqual([{ card: b5, source: 'board' }]);
     expect(combo.combo2).toEqual([
-      { card: b2, source: 'board', originalIndex: 0 },
-      { card: b3, source: 'board', originalIndex: 2 },
+      { card: b2, source: 'board' },
+      { card: b3, source: 'board' },
     ]);
     expect(combo.combo3).toEqual([]);
   });
@@ -98,14 +96,14 @@ describe('botCaptureToCombination', () => {
           const slots: MultiSlotCaptureSlot[] = [
             { slot: 'combo1', cards: opt.boardCards, type: opt.type },
           ];
-          const v = validateFullCombo(state, botCaptureToCombination(handCard, slots, board));
+          const v = validateFullCombo(state, botCaptureToCombination(handCard, slots));
           expect(v.errors).toEqual([]);
           expect(v.totalPoints).toBe(opt.points);
           checked++;
         }
         const multi = findBestMultiSlotCapture(handCard, board);
         if (multi) {
-          const v = validateFullCombo(state, botCaptureToCombination(handCard, multi.slots, board));
+          const v = validateFullCombo(state, botCaptureToCombination(handCard, multi.slots));
           expect(v.errors).toEqual([]);
           expect(v.totalPoints).toBe(multi.totalPoints);
           checked++;
@@ -124,8 +122,7 @@ describe('botCaptureToCombination', () => {
     const slots: MultiSlotCaptureSlot[] = [
       { slot: 'combo1', cards: [b5, elsewhere], type: 'pair' },
     ];
-    const combo = botCaptureToCombination(hand, slots, board);
-    expect(combo.combo1[1].originalIndex).toBe(-1);
+    const combo = botCaptureToCombination(hand, slots);
     expect(validateFullCombo(state, combo).isValid).toBe(false);
   });
 });

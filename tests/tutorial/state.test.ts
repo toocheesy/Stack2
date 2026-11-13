@@ -29,10 +29,3 @@ describe('tutorialStorage', () => {
     expect((globalThis.localStorage as Storage).getItem('stacked.tutorial.v1')).toBe(JSON.stringify({ seen: false }));
   });
 });
-
-// Honest skip per the ticket: the useTutorial hook (state machine) would
-// require @testing-library/react + renderHook to test cleanly. That dep
-// isn't in the project. The state-machine logic is small and covered by
-// playtest (Skip/Done/Next/Back/Dot-jump). Persistence above is the
-// regression guard that matters — if seen=true survives, the overlay
-// stays dismissed forever as designed.

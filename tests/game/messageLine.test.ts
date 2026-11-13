@@ -20,8 +20,8 @@ function card(id: string): Card {
   return { id, rank, suit: SUITS[id.slice(-1)], value: RANK_VALUES[rank] };
 }
 const cards = (...ids: string[]) => ids.map(card);
-const fromHand = (id: string): CaptureGroup => ({ card: card(id), source: 'hand', originalIndex: 0 });
-const fromTable = (id: string): CaptureGroup => ({ card: card(id), source: 'board', originalIndex: 0 });
+const fromHand = (id: string): CaptureGroup => ({ card: card(id), source: 'hand' });
+const fromTable = (id: string): CaptureGroup => ({ card: card(id), source: 'board' });
 const NOTHING: Combination = { base: null, combo1: [], combo2: [], combo3: [] };
 function build(base: string, combo1: CaptureGroup[] = [], combo2: CaptureGroup[] = [], combo3: CaptureGroup[] = []): Combination {
   return { base: card(base), combo1, combo2, combo3 };

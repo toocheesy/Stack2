@@ -76,11 +76,6 @@ describe('the in-game Settings (ST3)', () => {
     expect(onTutorial).toHaveBeenCalledTimes(1);
   });
 
-  it('The Run: PAUSED · THE RUN · ROUND 1 · HAND 2', () => {
-    open({ modeWord: 'THE RUN', round: 1, hand: 2 });
-    expect(screen.getByText('PAUSED · THE RUN · ROUND 1 · HAND 2')).toBeTruthy();
-  });
-
   it('the switch starts On; a tap turns it Off and saves the opt-out; another turns it back On', () => {
     const sw = open();
     expect(sw.getAttribute('aria-checked')).toBe('true');

@@ -2,7 +2,6 @@
 
 @theme {
   /* The two STACKED v2 families; their other home is src/config/fonts.ts. */
-  --font-display: "Abril Fatface", Georgia, serif;
   --font-sans: "Josefin Sans", system-ui, sans-serif;
 }
 

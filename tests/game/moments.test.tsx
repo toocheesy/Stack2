@@ -22,7 +22,7 @@ const SEED = 21;
 const WELL_PAST = 10_000;
 
 function mount() {
-  return renderHook(() => useGameController(SEED, settings, null, false));
+  return renderHook(() => useGameController(SEED, settings, false));
 }
 
 async function advance(ms: number) {

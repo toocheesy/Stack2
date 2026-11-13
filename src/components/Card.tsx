@@ -35,15 +35,14 @@ interface CardGeometry {
   shadow: string | null;
 }
 
-/** The hand and table cards' locked widths and the hand card's ring, for
- *  layout that fits cards to a row (GameView's hand rule and six-across fit). */
+/** The hand and table cards' locked widths, for layout that fits cards to a
+ *  row (GameView's hand rule and six-across fit). */
 export const HAND_CARD_W = 72;
-export const HAND_CARD_RING = 3;
 export const TABLE_CARD_W = 54;
 
 const GEOMETRY: Record<CardSize, CardGeometry> = {
   full:  { w: 180, h: 252, radius: 20, ring: 5, stripeTop: 118, stripe: 4, stripeGap: 3, centreTop: 66, rank: 92, rankPad: 10, suit: 36, suitLineHeight: 1, corner: { x: 10, y: 10, rank: 28, suit: 20 }, shadow: SHADOWS.cardFull },
-  hand:  { w: HAND_CARD_W, h: 100, radius: 9, ring: HAND_CARD_RING, stripeTop: 47, stripe: 2, stripeGap: 1.5, centreTop: 22, rank: 36, rankPad: 4, suit: 15, suitLineHeight: 1.1, corner: { x: 5, y: 4, rank: 13, suit: 10 }, shadow: SHADOWS.cardHand },
+  hand:  { w: HAND_CARD_W, h: 100, radius: 9, ring: 3, stripeTop: 47, stripe: 2, stripeGap: 1.5, centreTop: 22, rank: 36, rankPad: 4, suit: 15, suitLineHeight: 1.1, corner: { x: 5, y: 4, rank: 13, suit: 10 }, shadow: SHADOWS.cardHand },
   table: { w: TABLE_CARD_W, h: 76, radius: 7, ring: 2, stripeTop: 36, stripe: 2, stripeGap: 1, centreTop: 13, rank: 28, rankPad: 3, suit: 13, suitLineHeight: 1.1, corner: null, shadow: SHADOWS.cardTable },
   slot:  { w: 40, h: 56, radius: 6, ring: 2, stripeTop: 26, stripe: 1.5, stripeGap: 1, centreTop: 8, rank: 20, rankPad: 2, suit: 10, suitLineHeight: 1.1, corner: null, shadow: null },
 };
@@ -58,7 +57,6 @@ export interface CardProps {
   /** Draws the card below its locked size in the same shape and look (the
    *  hand rule, the table's six-across fit). Never above 1. */
   scale?: number;
-  faceDown?: boolean;
   selected?: boolean;
   disabled?: boolean;
   draggable?: boolean;
@@ -76,38 +74,6 @@ const RED_FAMILY = new Set(['hearts', 'diamonds']);
 function ringAndShadow(g: CardGeometry): string {
   const ring = `0 0 0 ${g.ring}px ${C.cardRing}`;
   return g.shadow ? `${ring}, ${g.shadow}` : ring;
-}
-
-// --- Card Back ----------------------------------------
-// No locked design yet (GB2 shows the bots' card counts instead, in release 2).
-// It keeps its shape and takes the nearest roles: the table for the back, gold
-// for the stripe, the table colour for the word on it, the size's ring and shadow.
-
-function CardBack({ g }: { g: CardGeometry }) {
-  const stripeW = g.w * 0.18;
-  const bottomR = Math.max(4, Math.round(g.w * 0.03));
-  const wordSize = Math.max(5, Math.round(stripeW * 0.55));
-
-  return (
-    <div style={{
-      position: 'relative', width: g.w, height: g.h, borderRadius: g.radius, overflow: 'hidden',
-      background: C.surface.classic, boxShadow: ringAndShadow(g), flexShrink: 0,
-    }}>
-      <div style={{
-        position: 'absolute', left: g.w * 0.10, top: 0, width: stripeW, height: g.h * 0.70,
-        background: C.classicGold, borderRadius: `0 0 ${bottomR}px ${bottomR}px`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
-      }}>
-        <div style={{
-          transform: 'rotate(-90deg)', transformOrigin: 'center center',
-          whiteSpace: 'nowrap' as const, fontFamily: FONTS.sans,
-          fontWeight: 700, fontSize: wordSize, lineHeight: 1,
-          letterSpacing: '0.18em', color: C.classicTable, opacity: 0.65,
-          userSelect: 'none' as const,
-        }}>STACKED!</div>
-      </div>
-    </div>
-  );
 }
 
 // --- Card Face ----------------------------------------
@@ -152,14 +118,14 @@ function CardFace({ card, g }: { card: CardData; g: CardGeometry }) {
 // --- Exported Card Component --------------------------
 
 export function CardComponent({
-  card, size, scale = 1, faceDown, selected, disabled,
+  card, size, scale = 1, selected, disabled,
   draggable, onTap, onDragEnd, onDragMove,
 }: CardProps) {
   const g = GEOMETRY[size];
   const s = Math.min(1, scale);
   const ring = g.ring * s;
 
-  const inner = faceDown ? <CardBack g={g} /> : <CardFace card={card} g={g} />;
+  const inner = <CardFace card={card} g={g} />;
 
   // The outer box is the card's layout size; the face inside is drawn at the
   // locked size and scaled down when the row needs it. Drag moves this box, so

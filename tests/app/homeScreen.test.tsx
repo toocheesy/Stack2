@@ -20,7 +20,6 @@ import App from '../../src/App';
 import { saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
 import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
-import { getLevel } from '../../src/engine/adventure/levelConfig';
 import type { GameSettings } from '../../src/engine/types';
 
 // The home screen, HS15 Citrus Press (D-007 release 3, rulings 32, 35, 37,
@@ -36,8 +35,6 @@ const classicSettings: GameSettings = {
   bot2Personality: 'beginner',
 };
 const DEAL_SEED = 1;
-const RUN_LEVEL = 3;
-const RUN_SEED = 777;
 // DD2 is 880ms in all.
 const CURTAIN = 880;
 // Every word the old home gave The Run.
@@ -51,27 +48,6 @@ function saveClassic() {
     dealStream: DEAL_SEED,
     botStream: botStreamSeed(DEAL_SEED),
   });
-}
-
-function saveRun() {
-  const level = getLevel(RUN_LEVEL)!;
-  const settings: GameSettings = {
-    targetScore: level.targetScore,
-    bot1Personality: level.bots[0],
-    bot2Personality: level.bots[1],
-    hintStripEnabled: level.hintStripEnabled,
-    disableSeatingSwap: !level.turnOrderSwap,
-  };
-  saveGame('run', {
-    game: createInitialState(settings, createPRNG(RUN_SEED)),
-    currentLevelId: RUN_LEVEL,
-    seed: RUN_SEED,
-    dealStream: RUN_SEED,
-    botStream: botStreamSeed(RUN_SEED),
-  });
-  localStorage.setItem('stacked_v2_adventure_progress', JSON.stringify({
-    unlockedLevels: [1, 2, 3], starsPerLevel: { 1: 3, 2: 2 }, lastCompleted: 2, totalStars: 5,
-  }));
 }
 
 async function advance(ms: number) {
@@ -136,20 +112,20 @@ describe('the home screen (HS15)', () => {
     }
   });
 
-  it('nothing on the home screen names The Run, with or without a Run save, and the Run save stays as it was', () => {
+  it('nothing on the home screen names The Run, and its three stored keys are removed on load (S-032)', () => {
     render(<App />);
     expect(screen.queryByText(RUN_WORDS)).toBeNull();
     cleanup();
 
-    saveRun();
-    const save = localStorage.getItem('stacked-save-run');
-    const progress = localStorage.getItem('stacked_v2_adventure_progress');
-    expect(save).not.toBeNull();
+    const keys = ['stacked-save-run', 'stacked_v2_adventure_progress', 'stacked_v2_jett_unlocked_classic'];
+    for (const key of keys) localStorage.setItem(key, 'left over');
+    saveClassic();
     render(<App />);
     expect(screen.queryByText(RUN_WORDS)).toBeNull();
-    expect(buttonNames()).toEqual(['Settings', 'QUICK MATCH', 'SET THE TABLE', 'How to play']);
-    expect(localStorage.getItem('stacked-save-run')).toBe(save);
-    expect(localStorage.getItem('stacked_v2_adventure_progress')).toBe(progress);
+    expect(buttonNames()).toEqual(['Settings', 'CONTINUE', 'QUICK MATCH', 'SET THE TABLE', 'How to play']);
+    for (const key of keys) expect(localStorage.getItem(key)).toBeNull();
+    // The Classic save is left as it was.
+    expect(localStorage.getItem('stacked-save-classic')).not.toBeNull();
   });
 
   it('SET THE TABLE: DD2 plays over Classic Setup with nothing picked; Back on Setup returns home at once', async () => {

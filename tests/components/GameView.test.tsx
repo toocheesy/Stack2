@@ -20,16 +20,11 @@ import App from '../../src/App';
 import { saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
 import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
-import { getLevel } from '../../src/engine/adventure/levelConfig';
-import { setTutorialSeen } from '../../src/tutorial/tutorialStorage';
 import type { GameSettings, GameState } from '../../src/engine/types';
 
 // The game board, GB2 (D-007 release 2, part 1), through the whole app: the
 // top bar's mode line, the seats, the message line, the table's deck count,
-// your bar and the tray's absence until you build. The Run's two tests
-// reached its board from the old home's Run card; release 3 took that way in
-// off the home screen (ruling 32), so they are skipped until S-032 deletes
-// The Run and them.
+// your bar and the tray's absence until you build.
 
 const SEED = 1;
 
@@ -43,17 +38,6 @@ const classicSettings: GameSettings = {
 function yourTurn(settings: GameSettings): GameState {
   const game = createInitialState(settings, createPRNG(SEED));
   return { ...game, currentPlayer: 0, lastAction: null };
-}
-
-function runSettings(levelId: number): GameSettings {
-  const level = getLevel(levelId)!;
-  return {
-    targetScore: level.targetScore,
-    bot1Personality: level.bots[0],
-    bot2Personality: level.bots[1],
-    hintStripEnabled: level.hintStripEnabled,
-    disableSeatingSwap: !level.turnOrderSwap,
-  };
 }
 
 async function advance(ms: number) {
@@ -116,39 +100,5 @@ describe('the game board (GB2)', () => {
     expect(screen.queryByText(/WAITING/)).toBeNull();
     await advance(3000);
     expect(screen.getByText('Round 1 is over')).toBeTruthy();
-  });
-
-  it.skip('The Run: a level starts on the board, with its mode line and its hint strip on the message line', () => {
-    setTutorialSeen(true);
-    const level = 1;
-    saveGame('run', { game: yourTurn(runSettings(level)), currentLevelId: level, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
-    render(<App />);
-    fireEvent.click(screen.getByText('The Run'));
-    fireEvent.click(screen.getByText(/^Resume 1-1/));
-
-    expect(screen.getAllByText('THE RUN · 1-1 · R1 · H1').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getByText('Drag a card to start your turn')).toBeTruthy();
-    expect(screen.getByText('Calvin · 1')).toBeTruthy();
-    expect(screen.getByText('Calvin · 2')).toBeTruthy();
-  });
-
-  it.skip('The Run: a level ends with its level-complete overlay', async () => {
-    const level = 3;
-    const base = createInitialState(runSettings(level), createPRNG(SEED));
-    // Bot 1 holds the last card, the deck is out, and bot 1 is at the target: its move ends the level.
-    const game: GameState = {
-      ...base,
-      deck: [],
-      hands: [[], [base.hands[1][0]], []],
-      currentPlayer: 1,
-      overallScores: { player: 0, bot1: base.settings.targetScore, bot2: 0 },
-    };
-    saveGame('run', { game, currentLevelId: level, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
-    render(<App />);
-    fireEvent.click(screen.getByText('The Run'));
-    fireEvent.click(screen.getByText(/^Resume 1-3/));
-    await advance(10_000);
-
-    expect(screen.getByText('TRY AGAIN')).toBeTruthy();
   });
 });

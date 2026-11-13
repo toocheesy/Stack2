@@ -7,9 +7,6 @@ const ENGINE_SOURCES = import.meta.glob<string>(
   { query: '?raw', import: 'default', eager: true },
 );
 
-// The one named exception: the frozen Run's progress file, until the new Run replaces it (S-007).
-const EXCEPTIONS = new Set(['/src/engine/adventure/progressManager.ts']);
-
 const BROWSER_NAMES = /\b(window|document|localStorage|sessionStorage|navigator|indexedDB)\b/;
 
 describe('engine has no browser (S-007)', () => {
@@ -21,7 +18,6 @@ describe('engine has no browser (S-007)', () => {
   it('no engine source file names a browser global', () => {
     const hits: string[] = [];
     for (const [path, text] of Object.entries(ENGINE_SOURCES)) {
-      if (EXCEPTIONS.has(path)) continue;
       text.split('\n').forEach((line, i) => {
         const code = line.trim();
         if (code.startsWith('//') || code.startsWith('*') || code.startsWith('/*')) return;
@@ -29,9 +25,5 @@ describe('engine has no browser (S-007)', () => {
       });
     }
     expect(hits).toEqual([]);
-  });
-
-  it('the exception file still exists', () => {
-    for (const path of EXCEPTIONS) expect(Object.keys(ENGINE_SOURCES)).toContain(path);
   });
 });

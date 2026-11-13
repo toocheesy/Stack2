@@ -107,7 +107,8 @@ export function PopNumber({ value, delay = 0 }: { value: number; delay?: number 
 }
 
 /** A small tag: outlined (HAND, PICK) or solid with table-colour text (TABLE, PICKED). */
-export function Tag({ solid, colour = C.ink.classic, children }: { solid?: boolean; colour?: string; children: ReactNode }) {
+export function Tag({ solid, children }: { solid?: boolean; children: ReactNode }) {
+  const colour = C.ink.classic;
   return (
     <span style={{
       padding: '1px 5px', borderRadius: 3, fontFamily: FONTS.sans, fontSize: 9, fontWeight: 700, letterSpacing: '0.08em', lineHeight: 1.3, whiteSpace: 'nowrap',
@@ -179,7 +180,6 @@ export interface Flight {
   shrink: number;
   rotate: number;
   calmDuration: number;
-  calmDelay?: number;
 }
 
 /** A card on its way to a seat or a bar (YC1, TT1). Its contents are the card itself. */
@@ -207,7 +207,7 @@ export function FlyingCard({ flight, children }: { flight: Flight; children: Rea
           : { x: delta.x, y: [0, -flight.hop, delta.y], scale: [1, flight.grow, flight.shrink], rotate: flight.rotate, opacity: [1, 1, 0] })
         : undefined}
       transition={calm
-        ? { duration: flight.calmDuration, delay: flight.calmDelay ?? 0, ease: 'linear' }
+        ? { duration: flight.calmDuration, ease: 'linear' }
         : { ...leg, y: { ...leg, times: [0, 0.2, 1] }, scale: { ...leg, times: [0, 0.2, 1] }, opacity: { ...leg, times: [0, 0.85, 1] } }}
       style={{ position: 'relative', zIndex: 5, flexShrink: 0 }}
     >

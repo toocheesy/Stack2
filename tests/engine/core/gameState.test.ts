@@ -89,7 +89,7 @@ describe('createInitialState', () => {
     expect(s.lastCapturer).toBeNull();
   });
 
-  it('dumpActive defaults to false (RULES.md Law 8)', () => {
+  it('Law 8: dumpActive defaults to false', () => {
     expect(makeState().dumpActive).toBe(false);
   });
 });
@@ -114,7 +114,7 @@ describe('dealNewHand', () => {
     expect(dealt).not.toBe(s);
   });
 
-  it('clears dumpActive when new cards are dealt (RULES.md Law 8)', () => {
+  it('Law 8: clears dumpActive when new cards are dealt', () => {
     const s: GameState = { ...makeState(), dumpActive: true };
     const dealt = dealNewHand(s);
     expect(dealt.dumpActive).toBe(false);
@@ -356,7 +356,7 @@ describe('startNewRound', () => {
     expect(next.board).toHaveLength(4);
   });
 
-  it('clears dumpActive at the start of a new round (RULES.md Law 8)', () => {
+  it('Law 8: clears dumpActive at the start of a new round', () => {
     const s: GameState = { ...makeState(10), dumpActive: true };
     const prng = createPRNG(99);
     const next = startNewRound(s, prng);

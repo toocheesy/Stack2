@@ -20,12 +20,11 @@ import App from '../../src/App';
 import { loadGame, saveGame } from '../../src/game/persistence';
 import { createInitialState } from '../../src/engine/core/gameState';
 import { botStreamSeed, createPRNG } from '../../src/engine/utils/prng';
-import { getLevel } from '../../src/engine/adventure/levelConfig';
 import type { GameSettings, GameState } from '../../src/engine/types';
 
-// S-006, through the whole app: quitting keeps the save in both modes and the
-// home screen offers that mode's resume; game_start and game_end carry the
-// seed, including on a resumed game.
+// S-006, through the whole app: quitting keeps the save and the home screen
+// offers CONTINUE; game_start and game_end carry the seed, including on a
+// resumed game.
 
 const classicSettings: GameSettings = {
   targetScore: 300,
@@ -35,8 +34,6 @@ const classicSettings: GameSettings = {
 // Seed 1 deals the player first with these settings (tutorialFreeze.test.tsx).
 const DEAL_SEED = 1;
 const CLASSIC_SEED = 90210;
-const RUN_LEVEL = 3;
-const RUN_SEED = 777;
 
 function ids(cards: readonly { id: string }[]): string[] {
   return cards.map((c) => c.id);
@@ -50,17 +47,6 @@ function saveClassic(game: GameState, seed = CLASSIC_SEED) {
     dealStream: DEAL_SEED,
     botStream: botStreamSeed(DEAL_SEED),
   });
-}
-
-function runSettings(): GameSettings {
-  const level = getLevel(RUN_LEVEL)!;
-  return {
-    targetScore: level.targetScore,
-    bot1Personality: level.bots[0],
-    bot2Personality: level.bots[1],
-    hintStripEnabled: level.hintStripEnabled,
-    disableSeatingSwap: !level.turnOrderSwap,
-  };
 }
 
 async function advance(ms: number) {
@@ -112,41 +98,6 @@ describe('quitting keeps the save (S-006)', () => {
     expect(kept.seed).toBe(CLASSIC_SEED);
     expect(ids(kept.game.board)).toEqual(ids(game.board));
     expect(ids(kept.game.hands[0])).toEqual(ids(game.hands[0]));
-  });
-
-  // This test reached The Run's map from the old home's Run card; release 3
-  // took that way in off the home screen (D-007 ruling 32), so it is skipped
-  // until S-032 deletes The Run and it.
-  it.skip('the Run: Resume on the map resumes with the saved seed, quitting keeps the save, and Resume shows again', () => {
-    const game = createInitialState(runSettings(), createPRNG(RUN_SEED));
-    saveGame('run', {
-      game,
-      currentLevelId: RUN_LEVEL,
-      seed: RUN_SEED,
-      dealStream: createPRNG(RUN_SEED).getSeed(),
-      botStream: botStreamSeed(RUN_SEED),
-    });
-
-    render(<App />);
-    fireEvent.click(screen.getByText('The Run'));
-    fireEvent.click(screen.getByText(/^Resume 1-3/));
-    expect(gtag).toHaveBeenCalledWith(
-      'event',
-      'game_start',
-      expect.objectContaining({ mode: 'run', level_id: RUN_LEVEL, resumed: true, seed: RUN_SEED }),
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Leave game' }));
-    expect(screen.getByText('Return to The Run Map?')).toBeTruthy();
-    expect(screen.getByText('Your level is saved. Resume it from The Run map. Star progress is safe.')).toBeTruthy();
-    fireEvent.click(screen.getByText('BACK'));
-
-    expect(screen.getByText(/^Resume 1-3/)).toBeTruthy();
-    const kept = loadGame('run', 0)!;
-    expect(kept).not.toBeNull();
-    expect(kept.currentLevelId).toBe(RUN_LEVEL);
-    expect(kept.seed).toBe(RUN_SEED);
-    expect(ids(kept.game.board)).toEqual(ids(game.board));
   });
 
   it('game_end carries the seed of a resumed game', async () => {

@@ -25,7 +25,7 @@ describe('analytics events (S-005)', () => {
   });
 
   it('does nothing when gtag is absent', () => {
-    expect(() => trackGameStart({ mode: 'run', level_id: 1, resumed: true, seed: 7 })).not.toThrow();
+    expect(() => trackGameStart({ mode: 'classic', resumed: true, seed: 7 })).not.toThrow();
   });
 });
 
@@ -83,7 +83,7 @@ describe('the seed in analytics (S-006)', () => {
   it('game_start, first_capture and game_end each send the seed', () => {
     const gtag = vi.fn();
     window.gtag = gtag;
-    trackGameStart({ mode: 'run', level_id: 3, resumed: true, seed: 90210 });
+    trackGameStart({ mode: 'classic', resumed: true, seed: 90210 });
     trackFirstCapture({ mode: 'classic', time_to_first_capture_ms: 1200, seed: 90210 });
     trackGameEnd({ mode: 'classic', won: true, score: 310, duration_ms: 60_000, seed: 90210 });
     for (const name of ['game_start', 'first_capture', 'game_end']) {

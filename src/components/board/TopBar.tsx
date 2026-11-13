@@ -8,9 +8,9 @@ import { ChevronLeft, Gear, IconButton, Wordmark } from './pieces';
  *  narrow for the mode line in one row (375), it takes two rows at the same
  *  size instead of losing its end. */
 export function TopBar({ mode, detail, round, hand, canLeave, onLeave, onSettings, barRef }: {
-  /** "CLASSIC" or "THE RUN". */
+  /** "CLASSIC". */
   mode: string;
-  /** The target score, or the Run's level. */
+  /** The target score. */
   detail: string;
   round: number;
   hand: number;

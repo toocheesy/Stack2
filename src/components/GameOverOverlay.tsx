@@ -19,12 +19,11 @@ const NAMES: Record<Difficulty, string> = { beginner: 'Calvin', intermediate: 'N
 interface Props {
   winner: { winner: PlayerIndex; winnerName: string } | null;
   state: GameState;
-  adventureMode?: boolean;
   onPlayAgain: () => void;
   onHome: () => void;
 }
 
-export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onHome }: Props) {
+export function GameOverOverlay({ winner, state, onPlayAgain, onHome }: Props) {
   const calm = useReducedMotion();
   if (!winner) return null;
 
@@ -116,7 +115,7 @@ export function GameOverOverlay({ winner, state, adventureMode, onPlayAgain, onH
               width: '100%', height: 46, borderRadius: 6, border: `1.5px solid ${C.classicSheetInk}`, background: 'transparent', fontFamily: FONTS.sans,
               fontSize: 14, fontWeight: 700, letterSpacing: '0.16em', color: C.classicSheetInk, cursor: 'pointer',
             }}>
-              {adventureMode ? 'WORLD MAP' : 'HOME'}
+              HOME
             </motion.button>
           </div>
         </motion.section>

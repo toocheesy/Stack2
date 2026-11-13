@@ -29,12 +29,10 @@ interface Props {
   onContinue: () => void;
   /** RULES.md Law 11: the round ended with a tie at the top; one more round. */
   isOvertime: boolean;
-  /** "CLASSIC" or "THE RUN", for the line above the title. */
+  /** "CLASSIC", for the line above the title. */
   modeWord: string;
   /** A pause sheet is open over the game (D-007 release 2 part 3): the countdown holds. */
   paused?: boolean;
-  /** The Run's games use the same sheet (the prop stays for the caller). */
-  adventureMode?: boolean;
 }
 
 const NAMES: Record<Difficulty, string> = { beginner: 'Calvin', intermediate: 'Nina', advanced: 'Rex', expert: 'Jett' };

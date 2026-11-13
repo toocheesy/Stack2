@@ -12,7 +12,7 @@ export default defineConfig({
       // injectRegister 'auto' adds the SW registration script to index.html
       // automatically — no manual main.tsx change needed.
       injectRegister: 'auto',
-      includeAssets: ['og-share.png', 'icons/favicon-32.png', 'icons/favicon-16.png'],
+      includeAssets: ['icons/favicon-32.png', 'icons/favicon-16.png'],
       manifest: {
         name: 'STACKED',
         short_name: 'STACKED',
@@ -30,14 +30,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Precache the app shell only. Music-loop is 2.29 MB and the lazy-
-        // load track defers it to first user gesture; if Workbox precached
-        // it here the SW would eager-download exactly the file we deferred,
-        // undoing the perf win.
         globPatterns: ['**/*.{js,css,html,svg,woff,woff2}'],
-        // Smaller precache footprint — default max is 2 MB per file, which
-        // would have caught the music anyway, but we exclude it explicitly.
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
   ],

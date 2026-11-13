@@ -13,8 +13,8 @@ import { CARD_GLOW, SHEET_DIM } from './board/sheet';
 // a spotlight on the part. The spotlight doesn't travel: the old light fades
 // out as the new one fades in. Steps 3 to 6 lay a sample capture over the
 // tray; it is a picture only, and the game underneath is never touched. It
-// opens only from the in-game Settings (The Run's level 1 still opens it by
-// itself), and the game is paused while it is open.
+// opens only from the in-game Settings, and the game is paused while it is
+// open.
 
 export interface TutorialMark {
   title: string;

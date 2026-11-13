@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { Card, ComboSlot, GameState, PlayerIndex } from '../engine/types';
-import { getTransition } from '../config/motion';
 import {
   MOMENTS,
   baseSourceOf,
@@ -25,7 +24,7 @@ import { TutorialOverlay, type TutorialMark } from './TutorialOverlay';
 import { LeaveSheet } from './LeaveSheet';
 import { GameSettingsSheet } from './GameSettingsSheet';
 import type { TutorialApi } from '../tutorial/useTutorial';
-import { C, alpha } from '../config/colors';
+import { C } from '../config/colors';
 import { FONTS } from '../config/fonts';
 import { TopBar } from './board/TopBar';
 import { OpponentSeat } from './board/OpponentSeat';
@@ -66,7 +65,6 @@ interface Props {
   lastCapture: LastMove | null;
   /** Take the Table on show (useGameController's TakeTheTableMoment), under App.tsx's name for it. */
   jackpotInfo: JackpotDisplay | null;
-  currentLevelId?: number | null;
   gameOver: { winner: number; winnerName: string } | null;
   actions: GameActions;
   onQuit: () => void;
@@ -80,8 +78,6 @@ interface Props {
   // the pause from its first render (freeze ticket). GameView renders the
   // overlay and shows the tray's ghost for its marks.
   tutorial: TutorialApi;
-  /** Still passed by App.tsx; the toasts it suppressed went with release 2. */
-  suppressToasts?: boolean;
 }
 
 const SLOT_KEYS: ComboSlot[] = ['base', 'combo1', 'combo2', 'combo3'];
@@ -102,7 +98,7 @@ function useCompact(): boolean {
 }
 
 export function GameView({
-  state, isPlayerTurn, botViz, botCombo, lastCapture: lastMove, jackpotInfo, currentLevelId, gameOver, actions, onQuit, onHome, onPlayAgain, pause, onPause, tutorial,
+  state, isPlayerTurn, botViz, botCombo, lastCapture: lastMove, jackpotInfo, gameOver, actions, onQuit, onHome, onPlayAgain, pause, onPause, tutorial,
 }: Props) {
   const calm = !!useReducedMotion();
   const compact = useCompact();
@@ -125,7 +121,6 @@ export function GameView({
   const [hoveredTable, setHoveredTable] = useState(false);
   // Ruling 98: a drag with nothing staged opens the tray as a drop target.
   const [dragOpen, setDragOpen] = useState(false);
-  const [showQuitDialog, setShowQuitDialog] = useState(false);
   const [flyTo, setFlyTo] = useState<Point | null>(null);
   const lastHitRef = useRef(0);
 
@@ -216,9 +211,9 @@ export function GameView({
       : thinkingBot === current
         ? `WAITING FOR ${opponentName(state, current).toUpperCase()}`
         : `WAITING · ${opponentName(state, current).toUpperCase()}'S TURN`;
-  // MODE · TARGET · R[round] · H[hand]; The Run keeps today's level in place of the target.
-  const mode = currentLevelId ? 'THE RUN' : 'CLASSIC';
-  const detail = currentLevelId ? `${Math.ceil(currentLevelId / 3)}-${((currentLevelId - 1) % 3) + 1}` : String(target);
+  // MODE · TARGET · R[round] · H[hand].
+  const mode = 'CLASSIC';
+  const detail = String(target);
 
   // The Take the Table panel: who is in line (from the moment while it plays).
   const panel = useMemo(() => (tt ? { player: tt.winner, cards: tt.cards, points: tt.points } : ttt), [tt, ttt]);
@@ -336,8 +331,8 @@ export function GameView({
         round={state.currentRound}
         hand={state.handNumber}
         canLeave={!gameOver && !tt && inPlay}
-        // Classic: QD1's leave sheet. The Run keeps its "Return to The Run Map?" dialog until release 3.
-        onLeave={() => (currentLevelId ? setShowQuitDialog(true) : onPause('leave'))}
+        // QD1's leave sheet.
+        onLeave={() => onPause('leave')}
         onSettings={() => onPause('settings')}
       />
 
@@ -495,30 +490,6 @@ export function GameView({
         onDragEnd={(card, pt) => handleDragEnd(card, 'hand', pt)}
       />
 
-      {/* ═══ THE RUN'S DIALOG (as it is, until release 3) ═══ */}
-      <AnimatePresence>
-        {showQuitDialog && (
-          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}
-            onClick={() => setShowQuitDialog(false)}
-            style={{ position: 'fixed', inset: 0, background: alpha(C.classicTable, 0.7), display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 250, padding: 20 }}>
-            <motion.div initial={{ scale: 0.95 }} animate={{ scale: 1 }} exit={{ scale: 0.95 }}
-              onClick={(e) => e.stopPropagation()}
-              style={{ background: C.surface.classic, borderRadius: 12, padding: 24, maxWidth: 280, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-              <h3 style={{ fontFamily: FONTS.display, fontWeight: 400, fontSize: 18, color: C.inkOnSurface.classic, margin: 0 }}>
-                Return to The Run Map?
-              </h3>
-              <p style={{ fontSize: 13, color: alpha(C.inkOnSurface.classic, 0.6), textAlign: 'center', margin: 0 }}>
-                Your level is saved. Resume it from The Run map. Star progress is safe.
-              </p>
-              <div style={{ display: 'flex', gap: 10, marginTop: 4, width: '100%' }}>
-                <Btn label="BACK" onClick={() => { setShowQuitDialog(false); onQuit(); }} />
-                <Btn label="RESUME" primary onClick={() => setShowQuitDialog(false)} />
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* ═══ THE SHEETS ═══ */}
       <RoundEndOverlay
         visible={state.gamePhase === 'roundEnd'}
@@ -532,9 +503,8 @@ export function GameView({
         isOvertime={state.isOvertime}
         modeWord={mode}
         paused={paused}
-        adventureMode={!!currentLevelId}
       />
-      <GameOverOverlay winner={gameOver as { winner: PlayerIndex; winnerName: string } | null} state={state} adventureMode={!!currentLevelId} onPlayAgain={onPlayAgain} onHome={onHome} />
+      <GameOverOverlay winner={gameOver as { winner: PlayerIndex; winnerName: string } | null} state={state} onPlayAgain={onPlayAgain} onHome={onHome} />
 
       {/* ═══ THE PAUSES (D-007 release 2 part 3) ═══ */}
       <LeaveSheet
@@ -551,8 +521,7 @@ export function GameView({
         onTutorial={() => { onPause(null); tutorial.open(); }}
       />
       {/* The tutorial, TU2: nine steps over the board's parts. It opens from
-          Settings › Tutorial (and by itself on The Run's level 1); the engine
-          is never touched. */}
+          Settings › Tutorial; the engine is never touched. */}
       <TutorialOverlay
         visible={tutorial.visible}
         currentStep={tutorial.currentStep}
@@ -602,21 +571,4 @@ function TUTORIAL_MARKS(refs: TutorialMarkRefs): TutorialMark[] {
     { title: 'The message line.', copy: 'It tells you the rule that matters right now.', refs: [refs.message], side: 'bottom' },
     { title: 'The top bar.', copy: "The target score, and the round and hand you're on. The back arrow leaves the game; it stays saved.", refs: [refs.topBar], side: 'bottom' },
   ];
-}
-
-// ─── Button (The Run's dialog) ──────────────────────
-
-function Btn({ label, primary, onClick }: { label: string; primary?: boolean; onClick: () => void }) {
-  // Secondary outlined style: 1.5px ink@40% border, ink@90% text,
-  // transparent fill. Primary is Classic's gold with the table colour (RESUME).
-  return (
-    <motion.button onClick={onClick} whileTap={{ scale: 0.97 }} transition={getTransition('snappy')} style={{
-      padding: '10px 24px', borderRadius: 6,
-      border: primary ? 'none' : `1.5px solid ${alpha(C.ink.classic, 0.4)}`,
-      background: primary ? C.classicGold : 'transparent',
-      color: primary ? C.classicTable : alpha(C.ink.classic, 0.9),
-      fontSize: 15, fontWeight: 600, fontFamily: FONTS.sans,
-      cursor: 'pointer',
-    }}>{label}</motion.button>
-  );
 }

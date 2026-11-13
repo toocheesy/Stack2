@@ -25,7 +25,7 @@ const WELL_PAST = 10_000;
 
 function mount(seed: number, tutorialActive: boolean) {
   return renderHook(
-    ({ tutorial }: { tutorial: boolean }) => useGameController(seed, settings, null, tutorial),
+    ({ tutorial }: { tutorial: boolean }) => useGameController(seed, settings, tutorial),
     { initialProps: { tutorial: tutorialActive } },
   );
 }

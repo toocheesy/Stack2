@@ -102,7 +102,7 @@ describe('the message line (D-007 ruling 95)', () => {
       expect(messageLine(state({ hand: [], currentPlayer: 1 }), NOTHING, move({ captures: [ONE_CAPTURE], next: 1 }), null))
         .toBe('Your turn ends: your hand is empty. Nina is next.');
     });
-    it('the next player is the next one holding cards (RULES.md Law 12)', () => {
+    it('Law 12: the next player is the next one holding cards', () => {
       expect(messageLine(state({ hand: [], bot1: [], currentPlayer: 2 }), NOTHING, move({ captures: [ONE_CAPTURE], next: 2 }), null))
         .toBe('Your turn ends: your hand is empty. Rex is next.');
     });
@@ -142,7 +142,7 @@ describe('the message line (D-007 ruling 95)', () => {
     it('in place of "Rex\'s turn."', () => {
       expect(messageLine(state({ deck: [], currentPlayer: 2 }), NOTHING, null, null)).toBe(LAST_HAND);
     });
-    it('the last cards (RULES.md Law 8), you last', () => {
+    it('Law 8: the last cards, you last', () => {
       const s = state({ hand: [], bot1: [], bot2: [], deck: [], handNumber: 4 });
       expect(messageLine(s, NOTHING, move({ placed: card('6H'), rest: cards('JC'), hand: 4 }), null))
         .toBe('Nina and Rex are out of cards. You placed 6♥, so the rest of your hand (J♣) goes onto the table. Hand 4 is over.');
@@ -212,27 +212,6 @@ describe('the message line (D-007 ruling 95)', () => {
     });
     it('5 over 6', () => {
       expect(messageLine(state({ deck: [] }), NOTHING, null, null)).toBe(LAST_HAND);
-    });
-  });
-
-  describe("the Run's hint strip, in place of 2, 4 and 6", () => {
-    const run = (over: Parameters<typeof state>[0] = {}) => state({ settings: { ...settings, hintStripEnabled: true }, ...over });
-    it('6: your turn and an opponent\'s turn', () => {
-      expect(messageLine(run(), NOTHING, null, null)).toBe('Drag a card to start your turn');
-      expect(messageLine(run({ currentPlayer: 2 }), NOTHING, null, null)).toBe('Watch the opponents play their turn');
-    });
-    it('4: while you build', () => {
-      expect(messageLine(run({ hand: ['5H'] }), build('5H'), null, null)).toBe('Combo groups must sum (or match) the base card value');
-      expect(messageLine(run({ hand: ['5H'], table: ['5C', '9D'] }), build('5H', [fromTable('5C')]), null, null)).toBe('Tap SUBMIT to capture, or RESET to clear');
-    });
-    it('2: after your move', () => {
-      expect(messageLine(run({ hand: ['7C'] }), NOTHING, move({ captures: [ONE_CAPTURE] }), null)).toBe('Drag a card to start your turn');
-      expect(messageLine(run({ currentPlayer: 1 }), NOTHING, move({ placed: card('4H') }), null)).toBe('Watch the opponents play their turn');
-    });
-    it('not 1, 3 or 5', () => {
-      expect(messageLine(run({ hand: [], bot1: [], bot2: [] }), NOTHING, move({ placed: card('6H'), rest: cards('JC') }), null)).toMatch(/^Nina and Rex are out of cards/);
-      expect(messageLine(run({ currentPlayer: 2, bot2: ['9S'], table: ['9D'] }), NOTHING, null, replay(2, build('9S', [fromTable('9D')])))).toBe("Base from Rex's hand: every combo has a table card.");
-      expect(messageLine(run({ deck: [] }), NOTHING, null, null)).toBe(LAST_HAND);
     });
   });
 });

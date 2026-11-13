@@ -11,7 +11,7 @@ import { Gear } from './board/pieces';
 // Classic's card holds CONTINUE (only with a saved game), QUICK MATCH and
 // SET THE TABLE, and grows to hold the third button. The "How to play" pill
 // (release 4, rulings 43, 105, 111) sits between the card and Privacy at the
-// bottom. No playing card, and nothing names The Run (ruling 32). Phone A's
+// bottom. No playing card (ruling 32). Phone A's
 // values (390 x 844) on phones 760px and taller, phone B's (375 x 667) below
 // that; both show everything with no scrolling.
 //

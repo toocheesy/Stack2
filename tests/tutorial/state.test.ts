@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  loadTutorialSeen,
-  setTutorialSeen,
-} from '../../src/tutorial/tutorialStorage';
+import { setTutorialSeen } from '../../src/tutorial/tutorialStorage';
 
 // localStorage mock for the Node test environment (same shape as audio tests).
 const mockStorage: { [k: string]: string } = {};
@@ -21,25 +18,15 @@ Object.defineProperty(globalThis, 'localStorage', {
 describe('tutorialStorage', () => {
   beforeEach(() => { (globalThis.localStorage as Storage).clear(); });
 
-  it('returns false when the key is absent (graceful default)', () => {
-    expect(loadTutorialSeen()).toBe(false);
+  it('writes seen=true under stacked.tutorial.v1', () => {
+    setTutorialSeen(true);
+    expect((globalThis.localStorage as Storage).getItem('stacked.tutorial.v1')).toBe(JSON.stringify({ seen: true }));
   });
 
-  it('round-trips seen=true through save/load', () => {
+  it('writes seen=false over seen=true', () => {
     setTutorialSeen(true);
-    expect(loadTutorialSeen()).toBe(true);
-  });
-
-  it('round-trips seen=false through save/load', () => {
-    setTutorialSeen(true);
-    expect(loadTutorialSeen()).toBe(true);
     setTutorialSeen(false);
-    expect(loadTutorialSeen()).toBe(false);
-  });
-
-  it('returns false on malformed JSON in the key', () => {
-    (globalThis.localStorage as Storage).setItem('stacked.tutorial.v1', '{bad');
-    expect(loadTutorialSeen()).toBe(false);
+    expect((globalThis.localStorage as Storage).getItem('stacked.tutorial.v1')).toBe(JSON.stringify({ seen: false }));
   });
 });
 

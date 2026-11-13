@@ -91,11 +91,11 @@ describe('the privacy page (PP3)', () => {
 
   it('the fonts come from /fonts/ on this site, every file exists, and the page asks nothing of any other site', () => {
     const faces = html.match(/@font-face\s*\{[^}]*\}/g) ?? [];
-    expect(faces).toHaveLength(4);
+    expect(faces).toHaveLength(3);
     const families = faces.map((f) => `${f.match(/font-family:\s*'([^']+)'/)![1]} ${f.match(/font-weight:\s*(\d+)/)![1]}`).sort();
-    expect(families).toEqual(['Abril Fatface 400', 'Josefin Sans 400', 'Josefin Sans 600', 'Josefin Sans 700']);
+    expect(families).toEqual(['Abril Fatface 400', 'Josefin Sans 400', 'Josefin Sans 700']);
     const urls = html.match(/url\(([^)]+)\)/g) ?? [];
-    expect(urls.length).toBe(4);
+    expect(urls.length).toBe(3);
     for (const u of urls) {
       const path = u.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '');
       expect(path.startsWith('/fonts/')).toBe(true);

@@ -19,9 +19,9 @@ const settings: GameSettings = {
 const PLAYER_FIRST_SEEDS = [1, 2, 4, 10, 11, 16, 17, 22, 23, 24, 26, 27, 30, 38, 39];
 const SAVED_SEED = 90210;
 
-function mount(seed: number, currentLevelId: number | null) {
+function mount(seed: number) {
   // The tutorial flag keeps the bots from moving.
-  return renderHook(() => useGameController(seed, settings, currentLevelId, true));
+  return renderHook(() => useGameController(seed, settings, true));
 }
 
 describe('the seed in analytics (S-006)', () => {
@@ -39,7 +39,7 @@ describe('the seed in analytics (S-006)', () => {
   });
 
   it('a new game reports the seed prop', () => {
-    const { result, unmount } = mount(4321, null);
+    const { result, unmount } = mount(4321);
     expect(result.current.wasResumed).toBe(false);
     expect(result.current.seed).toBe(4321);
     unmount();
@@ -54,7 +54,7 @@ describe('the seed in analytics (S-006)', () => {
       dealStream: 1,
       botStream: botStreamSeed(1),
     });
-    const { result, unmount } = mount(4321, null);
+    const { result, unmount } = mount(4321);
     expect(result.current.wasResumed).toBe(true);
     expect(result.current.seed).toBe(SAVED_SEED);
     unmount();
@@ -65,7 +65,7 @@ describe('the seed in analytics (S-006)', () => {
     window.gtag = gtag;
     let captured = false;
     for (const seed of PLAYER_FIRST_SEEDS) {
-      const { result, unmount } = mount(seed, null);
+      const { result, unmount } = mount(seed);
       const { hands, board } = result.current.state;
       expect(result.current.state.currentPlayer).toBe(0);
       // A pair: a hand card matching a board card's rank.

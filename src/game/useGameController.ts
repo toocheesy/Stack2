@@ -28,7 +28,7 @@ import { botStreamSeed, createPRNG, type PRNG } from '../engine/utils/prng';
 import { readCardMemory } from '../engine/ai/cardTracker';
 import { decideBotAction, getBotThinkingDelay, getPersonalityProfile } from '../engine/ai/botDecision';
 import { evaluateAllActions } from '../engine/ai/evaluator';
-import { saveGame, loadGame, clearSavedGame, saveModeFor } from './persistence';
+import { saveGame, loadGame, clearSavedGame } from './persistence';
 import { trackFirstCapture } from '../analytics/track';
 
 export interface GameActions {
@@ -41,21 +41,8 @@ export interface GameActions {
 }
 
 export interface BotVizStep {
-  type: 'thinking' | 'done';
+  type: 'thinking';
   playerIndex: PlayerIndex;
-}
-
-/** Kept for src/components/LastCapture.tsx (dead code, S-032). Nothing has
- *  produced one since D-007 release 2 replaced it with LastMove. */
-export interface LastCaptureInfo {
-  playerIndex: PlayerIndex;
-  playerName: string;
-  baseCard: Card | null;
-  comboCards: Card[];
-  areas: Card[][];
-  allCards: Card[];
-  points: number;
-  timestamp: number;
 }
 
 /** An opponent's capture on show in the tray (GB2 phone C): the Combination
@@ -156,13 +143,13 @@ function restAfterPlace(s: GameState, player: PlayerIndex, placedId: string): Ca
  *  Settings is open. While it is, no opponent moves and no moment carries
  *  on; closing the sheet carries on from where the game stood. It began as
  *  the tutorial's freeze and keeps that freeze's gates. */
-export function useGameController(seed: number, settings: GameSettings, currentLevelId: number | null, paused: boolean = false) {
-  // Set up once, on mount (S-006): the save for this mode if there is one, the
+export function useGameController(seed: number, settings: GameSettings, paused: boolean = false) {
+  // Set up once, on mount (S-006): the saved game if there is one, the
   // game seed (the seed prop for a new game, the save's own for a resumed one)
   // and the two streams from it: prngRef deals, botPrngRef feeds the bots. A
   // resumed game's streams carry on from where the save left them.
   const [mount] = useState(() => {
-    const saved = loadGame(saveModeFor(currentLevelId), seed);
+    const saved = loadGame('classic', seed);
     return saved
       ? { saved, seed: saved.seed, dealPrng: createPRNG(saved.dealStream), botPrng: createPRNG(saved.botStream) }
       : { saved: null, seed, dealPrng: createPRNG(seed), botPrng: createPRNG(botStreamSeed(seed)) };
@@ -208,12 +195,6 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     return createInitialState(settings, prngRef.current);
   });
 
-  // Per-mode split: latest currentLevelId flows through a ref so every
-  // setAndPersist call writes the right discriminator (null = Classic,
-  // number = Run level id). Future-proofs if level id changes mid-mount.
-  const currentLevelIdRef = useRef(currentLevelId);
-  currentLevelIdRef.current = currentLevelId;
-
   // Analytics: time the player's first capture from mount.
   const gameStartedAtRef = useRef(Date.now());
   const firstCaptureFiredRef = useRef(false);
@@ -221,9 +202,9 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   const setAndPersist = useCallback((s: GameState) => {
     setState(s);
     stateRef.current = s;
-    saveGame(saveModeFor(currentLevelIdRef.current), {
+    saveGame('classic', {
       game: s,
-      currentLevelId: currentLevelIdRef.current,
+      currentLevelId: null,
       seed: seedRef.current,
       dealStream: prngRef.current.getSeed(),
       botStream: botPrngRef.current.getSeed(),
@@ -256,9 +237,9 @@ export function useGameController(seed: number, settings: GameSettings, currentL
   // A new Classic game is saved the moment it is dealt (D-007 ruling 110), so
   // leaving before anyone has moved keeps it for CONTINUE. The save is the
   // one setAndPersist writes, written now instead of at the first move. A
-  // resumed game is left as it was loaded; The Run's games save as they did.
+  // resumed game is left as it was loaded.
   useEffect(() => {
-    if (mount.saved !== null || currentLevelIdRef.current !== null) return;
+    if (mount.saved !== null) return;
     saveGame('classic', {
       game: stateRef.current,
       currentLevelId: null,
@@ -346,7 +327,7 @@ export function useGameController(seed: number, settings: GameSettings, currentL
         }
         const finalState = { ...stateRef.current, gamePhase: 'gameOver' as const };
         setAndPersist(finalState);
-        clearSavedGame(saveModeFor(currentLevelIdRef.current));
+        clearSavedGame('classic');
         setGameOver({
           winner: result.winner,
           winnerName: result.winnerName,
@@ -656,10 +637,8 @@ export function useGameController(seed: number, settings: GameSettings, currentL
     const next = executeCapture(s, s.combination);
     if (!firstCaptureFiredRef.current && !wasResumedRef.current) {
       firstCaptureFiredRef.current = true;
-      const levelId = currentLevelIdRef.current;
       trackFirstCapture({
-        mode: levelId === null ? 'classic' : 'run',
-        level_id: levelId ?? undefined,
+        mode: 'classic',
         time_to_first_capture_ms: Date.now() - gameStartedAtRef.current,
         seed: seedRef.current,
       });
@@ -880,23 +859,8 @@ const LINE = {
   lastHand: 'Last hand: the deck is empty. When the round ends, the last player to capture takes every card left on the table.',
 } as const;
 
-// The Run's hint strip, its words unchanged. In a level with it on, it shows
-// in place of the after-your-move, building and whose-turn lines.
-const HINT = {
-  watch: 'Watch the opponents play their turn',
-  invalid: 'Combo groups must sum (or match) the base card value',
-  valid: 'Tap SUBMIT to capture, or RESET to clear',
-  start: 'Drag a card to start your turn',
-} as const;
-
 function article(rank: Rank): string {
   return rank === '8' || rank === 'A' ? 'an' : 'a';
-}
-
-function runHint(state: GameState, build: Combination): string {
-  if (state.currentPlayer !== 0) return HINT.watch;
-  if (hasStaged(build)) return validateFullCombo(state, build).isValid ? HINT.valid : HINT.invalid;
-  return HINT.start;
 }
 
 function buildLine(state: GameState, build: Combination): string {
@@ -935,11 +899,8 @@ function lastCardsLine(state: GameState, last: LastMove): string {
  *  3. an opponent's capture replays;
  *  4. while you build: mixed, kings, base source, aces, 10s, base source;
  *  5. the last hand;
- *  6. whose turn it is.
- *  In a Run level with its hint strip on, the strip's text shows in place of
- *  2, 4 and 6. */
+ *  6. whose turn it is. */
 export function messageLine(state: GameState, build: Combination, last: LastMove | null, replay: BotComboDisplay | null): string {
-  const hint = state.settings.hintStripEnabled && state.gamePhase === 'playing' ? runHint(state, build) : null;
   const sameHand = last !== null && last.round === state.currentRound && last.hand === state.handNumber;
 
   // 1. The last cards, from the moment Law 8 places the rest of a hand until the next hand is dealt.
@@ -950,11 +911,11 @@ export function messageLine(state: GameState, build: Combination, last: LastMove
   // 2. After your move, until you stage a card or the next player moves.
   if (last && sameHand && last.player === 0 && !hasStaged(build)) {
     if (last.placed) {
-      return hint ?? `You placed ${article(last.placed.rank)} ${last.placed.rank}. Placing ends your turn; there is no pass.`;
+      return `You placed ${article(last.placed.rank)} ${last.placed.rank}. Placing ends your turn; there is no pass.`;
     }
     const held = state.hands[0].length;
-    if (held > 0) return hint ?? `Your turn continues: you still hold ${held} ${held === 1 ? 'card' : 'cards'}.`;
-    if (last.next !== null) return hint ?? `Your turn ends: your hand is empty. ${playerName(state, last.next)} is next.`;
+    if (held > 0) return `Your turn continues: you still hold ${held} ${held === 1 ? 'card' : 'cards'}.`;
+    if (last.next !== null) return `Your turn ends: your hand is empty. ${playerName(state, last.next)} is next.`;
   }
 
   // 3. An opponent's capture replays.
@@ -966,12 +927,11 @@ export function messageLine(state: GameState, build: Combination, last: LastMove
   }
 
   // 4. While you build.
-  if (build.base && state.currentPlayer === 0) return hint ?? buildLine(state, build);
+  if (build.base && state.currentPlayer === 0) return buildLine(state, build);
 
   // 5. The last hand.
   if (state.gamePhase === 'playing' && state.deck.length === 0) return LINE.lastHand;
 
   // 6. Whose turn it is.
-  if (hint) return hint;
   return state.currentPlayer === 0 ? LINE.yourTurn : `${opponentName(state, state.currentPlayer)}'s turn.`;
 }

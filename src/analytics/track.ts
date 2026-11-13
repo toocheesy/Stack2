@@ -69,7 +69,7 @@ export function initAnalytics(hostname?: string): void {
   document.head.appendChild(script);
 }
 
-type GameMode = 'classic' | 'run';
+type GameMode = 'classic';
 
 function emit(name: string, params: Record<string, unknown> = {}): void {
   if (typeof window === 'undefined' || typeof window.gtag !== 'function') return;
@@ -79,7 +79,6 @@ function emit(name: string, params: Record<string, unknown> = {}): void {
 
 export function trackGameStart(params: {
   mode: GameMode;
-  level_id?: number;
   resumed: boolean;
   seed: number;
 }): void {
@@ -96,7 +95,6 @@ export function trackTutorialComplete(params: {
 
 export function trackFirstCapture(params: {
   mode: GameMode;
-  level_id?: number;
   time_to_first_capture_ms: number;
   seed: number;
 }): void {
@@ -109,15 +107,8 @@ export function trackGameEnd(params: {
   score: number;
   seed: number;
   duration_ms: number;
-  level_id?: number;
-  stars?: 0 | 1 | 2 | 3;
-  margin?: number;
 }): void {
   emit('game_end', params);
-}
-
-export function trackRunComplete(params: { total_stars: number }): void {
-  emit('run_complete', params);
 }
 
 export function trackPwaInstalled(params: { source: 'appinstalled' | 'standalone_first_run' }): void {

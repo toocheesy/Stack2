@@ -19,7 +19,7 @@ const SEED = 11;
 const WELL_PAST = 10_000;
 
 function mount(seed: number) {
-  return renderHook(() => useGameController(seed, settings, null, false));
+  return renderHook(() => useGameController(seed, settings, false));
 }
 
 async function advance(ms: number) {
@@ -72,7 +72,7 @@ function movedOn(s: GameState): boolean {
   return s.handNumber > 1 || s.gamePhase === 'roundEnd';
 }
 
-describe('RULES.md Law 8: the last player holding cards', () => {
+describe('Law 8: the last player holding cards', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.useFakeTimers();

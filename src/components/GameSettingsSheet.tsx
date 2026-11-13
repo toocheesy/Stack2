@@ -16,7 +16,7 @@ import { CARD_GLOW, SHEET_DIM, cardMotion } from './board/sheet';
 
 interface Props {
   open: boolean;
-  /** "CLASSIC" or "THE RUN". */
+  /** "CLASSIC". */
   modeWord: string;
   round: number;
   hand: number;

@@ -96,7 +96,6 @@ export interface GameSettings {
   targetScore: number;
   bot1Personality: Difficulty;
   bot2Personality: Difficulty;
-  hintStripEnabled?: boolean;
   disableSeatingSwap?: boolean;
 }
 

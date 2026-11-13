@@ -87,7 +87,6 @@ export function validateFullCombo(
   if (!base) {
     return {
       isValid: false,
-      validSlots: [],
       allCapturedCards: [],
       totalPoints: 0,
       errors: ['Base card is required'],
@@ -154,7 +153,6 @@ export function validateFullCombo(
 
   return {
     isValid: errors.length === 0,
-    validSlots: slotValidations,
     allCapturedCards,
     totalPoints,
     errors,
@@ -289,5 +287,5 @@ export function findBestMultiSlotCapture(
     type: opt.type,
   }));
 
-  return { handCard, slots, totalPoints: best.total };
+  return { slots, totalPoints: best.total };
 }

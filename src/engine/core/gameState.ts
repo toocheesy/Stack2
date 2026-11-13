@@ -10,7 +10,7 @@ import type {
   RoundStats,
   Scores,
 } from '../types';
-import { PLAYER_NAMES, SCORE_KEYS } from '../types';
+import { SCORE_KEYS } from '../types';
 import type { PRNG } from '../utils/prng';
 import { createDeck, shuffleDeck } from '../utils/deck';
 import { validateFullCombo } from './captureValidator';
@@ -64,10 +64,8 @@ export function createInitialState(
   settings: GameSettings,
   prng: PRNG,
 ): GameState {
-  // Randomize bot seating: 50/50 coin flip swaps bot1 ↔ bot2.
-  // Adventure mode disables this (settings.disableSeatingSwap === true) so
-  // bot pairings stay deterministic per the level config.
-  const swapBots = settings.disableSeatingSwap ? false : prng.next() < 0.5;
+  // RULES.md Classic rule 5: a 50/50 coin flip swaps bot1 ↔ bot2.
+  const swapBots = prng.next() < 0.5;
   const finalSettings = swapBots
     ? { ...settings, bot1Personality: settings.bot2Personality, bot2Personality: settings.bot1Personality }
     : settings;
@@ -120,13 +118,6 @@ export function dealNewHand(state: GameState): GameState {
     deck = remaining;
   }
   return { ...state, deck, hands, handNumber: state.handNumber + 1 };
-}
-
-export function nextPlayer(state: GameState): GameState {
-  return {
-    ...state,
-    currentPlayer: ((state.currentPlayer + 1) % 3) as PlayerIndex,
-  };
 }
 
 export function addScore(
@@ -263,13 +254,12 @@ export function applyJackpot(state: GameState): {
   const player = state.lastCapturer;
   const points = calculateCardsPoints(state.board);
   const cardCount = state.board.length;
-  const message = `${PLAYER_NAMES[player]} sweeps ${cardCount} board cards for ${points} points`;
   const scored = addScore(state, player, points);
   const roundStats = [...scored.roundStats] as [RoundStats, RoundStats, RoundStats];
   roundStats[player] = { ...roundStats[player], tookTheTable: true };
   return {
     state: { ...scored, roundStats, board: [] },
-    jackpotResult: { player, points, cardCount, message },
+    jackpotResult: { player, points, cardCount },
   };
 }
 

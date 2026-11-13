@@ -32,7 +32,6 @@ const classicSettings: GameSettings = {
   targetScore: 300,
   bot1Personality: 'intermediate',
   bot2Personality: 'advanced',
-  disableSeatingSwap: true,
 };
 
 function yourTurn(settings: GameSettings): GameState {

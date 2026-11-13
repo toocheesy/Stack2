@@ -5,7 +5,6 @@ import {
   createInitialState,
   dealNewHand,
   executeCapture,
-  nextPlayer,
   placeCard,
   placeRestOfHand,
   resetCombination,
@@ -108,14 +107,6 @@ describe('dealNewHand', () => {
     const s = makeState();
     const dealt = dealNewHand(s);
     expect(dealt).not.toBe(s);
-  });
-});
-
-describe('nextPlayer', () => {
-  it('advances currentPlayer mod 3', () => {
-    const s = { ...makeState(), currentPlayer: 0 as 0 | 1 | 2 };
-    expect(nextPlayer(s).currentPlayer).toBe(1);
-    expect(nextPlayer({ ...s, currentPlayer: 2 }).currentPlayer).toBe(0);
   });
 });
 

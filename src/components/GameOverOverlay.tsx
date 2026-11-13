@@ -17,7 +17,7 @@ import { captureLine } from './board/words';
 const NAMES: Record<Difficulty, string> = { beginner: 'Calvin', intermediate: 'Nina', advanced: 'Rex', expert: 'Jett' };
 
 interface Props {
-  winner: { winner: PlayerIndex; winnerName: string } | null;
+  winner: { winner: PlayerIndex } | null;
   state: GameState;
   onPlayAgain: () => void;
   onHome: () => void;

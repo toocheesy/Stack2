@@ -9,7 +9,6 @@ import {
 } from '../gameState';
 import { determineTurnResult } from '../turnManager';
 import { createPRNG } from '../../utils/prng';
-import { PLAYER_NAMES } from '../../types';
 import type { Card, GameSettings, GameState, PlayerIndex } from '../../types';
 import { RANK_VALUES } from '../../types';
 
@@ -280,7 +279,6 @@ describe('overtime tie-breaker (RULES.md Law 11)', () => {
     expect(r.type).toBe('END_GAME');
     if (r.type === 'END_GAME') {
       expect(r.winner).toBe(0);
-      expect(r.winnerName).toBe(PLAYER_NAMES[0]);
     }
   });
 

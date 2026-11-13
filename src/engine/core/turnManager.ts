@@ -1,11 +1,5 @@
-import type {
-  GameState,
-  JackpotResult,
-  PlayerIndex,
-  Scores,
-  TurnResult,
-} from '../types';
-import { PLAYER_NAMES, SCORE_KEYS } from '../types';
+import type { GameState, PlayerIndex, Scores, TurnResult } from '../types';
+import { SCORE_KEYS } from '../types';
 import { calculateCardsPoints } from './scoring';
 
 export function findNextPlayerWithCards(
@@ -24,28 +18,11 @@ function anyPlayerHasCards(state: GameState): boolean {
   return state.hands.some((h) => h.length > 0);
 }
 
-function projectJackpot(state: GameState): {
-  jackpotResult: JackpotResult | null;
-  projectedOverall: Scores;
-} {
-  if (state.lastCapturer === null || state.board.length === 0) {
-    return { jackpotResult: null, projectedOverall: state.overallScores };
-  }
-  const player = state.lastCapturer;
-  const points = calculateCardsPoints(state.board);
-  const cardCount = state.board.length;
-  const jackpotResult: JackpotResult = {
-    player,
-    points,
-    cardCount,
-    message: `${PLAYER_NAMES[player]} sweeps ${cardCount} board cards for ${points} points`,
-  };
-  const key = SCORE_KEYS[player];
-  const projectedOverall: Scores = {
-    ...state.overallScores,
-    [key]: state.overallScores[key] + points,
-  };
-  return { jackpotResult, projectedOverall };
+// The overall scores once the round's last capturer takes the table (RULES.md Law 10).
+function projectedScores(state: GameState): Scores {
+  if (state.lastCapturer === null || state.board.length === 0) return state.overallScores;
+  const key = SCORE_KEYS[state.lastCapturer];
+  return { ...state.overallScores, [key]: state.overallScores[key] + calculateCardsPoints(state.board) };
 }
 
 export function determineTurnResult(state: GameState): TurnResult {
@@ -66,9 +43,8 @@ export function determineTurnResult(state: GameState): TurnResult {
     return { type: 'DEAL_NEW_HAND', startingPlayer };
   }
 
-  const { jackpotResult, projectedOverall } = projectJackpot(state);
+  const projectedOverall = projectedScores(state);
   const target = state.settings.targetScore;
-  const newDealer = ((state.currentDealer + 1) % 3) as PlayerIndex;
 
   const indices: PlayerIndex[] = [0, 1, 2];
   const maxScore = Math.max(...indices.map((i) => projectedOverall[SCORE_KEYS[i]]));
@@ -76,32 +52,13 @@ export function determineTurnResult(state: GameState): TurnResult {
 
   if (maxScore >= target) {
     if (leaders.length === 1) {
-      const winner = leaders[0];
-      return {
-        type: 'END_GAME',
-        scores: projectedOverall,
-        jackpotResult,
-        winner,
-        winnerName: PLAYER_NAMES[winner],
-      };
+      return { type: 'END_GAME', winner: leaders[0] };
     }
     // RULES.md Law 11 — tied leaders at/above target trigger overtime.
     // Game does NOT end. Continue into a new round; recursion is automatic
     // via re-entry into determineTurnResult at the next round boundary.
-    return {
-      type: 'END_ROUND',
-      scores: projectedOverall,
-      jackpotResult,
-      newDealer,
-      isOvertime: true,
-    };
+    return { type: 'END_ROUND', isOvertime: true };
   }
 
-  return {
-    type: 'END_ROUND',
-    scores: projectedOverall,
-    jackpotResult,
-    newDealer,
-    isOvertime: false,
-  };
+  return { type: 'END_ROUND', isOvertime: false };
 }

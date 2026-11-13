@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { calculateCardPoints, calculateCardsPoints, getRankedPlayers } from '../../../src/engine/core/scoring';
-import type { Card, GameState } from '../../../src/engine/types';
+import { calculateCardPoints, calculateCardsPoints } from '../../../src/engine/core/scoring';
+import type { Card } from '../../../src/engine/types';
 
 function makeCard(id: string, rank: Card['rank']): Card {
   return { id, rank, suit: 'hearts', value: 0 };
@@ -30,14 +30,5 @@ describe('scoring', () => {
   it('calculateCardsPoints sums', () => {
     const cards = [makeCard('a', 'A'), makeCard('k', 'K'), makeCard('5', '5')];
     expect(calculateCardsPoints(cards)).toBe(15 + 10 + 5);
-  });
-
-  it('getRankedPlayers sorts descending by overallScores', () => {
-    const state = {
-      overallScores: { player: 100, bot1: 200, bot2: 150 },
-    } as GameState;
-    const ranked = getRankedPlayers(state);
-    expect(ranked.map((r) => r.index)).toEqual([1, 2, 0]);
-    expect(ranked[0].score).toBe(200);
   });
 });

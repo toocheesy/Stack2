@@ -13,7 +13,6 @@ export const BOT_COLOURS: Record<Difficulty, string> = {
 };
 
 export interface Seat {
-  player: 1 | 2;
   /** The name on the seat; when both seats hold one personality, with its seat number. */
   name: string;
   colour: string;
@@ -23,5 +22,5 @@ export function seatOf(state: GameState, player: 1 | 2): Seat {
   const difficulty = player === 1 ? state.settings.bot1Personality : state.settings.bot2Personality;
   const same = state.settings.bot1Personality === state.settings.bot2Personality;
   const name = opponentName(state, player);
-  return { player, name: same ? `${name} · ${player}` : name, colour: BOT_COLOURS[difficulty] };
+  return { name: same ? `${name} · ${player}` : name, colour: BOT_COLOURS[difficulty] };
 }

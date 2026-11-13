@@ -65,7 +65,7 @@ interface Props {
   lastCapture: LastMove | null;
   /** Take the Table on show (useGameController's TakeTheTableMoment), under App.tsx's name for it. */
   jackpotInfo: JackpotDisplay | null;
-  gameOver: { winner: number; winnerName: string } | null;
+  gameOver: { winner: number } | null;
   actions: GameActions;
   onQuit: () => void;
   onHome: () => void;
@@ -504,7 +504,7 @@ export function GameView({
         modeWord={mode}
         paused={paused}
       />
-      <GameOverOverlay winner={gameOver as { winner: PlayerIndex; winnerName: string } | null} state={state} onPlayAgain={onPlayAgain} onHome={onHome} />
+      <GameOverOverlay winner={gameOver as { winner: PlayerIndex } | null} state={state} onPlayAgain={onPlayAgain} onHome={onHome} />
 
       {/* ═══ THE PAUSES (D-007 release 2 part 3) ═══ */}
       <LeaveSheet

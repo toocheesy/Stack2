@@ -21,7 +21,7 @@ function mount(seed: number, settings: GameSettings) {
   return renderHook(() => useGameController(seed, settings, true));
 }
 
-describe('two save slots (S-006)', () => {
+describe('the Classic save slot (S-006)', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.useFakeTimers();
@@ -39,7 +39,6 @@ describe('two save slots (S-006)', () => {
     const dealStream = 0xabcdef;
     saveGame('classic', {
       game,
-      currentLevelId: null,
       seed: SEED_PLAYER_FIRST,
       dealStream,
       botStream: 0x123456,
@@ -52,7 +51,7 @@ describe('two save slots (S-006)', () => {
       result.current.actions.placeCard(result.current.state.hands[0][0].id);
     });
 
-    const after = loadGame('classic', 0)!;
+    const after = loadGame('classic')!;
     expect(after.seed).toBe(SEED_PLAYER_FIRST);
     // No deal happened, so the deal stream stands where the save left it.
     expect(after.dealStream).toBe(dealStream);

@@ -74,7 +74,6 @@ export type CardSource = 'hand' | 'board';
 export interface CaptureGroup {
   card: Card;
   source: CardSource;
-  originalIndex: number;
 }
 
 export interface Combination {
@@ -116,7 +115,6 @@ export interface GameState {
   gamePhase: GamePhase;
   roundStats: [RoundStats, RoundStats, RoundStats];
   gameStats: [GamePlayerStats, GamePlayerStats, GamePlayerStats];
-  dumpActive: boolean;
   // RULES.md Law 11 — true during gamePhase === 'roundEnd' when the round-end
   // was triggered by tied leaders at/above target (overtime continuation).
   isOvertime: boolean;
@@ -164,7 +162,7 @@ export interface MultiSlotCapture {
 }
 
 export type TurnResult =
-  | { type: 'CONTINUE_TURN'; nextPlayer: PlayerIndex; dumpActive?: boolean }
+  | { type: 'CONTINUE_TURN'; nextPlayer: PlayerIndex }
   | { type: 'DEAL_NEW_HAND'; startingPlayer: PlayerIndex }
   | {
       type: 'END_ROUND';

@@ -58,13 +58,12 @@ describe('resume keeps the deal (S-006)', () => {
 
     saveGame('classic', {
       game: paused.state,
-      currentLevelId: null,
       seed,
       dealStream: paused.dealStream,
       botStream: paused.botStream,
     });
     // The mount seed is not used for a resumed game.
-    const loaded = loadGame('classic', 999_999)!;
+    const loaded = loadGame('classic')!;
     expect(loaded).not.toBeNull();
     expect(loaded.seed).toBe(seed);
     expect(loaded.dealStream).toBe(paused.dealStream);

@@ -101,7 +101,7 @@ describe('a game saves when it is dealt (ruling 110)', () => {
     expect(localStorage.getItem(SAVE_KEY)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'QUICK MATCH' }));
     // Saved at the tap, as it was dealt.
-    const dealt = loadGame('classic', 0)!;
+    const dealt = loadGame('classic')!;
     expect(dealt).not.toBeNull();
     expect(dealt.seed).toBe(seed);
     expect(dealt.game.currentPlayer).toBe(0);
@@ -140,7 +140,7 @@ describe('a game saves when it is dealt (ruling 110)', () => {
   it('CONTINUE on an existing save does not change it', async () => {
     const game = createInitialState(settings, createPRNG(DEAL_SEED));
     expect(game.currentPlayer).toBe(0);
-    saveGame('classic', { game, currentLevelId: null, seed: CLASSIC_SEED, dealStream: DEAL_SEED, botStream: botStreamSeed(DEAL_SEED) });
+    saveGame('classic', { game, seed: CLASSIC_SEED, dealStream: DEAL_SEED, botStream: botStreamSeed(DEAL_SEED) });
     const raw = localStorage.getItem(SAVE_KEY);
 
     render(<App />);
@@ -162,7 +162,7 @@ describe('a game saves when it is dealt (ruling 110)', () => {
     fireEvent.click(screen.getByRole('button', { name: /Nina/ }));
     expect(localStorage.getItem(SAVE_KEY)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'DEAL ME IN' }));
-    const dealt = loadGame('classic', 0)!;
+    const dealt = loadGame('classic')!;
     expect(dealt).not.toBeNull();
     expect(dealt.game.hands.map((h) => h.length)).toEqual([4, 4, 4]);
     // The two picked, in the seats the engine's coin flip gave them (RULES.md Classic rule 5).

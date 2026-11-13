@@ -16,7 +16,6 @@ import {
   dealNewHand,
   executeCapture,
   placeCard,
-  placeRestOfHand,
   resetCombination,
   applyJackpot,
   startNewRound,
@@ -149,7 +148,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
   // and the two streams from it: prngRef deals, botPrngRef feeds the bots. A
   // resumed game's streams carry on from where the save left them.
   const [mount] = useState(() => {
-    const saved = loadGame('classic', seed);
+    const saved = loadGame('classic');
     return saved
       ? { saved, seed: saved.seed, dealPrng: createPRNG(saved.dealStream), botPrng: createPRNG(saved.botStream) }
       : { saved: null, seed, dealPrng: createPRNG(seed), botPrng: createPRNG(botStreamSeed(seed)) };
@@ -176,20 +175,11 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
   // and first_capture is suppressed on resumed games (player isn't making
   // their literal first capture — they're picking up a game in progress).
   const wasResumedRef = useRef(false);
-  // Set when a loaded save needs play moved on at mount (see below); the
-  // bot-turn effect consumes it once the tutorial isn't open.
-  const pendingAdvanceRef = useRef(false);
 
   const [state, setState] = useState<GameState>(() => {
     const saved = mount.saved;
     if (saved) {
       wasResumedRef.current = true;
-      if (saved.game.dumpActive) {
-        // A save made under the old place-only lock, before RULES.md Law 8 was
-        // in the game: the game places the rest of that hand now.
-        pendingAdvanceRef.current = true;
-        return { ...placeRestOfHand(saved.game), dumpActive: false };
-      }
       return saved.game;
     }
     return createInitialState(settings, prngRef.current);
@@ -204,7 +194,6 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
     stateRef.current = s;
     saveGame('classic', {
       game: s,
-      currentLevelId: null,
       seed: seedRef.current,
       dealStream: prngRef.current.getSeed(),
       botStream: botPrngRef.current.getSeed(),
@@ -242,7 +231,6 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
     if (mount.saved !== null) return;
     saveGame('classic', {
       game: stateRef.current,
-      currentLevelId: null,
       seed: seedRef.current,
       dealStream: prngRef.current.getSeed(),
       botStream: botPrngRef.current.getSeed(),
@@ -263,7 +251,6 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
         const next = {
           ...current,
           currentPlayer: result.nextPlayer,
-          dumpActive: result.dumpActive ?? current.dumpActive,
         };
         setAndPersist(next);
         if (result.nextPlayer !== 0) {
@@ -445,7 +432,6 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
       const combo = botCaptureToCombination(
         decision.handCard,
         decision.captureDetails.slots,
-        current.board,
       );
       const validation = validateFullCombo(current, combo);
       if (validation.isValid) {
@@ -543,11 +529,6 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
       held.forEach((resume) => resume());
       return;
     }
-    if (pendingAdvanceRef.current) {
-      pendingAdvanceRef.current = false;
-      void advanceRef.current(stateRef.current);
-      return;
-    }
     if (botBusyRef.current || gameOver) return;
     const s = stateRef.current;
     if (s.currentPlayer !== 0) {
@@ -609,13 +590,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
           const newIsMatch = card.rank === combo.base.rank;
           if (firstIsMatch !== newIsMatch) return;
         }
-        const idx =
-          source === 'hand'
-            ? s.hands[0].findIndex((c) => c.id === cardId)
-            : s.board.findIndex((c) => c.id === cardId);
-        combo[slot] = combo[slot].concat([
-          { card, source, originalIndex: idx },
-        ]);
+        combo[slot] = combo[slot].concat([{ card, source }]);
       }
 
       const next = { ...s, combination: combo };

@@ -51,7 +51,6 @@ function state(overrides: Partial<GameState>): GameState {
       { highestCapture: null },
       { highestCapture: null },
     ],
-    dumpActive: false,
     isOvertime: false,
     ...overrides,
   };
@@ -159,17 +158,6 @@ describe('determineTurnResult', () => {
     const r = determineTurnResult(s);
     if (r.type !== 'CONTINUE_TURN') throw new Error('expected CONTINUE_TURN');
     expect(r.nextPlayer).toBe(2);
-  });
-
-  it('normal CONTINUE_TURN does not signal dumpActive', () => {
-    const s = state({
-      currentPlayer: 0,
-      hands: [[card('2')], [card('5')], [card('A')]],
-      lastAction: 'place',
-    });
-    const r = determineTurnResult(s);
-    if (r.type !== 'CONTINUE_TURN') throw new Error('expected CONTINUE_TURN');
-    expect(r.dumpActive).toBeFalsy();
   });
 
   it('all empty + deck >= 12 → DEAL_NEW_HAND', () => {

@@ -25,7 +25,7 @@ function card(rank: Rank, suit: Suit = 'hearts'): Card {
 }
 
 function group(c: Card, source: 'hand' | 'board' = 'board'): CaptureGroup {
-  return { card: c, source, originalIndex: 0 };
+  return { card: c, source };
 }
 
 function minimalState(overrides: Partial<GameState>): GameState {
@@ -57,7 +57,6 @@ function minimalState(overrides: Partial<GameState>): GameState {
       { highestCapture: null },
       { highestCapture: null },
     ],
-    dumpActive: false,
     isOvertime: false,
     ...overrides,
   };

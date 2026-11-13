@@ -66,7 +66,7 @@ describe('PLAY AGAIN after CONTINUE', () => {
       currentPlayer: 1,
       overallScores: { player: 40, bot1: 100, bot2: 30 },
     };
-    saveGame('classic', { game, currentLevelId: null, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
+    saveGame('classic', { game, seed: SEED, dealStream: SEED, botStream: botStreamSeed(SEED) });
 
     render(<App />);
     fireEvent.click(screen.getByText('CONTINUE'));

@@ -62,8 +62,8 @@ function sampleCard(id: string, rank: Card['rank'], suit: Card['suit']): Card {
 const SAMPLE: Combination = {
   base: sampleCard('10D', '10', 'diamonds'),
   combo1: [
-    { card: sampleCard('6C', '6', 'clubs'), source: 'board', originalIndex: 0 },
-    { card: sampleCard('4H', '4', 'hearts'), source: 'board', originalIndex: 1 },
+    { card: sampleCard('6C', '6', 'clubs'), source: 'board' },
+    { card: sampleCard('4H', '4', 'hearts'), source: 'board' },
   ],
   combo2: [],
   combo3: [],

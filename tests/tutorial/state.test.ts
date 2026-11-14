@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { setTutorialSeen } from '../../src/tutorial/tutorialStorage';
 
-// localStorage mock for the Node test environment (same shape as audio tests).
+// localStorage mock for the Node test environment.
 const mockStorage: { [k: string]: string } = {};
 Object.defineProperty(globalThis, 'localStorage', {
   value: {

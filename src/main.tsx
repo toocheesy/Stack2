@@ -41,7 +41,6 @@ if (import.meta.env.DEV) {
   try {
     const params = new URLSearchParams(window.location.search);
     if (params.has('reset')) {
-      localStorage.removeItem('stacked-v2-game');
       localStorage.removeItem('stacked-save-classic');
       params.delete('reset');
       const q = params.toString();

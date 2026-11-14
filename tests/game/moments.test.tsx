@@ -10,7 +10,7 @@ import type { Card, GameSettings, GameState, PlayerIndex } from '../../src/engin
 // D-007 release 2, part 2: when play moves on around the moments. The state
 // changes the instant a move is made (the engine's reads stay true); only the
 // next turn, the next deal and the round end wait for the motion.
-// Seats are fixed: Rex (advanced) in seat 1, Nina (intermediate) in seat 2.
+// Seed 22's coin flip seats Rex (advanced) in seat 1, Nina (intermediate) in seat 2.
 
 const settings: GameSettings = {
   targetScore: 100,
@@ -30,9 +30,9 @@ async function advance(ms: number) {
   });
 }
 
-async function advanceUntil(done: () => boolean, limitMs = WELL_PAST) {
+async function advanceUntil(done: () => boolean) {
   const step = 50;
-  for (let t = 0; t < limitMs; t += step) {
+  for (let t = 0; t < WELL_PAST; t += step) {
     if (done()) return;
     await advance(step);
   }
@@ -104,7 +104,7 @@ describe('when play moves on around the moments', () => {
     expect(result.current.botViz).toBeNull();
     await advance(100);
     expect(result.current.state.currentPlayer).toBe(1);
-    expect(result.current.botViz).toEqual({ type: 'thinking', playerIndex: 1 });
+    expect(result.current.botViz).toEqual({ playerIndex: 1 });
   });
 
   it('a capture with cards left goes on at once, and each move gets a new id', async () => {
@@ -198,6 +198,6 @@ describe('when play moves on around the moments', () => {
     const { result } = mount();
     await advance(0);
     expect(result.current.state.currentPlayer).toBe(1);
-    expect(result.current.botViz).toEqual({ type: 'thinking', playerIndex: 1 });
+    expect(result.current.botViz).toEqual({ playerIndex: 1 });
   });
 });

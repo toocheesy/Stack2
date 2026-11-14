@@ -154,7 +154,7 @@ export function executeCapture(
   combination: Combination,
 ): GameState {
   const validation = validateFullCombo(state, combination);
-  if (!validation.isValid) {
+  if (!validation.isValid || !combination.base) {
     throw new Error(`executeCapture: ${validation.errors[0] ?? 'Invalid combo'}`);
   }
   const { allCapturedCards, totalPoints } = validation;
@@ -170,20 +170,17 @@ export function executeCapture(
 
   let result = addScore(state, state.currentPlayer, totalPoints);
 
-  const baseCard = combination.base ?? allCapturedCards[0];
-  if (baseCard) {
-    // The record keeps the capture's shape: each filled combo's cards in slot
-    // order, the base apart (D-007 ruling 96).
-    const combos = [combination.combo1, combination.combo2, combination.combo3]
-      .filter((groups) => groups.length > 0)
-      .map((groups) => groups.map((g) => g.card));
-    result = maybeUpdateHighest(result, state.currentPlayer, {
-      points: totalPoints,
-      cards: allCapturedCards,
-      baseCard,
-      combos,
-    });
-  }
+  // The record keeps the capture's shape: each filled combo's cards in slot
+  // order, the base apart (D-007 ruling 96).
+  const combos = [combination.combo1, combination.combo2, combination.combo3]
+    .filter((groups) => groups.length > 0)
+    .map((groups) => groups.map((g) => g.card));
+  result = maybeUpdateHighest(result, state.currentPlayer, {
+    points: totalPoints,
+    cards: allCapturedCards,
+    baseCard: combination.base,
+    combos,
+  });
 
   return {
     ...result,

@@ -103,7 +103,6 @@ export type CaptureType = 'pair' | 'sum';
 
 export interface SlotValidation {
   isValid: boolean;
-  captureType: CaptureType | null;
   details: string;
 }
 

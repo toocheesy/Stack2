@@ -18,10 +18,10 @@ const settings: GameSettings = {
   bot2Personality: 'beginner',
 };
 
-function makeState(seed = 42): GameState {
+function makeState(): GameState {
   return createInitialState(
     settings,
-    createPRNG(seed),
+    createPRNG(42),
   );
 }
 

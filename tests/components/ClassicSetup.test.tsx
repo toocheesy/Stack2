@@ -69,7 +69,7 @@ describe('Classic Setup (CS1)', () => {
     expect(screen.queryByText(/unlock/i)).toBeNull();
   });
 
-  it('Jett can be picked with no Run progress', () => {
+  it('Jett can be picked', () => {
     fireEvent.click(row('Jett'));
     expect(row('Jett').getAttribute('aria-pressed')).toBe('true');
     expect(screen.getAllByText('PICKED')).toHaveLength(1);

@@ -16,11 +16,11 @@ const fromTable = (card: Card): CaptureGroup => ({ card, source: 'board' });
 
 // A real deal rearranged: the hands and the table the case needs, the deck
 // the rest of the pack, so no card is in two places.
-function arrange(over: { hand?: string[]; bot1?: string[]; bot2?: string[]; table?: string[]; currentPlayer?: PlayerIndex; lastCapturer?: PlayerIndex | null }): GameState {
+function arrange(over: { hand?: string[]; bot1?: string[]; table?: string[]; lastCapturer?: PlayerIndex | null }): GameState {
   const base = createInitialState(settings, createPRNG(SEED));
   const pack = [...base.deck, ...base.board, ...base.hands[0], ...base.hands[1], ...base.hands[2]];
   const pick = (list?: string[]) => (list ?? []).map((id) => pack.find((c) => c.id === id)!);
-  const hands: [Card[], Card[], Card[]] = [pick(over.hand), pick(over.bot1), pick(over.bot2)];
+  const hands: [Card[], Card[], Card[]] = [pick(over.hand), pick(over.bot1), []];
   const board = pick(over.table);
   const used = new Set([...hands.flat(), ...board].map((c) => c.id));
   return {
@@ -28,7 +28,7 @@ function arrange(over: { hand?: string[]; bot1?: string[]; bot2?: string[]; tabl
     hands,
     board,
     deck: pack.filter((c) => !used.has(c.id)),
-    currentPlayer: over.currentPlayer ?? 0,
+    currentPlayer: 0,
     lastAction: null,
     lastCapturer: over.lastCapturer ?? null,
   };

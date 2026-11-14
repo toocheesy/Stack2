@@ -10,7 +10,7 @@ const mockStorage = {
   removeItem: (key: string) => { store.delete(key); },
   clear: () => { store.clear(); },
   get length() { return store.size; },
-  key: (_i: number) => null as string | null,
+  key: () => null as string | null,
 };
 Object.defineProperty(globalThis, 'localStorage', { value: mockStorage, configurable: true });
 
@@ -50,8 +50,8 @@ function fullState(overrides: Partial<GameState> = {}): GameState {
   };
 }
 
-function saveOf(game: GameState, seed = 7): SavedGame {
-  return { game, seed, dealStream: 1234, botStream: 5678 };
+function saveOf(game: GameState): SavedGame {
+  return { game, seed: 7, dealStream: 1234, botStream: 5678 };
 }
 
 describe('persistence — saveGame / loadGame (version 7)', () => {

@@ -32,8 +32,8 @@ export function moveWords(move: LastMove): string {
  *  combo's cards joined with " + ", the combos joined with " and ":
  *  "10 = 6 + 4", "9 = 5 + 4 and 9", "K = K". */
 export function captureLine(record: CaptureRecord): string {
-  const combos = record.combos.filter((c) => c.length > 0).map((c) => c.map((x) => x.rank).join(' + '));
-  return combos.length > 0 ? `${record.baseCard.rank} = ${combos.join(' and ')}` : record.baseCard.rank;
+  const combos = record.combos.map((c) => c.map((x) => x.rank).join(' + '));
+  return `${record.baseCard.rank} = ${combos.join(' and ')}`;
 }
 
 /** The Take the Table panel's points line: "A 15 · K 10 · 8, 5, 4, 9 at 5 each". */

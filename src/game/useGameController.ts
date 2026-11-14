@@ -40,7 +40,6 @@ export interface GameActions {
 }
 
 export interface BotVizStep {
-  type: 'thinking';
   playerIndex: PlayerIndex;
 }
 
@@ -358,7 +357,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
     }
 
     botBusyRef.current = true;
-    setBotViz({ type: 'thinking', playerIndex: player });
+    setBotViz({ playerIndex: player });
 
     const difficulty =
       player === 1
@@ -564,7 +563,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
       } else {
         if (!combo.base) return;
         const already =
-          combo.base?.id === cardId ||
+          combo.base.id === cardId ||
           [...combo.combo1, ...combo.combo2, ...combo.combo3].some(
             (g) => g.card.id === cardId,
           );
@@ -888,11 +887,9 @@ export function messageLine(state: GameState, build: Combination, last: LastMove
   }
 
   // 3. An opponent's capture replays.
+  // A bot's base is always its hand card (botCaptureToCombination).
   if (replay && replay.playerIndex !== 0) {
-    const name = opponentName(state, replay.playerIndex);
-    return baseSourceOf(state, replay.combination) === 'hand'
-      ? `Base from ${name}'s hand: every combo has a table card.`
-      : `Base from the table: every combo has a card from ${name}'s hand.`;
+    return `Base from ${opponentName(state, replay.playerIndex)}'s hand: every combo has a table card.`;
   }
 
   // 4. While you build.

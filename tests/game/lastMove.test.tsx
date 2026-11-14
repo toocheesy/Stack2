@@ -10,7 +10,7 @@ import type { Card, GameSettings, GameState, PlayerIndex } from '../../src/engin
 // The controller's reads for the board (D-007 release 2, part 1): an
 // opponent's capture on show as the Combination it built, slot by slot, and
 // the last move the message line and the speech bubbles read.
-// Seats are fixed: Rex (advanced) in seat 1, Nina (intermediate) in seat 2.
+// Seed 22's coin flip seats Rex (advanced) in seat 1, Nina (intermediate) in seat 2.
 // The target is low so Rex's risk gate never turns a capture into a place.
 
 const settings: GameSettings = {
@@ -31,9 +31,9 @@ async function advance(ms: number) {
   });
 }
 
-async function advanceUntil(done: () => boolean, limitMs = WELL_PAST) {
+async function advanceUntil(done: () => boolean) {
   const step = 50;
-  for (let t = 0; t < limitMs; t += step) {
+  for (let t = 0; t < WELL_PAST; t += step) {
     if (done()) return;
     await advance(step);
   }

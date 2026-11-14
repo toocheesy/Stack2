@@ -149,9 +149,6 @@ describe("a recorded capture's line on the sheets (RE1p, GO2)", () => {
     expect(captureLine(record('KS', [['KH']], 20))).toBe('K = K');
     expect(captureLine(record('AS', [['AH', 'AC']], 45))).toBe('A = A + A');
   });
-  it('a record converted from an old save with nothing beyond the base shows the base', () => {
-    expect(captureLine(record('7C', [[]], 5))).toBe('7');
-  });
 });
 
 describe("an opponent's move in words (GB2's speech bubble)", () => {

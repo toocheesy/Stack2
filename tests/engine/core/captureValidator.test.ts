@@ -68,7 +68,6 @@ describe('validateComboSlot', () => {
     const slot = [group(card('5', 'clubs'))];
     const v = validateComboSlot(slot, base);
     expect(v.isValid).toBe(true);
-    expect(v.captureType).toBe('pair');
   });
 
   it('valid multi-card pair', () => {
@@ -76,7 +75,6 @@ describe('validateComboSlot', () => {
     const slot = [group(card('5', 'clubs')), group(card('5', 'spades'))];
     const v = validateComboSlot(slot, base);
     expect(v.isValid).toBe(true);
-    expect(v.captureType).toBe('pair');
   });
 
   it('valid 2-card sum: 2+3=5', () => {
@@ -84,7 +82,6 @@ describe('validateComboSlot', () => {
     const slot = [group(card('2')), group(card('3'))];
     const v = validateComboSlot(slot, base);
     expect(v.isValid).toBe(true);
-    expect(v.captureType).toBe('sum');
   });
 
   it('valid 3-card sum: A+2+4=7', () => {
@@ -92,7 +89,6 @@ describe('validateComboSlot', () => {
     const slot = [group(card('A')), group(card('2')), group(card('4'))];
     const v = validateComboSlot(slot, base);
     expect(v.isValid).toBe(true);
-    expect(v.captureType).toBe('sum');
   });
 
   it('rejects mixed slot: match card + sum cards in same slot (capture-legality)', () => {
@@ -106,14 +102,12 @@ describe('validateComboSlot', () => {
     const slot = [group(card('7', 'clubs')), group(card('3')), group(card('4'))];
     const v = validateComboSlot(slot, base);
     expect(v.isValid).toBe(false);
-    expect(v.captureType).toBeNull();
   });
 
   it('face card base: only pairs allowed', () => {
     const base = card('K');
     const pair = validateComboSlot([group(card('K'))], base);
     expect(pair.isValid).toBe(true);
-    expect(pair.captureType).toBe('pair');
     const sum = validateComboSlot(
       [group(card('2')), group(card('3'))],
       base,
@@ -145,7 +139,6 @@ describe('validateComboSlot', () => {
       base,
     );
     expect(v.isValid).toBe(true);
-    expect(v.captureType).toBe('sum');
   });
 });
 

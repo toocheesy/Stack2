@@ -11,7 +11,7 @@ import type { Card, GameSettings, GameState, PlayerIndex } from '../../src/engin
 // a pause that opens while a moment's wait runs holds the moment where it
 // stands (the last cards' hold, Take the Table), and play carries on from
 // there once the pause closes. The bot gates are tests/game/tutorialFreeze.test.tsx.
-// Seats are fixed: Rex (advanced) in seat 1, Nina (intermediate) in seat 2.
+// Seed 22's coin flip seats Rex (advanced) in seat 1, Nina (intermediate) in seat 2.
 
 const settings: GameSettings = {
   targetScore: 100,

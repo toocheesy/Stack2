@@ -28,9 +28,9 @@ async function advance(ms: number) {
   });
 }
 
-async function advanceUntil(done: () => boolean, limitMs = WELL_PAST) {
+async function advanceUntil(done: () => boolean) {
   const step = 50;
-  for (let t = 0; t < limitMs; t += step) {
+  for (let t = 0; t < WELL_PAST; t += step) {
     if (done()) return;
     await advance(step);
   }

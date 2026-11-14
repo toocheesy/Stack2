@@ -5,7 +5,7 @@ import { RANK_VALUES, type Card, type CaptureGroup, type Combination, type GameS
 import { messageLine, type BotComboDisplay, type LastMove } from '../../src/game/useGameController';
 
 // D-007 ruling 95: the message line's words, and the order its rules apply
-// in. Seats are fixed: Nina (intermediate) in seat 1, Rex (advanced) in seat 2.
+// in. Seed 3's coin flip seats Nina (intermediate) in seat 1, Rex (advanced) in seat 2.
 
 const settings: GameSettings = {
   targetScore: 300,
@@ -22,8 +22,8 @@ const cards = (...ids: string[]) => ids.map(card);
 const fromHand = (id: string): CaptureGroup => ({ card: card(id), source: 'hand' });
 const fromTable = (id: string): CaptureGroup => ({ card: card(id), source: 'board' });
 const NOTHING: Combination = { base: null, combo1: [], combo2: [], combo3: [] };
-function build(base: string, combo1: CaptureGroup[] = [], combo2: CaptureGroup[] = [], combo3: CaptureGroup[] = []): Combination {
-  return { base: card(base), combo1, combo2, combo3 };
+function build(base: string, combo1: CaptureGroup[] = [], combo2: CaptureGroup[] = []): Combination {
+  return { base: card(base), combo1, combo2, combo3: [] };
 }
 
 // A real deal, then what the case needs: the hands, the table, the deck, whose turn.
@@ -126,11 +126,6 @@ describe('the message line (D-007 ruling 95)', () => {
       const s = state({ currentPlayer: 2, bot2: ['9S', 'JD'], table: ['5H', '4C', '9D'] });
       const r = replay(2, build('9S', [fromTable('5H'), fromTable('4C')], [fromTable('9D')]));
       expect(messageLine(s, NOTHING, null, r)).toBe("Base from Rex's hand: every combo has a table card.");
-    });
-    it('a capture replays, base from the table', () => {
-      const s = state({ currentPlayer: 1, bot1: ['9S'], table: ['9D', '5H', '4C'] });
-      const r = replay(1, build('9D', [fromHand('9S')]));
-      expect(messageLine(s, NOTHING, null, r)).toBe("Base from the table: every combo has a card from Nina's hand.");
     });
   });
 

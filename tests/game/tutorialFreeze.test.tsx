@@ -36,10 +36,10 @@ async function advance(ms: number) {
   });
 }
 
-// Advance in small steps until `done` is true, or fail after `limitMs`.
-async function advanceUntil(done: () => boolean, limitMs = WELL_PAST) {
+// Advance in small steps until `done` is true, or fail after WELL_PAST.
+async function advanceUntil(done: () => boolean) {
   const step = 50;
-  for (let t = 0; t < limitMs; t += step) {
+  for (let t = 0; t < WELL_PAST; t += step) {
     if (done()) return;
     await advance(step);
   }
@@ -109,7 +109,7 @@ describe('tutorial freeze: useGameController', () => {
     const { result, rerender } = mount(SEED_BOT_PLACES, false);
     const bot = result.current.state.currentPlayer;
     expect(bot).not.toBe(0);
-    expect(result.current.botViz).toEqual({ type: 'thinking', playerIndex: bot });
+    expect(result.current.botViz).toEqual({ playerIndex: bot });
     const before = snapshot(result.current.state);
 
     rerender({ tutorial: true });

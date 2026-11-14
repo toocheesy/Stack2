@@ -66,8 +66,8 @@ export function Gear() {
  *  open, so what it sits on shows through its empty part, filled in the
  *  runner's colour. The fill grows by transform (TT1: 420 ms); under
  *  reduce-motion it steps. */
-export function RaceBar({ value, max, colour, height = 8, track = C.line.classic, delay = 0 }: {
-  value: number; max: number; colour: string; height?: number; track?: string; delay?: number;
+export function RaceBar({ value, max, colour, height = 8, track = C.line.classic }: {
+  value: number; max: number; colour: string; height?: number; track?: string;
 }) {
   const calm = useReducedMotion();
   const fraction = max > 0 ? Math.min(1, Math.max(0, value / max)) : 0;
@@ -76,7 +76,7 @@ export function RaceBar({ value, max, colour, height = 8, track = C.line.classic
       <motion.div
         initial={false}
         animate={{ scaleX: fraction }}
-        transition={calm ? { duration: 0 } : { duration: 0.42, ease: [0.2, 0.8, 0.2, 1], delay }}
+        transition={calm ? { duration: 0 } : { duration: 0.42, ease: [0.2, 0.8, 0.2, 1] }}
         style={{ width: '100%', height: '100%', background: colour, transformOrigin: 'left center' }}
       />
     </div>
@@ -86,7 +86,7 @@ export function RaceBar({ value, max, colour, height = 8, track = C.line.classic
 /** A number that swaps with a pop when it changes: the new value lands from
  *  160% as the old fades beneath it (YC1, TT1). Under reduce-motion the two
  *  crossfade. */
-export function PopNumber({ value, delay = 0 }: { value: number; delay?: number }) {
+export function PopNumber({ value }: { value: number }) {
   const calm = useReducedMotion();
   return (
     <span style={{ display: 'inline-grid' }}>
@@ -96,7 +96,7 @@ export function PopNumber({ value, delay = 0 }: { value: number; delay?: number 
           initial={calm ? { opacity: 0 } : { opacity: 0, scale: 1.6 }}
           animate={{ opacity: 1, scale: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: calm ? 0.16 : 0.22, ease: 'easeOut', delay }}
+          transition={{ duration: calm ? 0.16 : 0.22, ease: 'easeOut' }}
           style={{ gridArea: '1 / 1', display: 'inline-block' }}
         >
           {value}

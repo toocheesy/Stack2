@@ -65,9 +65,8 @@ interface Props {
   lastCapture: LastMove | null;
   /** Take the Table on show (useGameController's TakeTheTableMoment), under App.tsx's name for it. */
   jackpotInfo: JackpotDisplay | null;
-  gameOver: { winner: number } | null;
+  gameOver: { winner: PlayerIndex } | null;
   actions: GameActions;
-  onQuit: () => void;
   onHome: () => void;
   onPlayAgain: () => void;
   /** The pause sheet open, and how to open or close one. Its state lives in
@@ -98,7 +97,7 @@ function useCompact(): boolean {
 }
 
 export function GameView({
-  state, isPlayerTurn, botViz, botCombo, lastCapture: lastMove, jackpotInfo, gameOver, actions, onQuit, onHome, onPlayAgain, pause, onPause, tutorial,
+  state, isPlayerTurn, botViz, botCombo, lastCapture: lastMove, jackpotInfo, gameOver, actions, onHome, onPlayAgain, pause, onPause, tutorial,
 }: Props) {
   const calm = !!useReducedMotion();
   const compact = useCompact();
@@ -202,7 +201,7 @@ export function GameView({
     : null;
   // The base on show has left the opponent's hand (GB2 phone C: 4 → 3).
   const heldBy = (p: 1 | 2) => state.hands[p].length - (replay?.playerIndex === p ? 1 : 0);
-  const thinkingBot = botViz?.type === 'thinking' && !replay ? botViz.playerIndex : null;
+  const thinkingBot = botViz && !replay ? botViz.playerIndex : null;
   // While Take the Table plays the label shows nothing (TC's playtest of part 2).
   const barLabel = tt
     ? ''
@@ -504,13 +503,13 @@ export function GameView({
         modeWord={mode}
         paused={paused}
       />
-      <GameOverOverlay winner={gameOver as { winner: PlayerIndex } | null} state={state} onPlayAgain={onPlayAgain} onHome={onHome} />
+      <GameOverOverlay winner={gameOver} state={state} onPlayAgain={onPlayAgain} onHome={onHome} />
 
       {/* ═══ THE PAUSES (D-007 release 2 part 3) ═══ */}
       <LeaveSheet
         open={pause === 'leave'}
         onKeepPlaying={() => onPause(null)}
-        onLeave={() => { onPause(null); onQuit(); }}
+        onLeave={() => { onPause(null); onHome(); }}
       />
       <GameSettingsSheet
         open={pause === 'settings'}

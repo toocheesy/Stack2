@@ -28,7 +28,6 @@ describe('one score (S-006)', () => {
             log.sweeps.filter((s) => s.player === p && (!inRound || s.round === round)).reduce((sum, s) => sum + s.points, 0);
           expect(state.overallScores[key]).toBe(points(false));
           expect(state.roundStats[p].pointsThisRound).toBe(points(true));
-          expect('totalScore' in state.gameStats[p]).toBe(false);
         }
       },
     });

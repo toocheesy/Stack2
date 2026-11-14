@@ -39,10 +39,10 @@ function ids(cards: readonly { id: string }[]): string[] {
   return cards.map((c) => c.id);
 }
 
-function saveClassic(game: GameState, seed = CLASSIC_SEED) {
+function saveClassic(game: GameState) {
   saveGame('classic', {
     game,
-    seed,
+    seed: CLASSIC_SEED,
     dealStream: DEAL_SEED,
     botStream: botStreamSeed(DEAL_SEED),
   });

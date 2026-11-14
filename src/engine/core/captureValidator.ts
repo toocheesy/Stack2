@@ -23,14 +23,13 @@ export function validateComboSlot(
   baseCard: Card,
 ): SlotValidation {
   if (slotCards.length === 0) {
-    return { isValid: false, captureType: null, details: 'Slot is empty' };
+    return { isValid: false, details: 'Slot is empty' };
   }
 
   const allMatchBase = slotCards.every((g) => g.card.rank === baseCard.rank);
   if (allMatchBase) {
     return {
       isValid: true,
-      captureType: 'pair',
       details: `Pair of ${baseCard.rank}`,
     };
   }
@@ -38,7 +37,6 @@ export function validateComboSlot(
   if (isFaceCard(baseCard)) {
     return {
       isValid: false,
-      captureType: null,
       details: 'Face cards can only pair, never sum',
     };
   }
@@ -46,7 +44,6 @@ export function validateComboSlot(
   if (slotCards.some((g) => isFaceCard(g.card))) {
     return {
       isValid: false,
-      captureType: null,
       details: 'Face cards cannot be used in sums',
     };
   }
@@ -55,14 +52,12 @@ export function validateComboSlot(
   if (sum === baseCard.value) {
     return {
       isValid: true,
-      captureType: 'sum',
       details: `Sum to ${baseCard.value}`,
     };
   }
 
   return {
     isValid: false,
-    captureType: null,
     details: `Sum ${sum} does not equal base value ${baseCard.value}`,
   };
 }
@@ -93,8 +88,7 @@ export function validateFullCombo(
     };
   }
 
-  const slots: ComboSlot[] = ['combo1', 'combo2', 'combo3'];
-  const slotValidations: SlotValidation[] = [];
+  const slots = ['combo1', 'combo2', 'combo3'] as const;
   const allCapturedCards: Card[] = [base];
   // RULES.md Law 15: a card may be used only once in a capture.
   const seenIds = new Set<string>([base.id]);
@@ -104,12 +98,10 @@ export function validateFullCombo(
 
   let occupiedSlotCount = 0;
   for (const slot of slots) {
-    if (slot === 'base') continue;
     const groups = combination[slot];
     if (groups.length === 0) continue;
     occupiedSlotCount++;
     const validation = validateComboSlot(groups, base);
-    slotValidations.push(validation);
     if (!validation.isValid) {
       errors.push(`${slot}: ${validation.details}`);
       continue;

@@ -127,6 +127,12 @@ describe('the home screen (HS15)', () => {
     expect(localStorage.getItem('stacked-save-classic')).not.toBeNull();
   });
 
+  it('the stacked_welcomed key, which no code writes, is removed on load (S-032)', () => {
+    localStorage.setItem('stacked_welcomed', 'true');
+    render(<App />);
+    expect(localStorage.getItem('stacked_welcomed')).toBeNull();
+  });
+
   it('a save from before version 7 and the old single-slot save are removed on load, so there is no CONTINUE (S-032)', () => {
     saveClassic();
     const raw = JSON.parse(localStorage.getItem('stacked-save-classic')!);

@@ -44,7 +44,7 @@ function App() {
 
   // The saved game (S-006), read once per render: CONTINUE reads the Classic slot.
   const savedClassic = loadGame('classic');
-  const savedIsClassic = savedClassic !== null;
+  const hasSave = savedClassic !== null;
 
   useEffect(() => {
     // Drop the orphan useSettings hook's dead localStorage key on any returning user.
@@ -57,13 +57,15 @@ function App() {
     try { localStorage.removeItem('stacked_v2_jett_unlocked_classic'); } catch { /* ignore */ }
     // Saves before version 7 are gone (S-032): clear returning players' old single-slot save.
     try { localStorage.removeItem('stacked-v2-game'); } catch { /* ignore */ }
+    // A key no code in this repo writes or reads (S-032).
+    try { localStorage.removeItem('stacked_welcomed'); } catch { /* ignore */ }
   }, []);
 
   // SET THE TABLE: DD2 plays over Classic Setup (ruling 46).
   const setTheTable = useCallback(() => {
-    setCurtain({ hadSave: savedIsClassic });
+    setCurtain({ hadSave: hasSave });
     setScreen('setup');
-  }, [savedIsClassic]);
+  }, [hasSave]);
 
   const startWithSettings = useCallback((targetScore: number, bot1: Difficulty, bot2: Difficulty) => {
     clearSavedGame('classic');
@@ -78,15 +80,15 @@ function App() {
   // faded in, so an opponent seated first moves in view.
   const quickMatch = useCallback(() => {
     const [bot1, bot2] = QUICK_MATCH_PAIRS[Math.floor(Math.random() * QUICK_MATCH_PAIRS.length)];
-    setCurtain({ hadSave: savedIsClassic });
+    setCurtain({ hadSave: hasSave });
     startWithSettings(QUICK_MATCH_TARGET, bot1, bot2);
-  }, [savedIsClassic, startWithSettings]);
+  }, [hasSave, startWithSettings]);
 
   // With a saved game QUICK MATCH asks first (QD1 phone B); without one it starts at once.
   const askQuickMatch = useCallback(() => {
-    if (savedIsClassic) setNewGameAsk(true);
+    if (hasSave) setNewGameAsk(true);
     else quickMatch();
-  }, [savedIsClassic, quickMatch]);
+  }, [hasSave, quickMatch]);
 
   const endCurtain = useCallback(() => setCurtain(null), []);
 
@@ -153,7 +155,7 @@ function App() {
   } else {
     view = (
       <HomeScreen
-        hasSave={savedIsClassic}
+        hasSave={hasSave}
         leaving={false}
         onContinue={continueClassic}
         onQuickMatch={askQuickMatch}
@@ -283,7 +285,6 @@ function GameWrapper({
       jackpotInfo={jackpotInfo}
       gameOver={gameOver}
       actions={actions}
-      onQuit={onHome}
       onHome={onHome}
       onPlayAgain={onPlayAgain}
       pause={pause}

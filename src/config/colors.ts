@@ -42,7 +42,9 @@ export const C = {
   suitDark: '#0A1A12',
   suitRed: '#D9241C',
 
-  // Bot colours. A bot's colour shows only on its own things; no bot owns one yet.
+  // Bot colours. A bot's colour shows only on its own things. Who wears which is
+  // BOT_COLOURS in src/components/board/opponents.ts: Nina azure, Rex wisteria;
+  // Calvin and Jett wear Classic's line colour for now.
   botAzure: '#5CC2FF',
   botWisteria: '#BE96FF',
   // The wisteria bot's colour on the plum sheet only; everywhere else it stays botWisteria.

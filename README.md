@@ -12,9 +12,9 @@ The official rules are in RULES.md.
 
 ## Running it locally
 
-Needs Node.js 22.
+Needs Node.js 22 or newer.
 
-    npm install
+    npm ci
     npm run dev      # play it on your computer
     npm test         # run the tests
     npm run build    # check and build it

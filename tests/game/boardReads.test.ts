@@ -67,7 +67,7 @@ describe('cards that cannot join your build (GB2, rulings 19 and 23b)', () => {
   });
 });
 
-describe('the points preview (RULES.md Law 6 and the scoring table)', () => {
+describe('the points preview (RULES.md Law 13 and the scoring table)', () => {
   it('A 15; K, Q, J, 10 score 10; 2 to 9 score 5', () => {
     expect(stagedPoints(build('AH'))).toBe(15);
     expect(stagedPoints(build('KH'))).toBe(10);
@@ -91,7 +91,7 @@ describe('a combo on the tray', () => {
     expect(baseSourceOf(state({ hand: ['7C'], table: ['5H'] }), build('5H'))).toBe('board');
     expect(baseSourceOf(state(), build(null))).toBeNull();
   });
-  it('is valid when it matches or sums to the base and holds a card from the other side (RULES.md Laws 2 to 5)', () => {
+  it('is valid when it matches or sums to the base and holds a card from the other side (RULES.md Laws 8 to 11)', () => {
     const s = state({ hand: ['9S', '5D', '4H'], table: ['5H', '4C', '9D', 'KC'] });
     expect(comboIsValid(s, build('9S', [fromTable('5H'), fromTable('4C')]), 'combo1')).toBe(true);
     expect(comboIsValid(s, build('9S', [], [fromTable('9D')]), 'combo2')).toBe(true);
@@ -107,7 +107,7 @@ describe('a combo on the tray', () => {
   });
 });
 
-describe('Take the Table (RULES.md Law 10) in the last hand', () => {
+describe('Take the Table (RULES.md Law 15) in the last hand', () => {
   it('nothing outside the last hand', () => {
     expect(takeTheTable(state({ lastCapturer: 0 }))).toBeNull();
   });

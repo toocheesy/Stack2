@@ -44,7 +44,7 @@ export interface BotVizStep {
 }
 
 /** An opponent's capture on show in the tray (GB2 phone C): the Combination
- *  the opponent built, slot by slot, its points (RULES.md Law 6) and every
+ *  the opponent built, slot by slot, its points (RULES.md Law 13) and every
  *  captured card, base first. */
 export interface BotComboDisplay {
   playerIndex: PlayerIndex;
@@ -72,19 +72,19 @@ export interface LastMove {
   captures: MoveCapture[];
   /** The card placed to end the turn; null while the turn goes on. */
   placed: Card | null;
-  /** RULES.md Law 8: the rest of the hand the game placed after `placed`. */
+  /** RULES.md Law 6: the rest of the hand the game placed after `placed`. */
   rest: Card[];
   /** The round and hand the move was made in. */
   round: number;
   hand: number;
   /** After a capture that emptied your hand: the next player holding cards
-   *  (RULES.md Law 12); null otherwise. */
+   *  (RULES.md Law 5); null otherwise. */
   next: PlayerIndex | null;
   /** The game as it stood before the move, for the board's motion. */
   before: GameState;
 }
 
-/** Take the Table on show (TT1, RULES.md Law 10): who takes it, the cards as
+/** Take the Table on show (TT1, RULES.md Law 15): who takes it, the cards as
  *  they lay and the scores before, for the board's motion. App.tsx passes it
  *  to GameView as jackpotInfo. */
 export interface TakeTheTableMoment {
@@ -102,7 +102,7 @@ export const MOMENTS = {
   /** YC1, your capture, about 1,020 ms from SUBMIT: the tray's chrome fades,
    *  the cards fly to your bar, the message line changes, the score lands. */
   yourCapture: { chromeOut: 140, cardStep: 60, cardFlight: 460, message: 640, land: 700, end: 1020, calm: { out: 180, land: 350, end: 750 } },
-  /** RULES.md Law 8 (ruling 44): the rest of a hand lands one card at a time,
+  /** RULES.md Law 6 (ruling 44): the rest of a hand lands one card at a time,
    *  then the last-cards line holds before play moves on. */
   landing: { step: 80, flight: 400, hold: 1500 },
   /** TT1, Take the Table, 2,500 ms: a beat, the cards fly to the taker, the
@@ -110,7 +110,7 @@ export const MOMENTS = {
   takeTheTable: { hold: 240, step: 80, flight: 640, banner: 260, land: 1180, bannerEnd: 1760, sheet: 2120, end: 2500, calm: { out: 400, land: 500, bannerEnd: 1700, sheet: 2100 } },
 } as const;
 
-/** How long the last cards take to land and the line to hold (Law 8). */
+/** How long the last cards take to land and the line to hold (Law 6). */
 export function landingMs(restCount: number): number {
   if (restCount <= 0) return 0;
   const l = MOMENTS.landing;
@@ -129,7 +129,7 @@ function turnCaptures(prev: LastMove | null, player: PlayerIndex, s: GameState):
     : [];
 }
 
-// RULES.md Law 8: when every other hand is empty, a place also puts the rest
+// RULES.md Law 6: when every other hand is empty, a place also puts the rest
 // of the placer's hand on the table. The rest, for the message line.
 function restAfterPlace(s: GameState, player: PlayerIndex, placedId: string): Card[] {
   const othersEmpty = s.hands.every((h, i) => i === player || h.length === 0);
@@ -333,7 +333,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
   }
 
   // Moves play on after a wait: when your capture empties your hand (YC1's
-  // land), and when the last cards land (Law 8). If play has moved on another
+  // land), and when the last cards land (Law 6). If play has moved on another
   // way meanwhile, the wait ends quietly.
   function advanceLater(next: GameState, ms: number) {
     void (async () => {
@@ -489,7 +489,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
     setBotViz(null);
     botBusyRef.current = false;
 
-    // The last cards land and the line holds (Law 8) before play moves on;
+    // The last cards land and the line holds (Law 6) before play moves on;
     // a pause opened meanwhile holds it until the sheet closes.
     await waitThrough(restPlaced > 0 ? landingMs(restPlaced) : 500);
     if (!mountedRef.current) return;
@@ -619,7 +619,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
       rest: [],
       round: s.currentRound,
       hand: s.handNumber,
-      // RULES.md Law 12: when the capture emptied your hand, the next player holding cards.
+      // RULES.md Law 5: when the capture emptied your hand, the next player holding cards.
       next: handEmptied ? findNextPlayerWithCards(next, false) : null,
       before: s,
     });
@@ -652,7 +652,7 @@ export function useGameController(seed: number, settings: GameSettings, paused: 
       before: s,
     });
     setAndPersist(next);
-    // RULES.md Law 8: the last cards land and the line holds before play moves on.
+    // RULES.md Law 6: the last cards land and the line holds before play moves on.
     if (rest.length > 0) advanceLater(next, landingMs(rest.length));
     else void advanceRef.current(next);
   }, [setAndPersist, recordMove]);
@@ -759,7 +759,7 @@ function hasStaged(build: Combination): boolean {
 }
 
 /** The points preview beside SUBMIT: the scoring table's points of every
- *  staged card, base included (RULES.md Law 6). */
+ *  staged card, base included (RULES.md Law 13). */
 export function stagedPoints(build: Combination): number {
   return calculateCardsPoints(stagedCards(build));
 }
@@ -772,7 +772,7 @@ export function baseSourceOf(state: GameState, build: Combination): CardSource |
 }
 
 /** A filled combo is valid when it matches the base or sums to it (RULES.md
- *  Laws 2, 4, 5) and holds a card from the other side of the base (Law 3). */
+ *  Laws 8, 10, 11) and holds a card from the other side of the base (Law 9). */
 export function comboIsValid(state: GameState, build: Combination, slot: Exclude<ComboSlot, 'base'>): boolean {
   const groups = build[slot];
   if (!build.base || groups.length === 0) return false;
@@ -806,7 +806,7 @@ export interface TakeTheTableRead {
   points: number;
 }
 
-/** RULES.md Law 10 in the last hand (the deck is empty): who is in line to take
+/** RULES.md Law 15 in the last hand (the deck is empty): who is in line to take
  *  the table and what it is worth. Null outside the last hand, and null when
  *  nobody has captured this round (nobody takes the table). */
 export function takeTheTable(state: GameState): TakeTheTableRead | null {
@@ -850,7 +850,7 @@ function buildLine(state: GameState, build: Combination): string {
   return sourceLine;
 }
 
-// RULES.md Law 8, for the player who placed last.
+// RULES.md Law 6, for the player who placed last.
 function lastCardsLine(state: GameState, last: LastMove): string {
   const others = ([0, 1, 2] as PlayerIndex[]).filter((p) => p !== last.player).map((p) => playerName(state, p));
   const placer = playerName(state, last.player);
@@ -862,7 +862,7 @@ function lastCardsLine(state: GameState, last: LastMove): string {
 /** The message line (D-007 ruling 95): the rule that matters now, from the
  *  game state, the build in the tray, the last move and the opponent's
  *  capture on show. First match wins, in this order:
- *  1. the last cards (RULES.md Law 8), until the next hand is dealt;
+ *  1. the last cards (RULES.md Law 6), until the next hand is dealt;
  *  2. after your move, until you stage a card or the next player moves;
  *  3. an opponent's capture replays;
  *  4. while you build: mixed, kings, base source, aces, 10s, base source;
@@ -871,7 +871,7 @@ function lastCardsLine(state: GameState, last: LastMove): string {
 export function messageLine(state: GameState, build: Combination, last: LastMove | null, replay: BotComboDisplay | null): string {
   const sameHand = last !== null && last.round === state.currentRound && last.hand === state.handNumber;
 
-  // 1. The last cards, from the moment Law 8 places the rest of a hand until the next hand is dealt.
+  // 1. The last cards, from the moment Law 6 places the rest of a hand until the next hand is dealt.
   if (last && sameHand && last.placed && last.rest.length > 0) {
     return lastCardsLine(state, last);
   }

@@ -3,7 +3,7 @@ import { C } from '../../config/colors';
 import { FONTS } from '../../config/fonts';
 import { pointsBreakdown, takeTheTableSentence, worthWords } from './words';
 
-/** The Take the Table panel (GB2 phone B, RULES.md Law 10): in the last hand,
+/** The Take the Table panel (GB2 phone B, RULES.md Law 15): in the last hand,
  *  who is in line to take the table, what it is worth, and the points by
  *  card. Its edge and label take the colour of the player in line: gold for
  *  you, an opponent's colour for an opponent. */

@@ -12,7 +12,7 @@ import { captureLine } from './board/words';
 // sheet rises over the table dimmed by the table colour at 85%, with a 2px
 // gold edge and the gold glow. One row per player in finishing order; the
 // round's top scorer sits on deep plum in a gold frame with TOP ROUND; the
-// taker's row carries "Took the Table" (RULES.md Law 10). The next round
+// taker's row carries "Took the Table" (RULES.md Law 15). The next round
 // deals itself after 10 seconds or on CONTINUE; the countdown holds while a
 // pause sheet is open over the game.
 
@@ -27,7 +27,7 @@ interface Props {
   bot1Personality: Difficulty;
   bot2Personality: Difficulty;
   onContinue: () => void;
-  /** RULES.md Law 11: the round ended with a tie at the top; one more round. */
+  /** RULES.md Law 17: the round ended with a tie at the top; one more round. */
   isOvertime: boolean;
   /** "CLASSIC", for the line above the title. */
   modeWord: string;

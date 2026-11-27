@@ -212,13 +212,13 @@ export function placeCard(state: GameState, cardId: string): GameState {
     lastAction: 'place',
     combination: emptyCombination(),
   };
-  // RULES.md Law 8: when every other player is out of cards, a place also
+  // RULES.md Law 6: when every other player is out of cards, a place also
   // puts the rest of the placer's hand on the board.
   const othersEmpty = hands.every((h, i) => i === state.currentPlayer || h.length === 0);
   return othersEmpty ? placeRestOfHand(placed) : placed;
 }
 
-// RULES.md Law 8: moves every card still in the current player's hand to the
+// RULES.md Law 6: moves every card still in the current player's hand to the
 // end of the board, in hand order. Scores, lastCapturer and stats are untouched.
 export function placeRestOfHand(state: GameState): GameState {
   const hand = state.hands[state.currentPlayer];
@@ -238,7 +238,7 @@ export function placeRestOfHand(state: GameState): GameState {
   };
 }
 
-// RULES.md Law 10: the round's last capturer takes every card left on the
+// RULES.md Law 15: the round's last capturer takes every card left on the
 // board at their scoring-table values. The take is not a capture: it never
 // becomes a highestCapture (D-007 ruling 97); the taker's round marks it.
 export function applyJackpot(state: GameState): {

@@ -44,7 +44,7 @@ import { Fade, type Flight } from './board/pieces';
 // message line, the table, the capture tray while you build or an opponent's
 // capture replays, your race bar and your hand. Gold is yours and the
 // table's; an opponent's things wear its colour. Part 2 adds the moments:
-// your capture (YC1), the last cards landing (Law 8), Take the Table (TT1),
+// your capture (YC1), the last cards landing (Law 6), Take the Table (TT1),
 // and the round end and game over sheets (RE1p, GO2). Part 3 adds the
 // pauses: leaving the game (QD1), the in-game Settings (ST3) and the
 // tutorial (TU2), each a plum sheet over the dimmed game, with the game
@@ -149,7 +149,7 @@ export function GameView({
   const ttPhase = useMomentPhase(tt ? tt.id : null, calm ? [1, TT.calm.land, TT.calm.bannerEnd] : [TT.hold, TT.land, TT.bannerEnd]);
   // 0: a beat; 1: the cards fly and the banner shows; 2: the score lands; 3: the banner is gone.
 
-  // The last cards landing (Law 8): the rest of a hand, one card at a time.
+  // The last cards landing (Law 6): the rest of a hand, one card at a time.
   const landingMove = lastMove && lastMove.rest.length > 0 && lastMove.round === state.currentRound && lastMove.hand === state.handNumber ? lastMove : null;
 
   const momentActive = ycShowing || tt !== null;

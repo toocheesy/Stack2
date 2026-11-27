@@ -71,7 +71,7 @@ function movedOn(s: GameState): boolean {
   return s.handNumber > 1 || s.gamePhase === 'roundEnd';
 }
 
-describe('Law 8: the last player holding cards', () => {
+describe('Law 6: the last player holding cards', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.useFakeTimers();
@@ -102,7 +102,7 @@ describe('Law 8: the last player holding cards', () => {
     });
     expect(refusal).toBeNull();
     await advance(0);
-    // Law 1: the capture continues the human's turn.
+    // Law 2: the capture continues the human's turn.
     expect(result.current.state.lastAction).toBe('capture');
     expect(result.current.state.currentPlayer).toBe(0);
     expect(ids(result.current.state.hands[0])).toEqual([keep1.id, keep2.id]);

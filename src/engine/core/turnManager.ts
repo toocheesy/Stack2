@@ -18,7 +18,7 @@ function anyPlayerHasCards(state: GameState): boolean {
   return state.hands.some((h) => h.length > 0);
 }
 
-// The overall scores once the round's last capturer takes the table (RULES.md Law 10).
+// The overall scores once the round's last capturer takes the table (RULES.md Law 15).
 function projectedScores(state: GameState): Scores {
   if (state.lastCapturer === null || state.board.length === 0) return state.overallScores;
   const key = SCORE_KEYS[state.lastCapturer];
@@ -54,7 +54,7 @@ export function determineTurnResult(state: GameState): TurnResult {
     if (leaders.length === 1) {
       return { type: 'END_GAME', winner: leaders[0] };
     }
-    // RULES.md Law 11 — tied leaders at/above target trigger overtime.
+    // RULES.md Law 17 — tied leaders at/above target trigger overtime.
     // Game does NOT end. Continue into a new round; recursion is automatic
     // via re-entry into determineTurnResult at the next round boundary.
     return { type: 'END_ROUND', isOvertime: true };

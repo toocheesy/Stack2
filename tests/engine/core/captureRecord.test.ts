@@ -5,7 +5,7 @@ import { createPRNG } from '../../../src/engine/utils/prng';
 import type { Card, CaptureGroup, Combination, GameSettings, GameState, PlayerIndex } from '../../../src/engine/types';
 
 // D-007 release 2, rulings 96 and 97: a capture's record keeps its combos
-// slot by slot, and Take the Table (RULES.md Law 10) is not a capture for
+// slot by slot, and Take the Table (RULES.md Law 15) is not a capture for
 // best captures; the taker's round marks it.
 
 const settings: GameSettings = { targetScore: 300, bot1Personality: 'beginner', bot2Personality: 'intermediate' };
@@ -79,7 +79,7 @@ describe('a capture record holds its combos (D-007 ruling 96)', () => {
   });
 });
 
-describe('Take the Table is not a capture (D-007 ruling 97, RULES.md Laws 10 and 16)', () => {
+describe('Take the Table is not a capture (D-007 ruling 97, RULES.md Laws 15 and 16)', () => {
   it("after applyJackpot nobody's highestCapture changed, the taker alone took the table, and the score is as before", () => {
     let s = arrange({ hand: ['9S', '2C'], bot1: ['7H'], table: ['5H', '4C', '9D', 'KS', '3D'] });
     s = executeCapture(s, { base: byId(s, '9S'), combo1: [fromTable(byId(s, '5H')), fromTable(byId(s, '4C'))], combo2: [], combo3: [] });
@@ -114,7 +114,7 @@ describe('Take the Table is not a capture (D-007 ruling 97, RULES.md Laws 10 and
     expect(next.roundStats.map((r) => r.tookTheTable)).toEqual([false, false, false]);
   });
 
-  it('nobody takes the table when nobody captured this round (RULES.md Law 10)', () => {
+  it('nobody takes the table when nobody captured this round (RULES.md Law 15)', () => {
     const s = arrange({ table: ['5H', '4C'], lastCapturer: null });
     const { state: after, jackpotResult } = applyJackpot(s);
     expect(jackpotResult).toBeNull();

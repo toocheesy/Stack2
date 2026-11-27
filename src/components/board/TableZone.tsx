@@ -13,7 +13,7 @@ export interface TableFlight {
   flightFor: (index: number, count: number) => Flight;
 }
 
-/** The last cards landing on the table (RULES.md Law 8): which, from where, how far apart. */
+/** The last cards landing on the table (RULES.md Law 6): which, from where, how far apart. */
 export interface TableLanding {
   ids: readonly string[];
   from: () => Point | null;

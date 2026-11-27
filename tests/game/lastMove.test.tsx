@@ -167,7 +167,7 @@ describe('the board reads from the controller', () => {
     expect(messageLine(s, s.combination, result.current.lastCapture, null)).toBe('Base from your hand: every combo you fill needs a table card.');
   });
 
-  it('a capture that empties your hand names the next player holding cards, skipping an empty hand (RULES.md Law 12)', async () => {
+  it('a capture that empties your hand names the next player holding cards, skipping an empty hand (RULES.md Law 5)', async () => {
     save(arrange({ hand: ['5H'], bot1: [], bot2: ['2D', '3D'], table: ['5C', '9D'], currentPlayer: 0 }));
     const { result } = mount();
     act(() => {
@@ -188,7 +188,7 @@ describe('the board reads from the controller', () => {
     expect(messageLine(s, s.combination, result.current.lastCapture, result.current.botCombo)).toBe('Your turn ends: your hand is empty. Nina is next.');
   });
 
-  it('RULES.md Law 8: your last place records the rest of your hand, and the line reads it', async () => {
+  it('RULES.md Law 6: your last place records the rest of your hand, and the line reads it', async () => {
     // Deck empty and a capturer this round, so the round end waits on Take the Table.
     save(arrange({ hand: ['6H', 'JC'], bot1: [], bot2: [], table: ['5C', '9D'], deck: 'empty', currentPlayer: 0, lastCapturer: 1, handNumber: 4 }));
     const { result } = mount();
@@ -200,7 +200,7 @@ describe('the board reads from the controller', () => {
     expect(ids(last.rest)).toEqual(['JC']);
     expect(last.hand).toBe(4);
     // The rest is on the table at once; the round end (and Take the Table,
-    // RULES.md Law 10) waits for the last cards to land and the line to hold.
+    // RULES.md Law 15) waits for the last cards to land and the line to hold.
     expect(ids(result.current.state.board)).toEqual(['5C', '9D', '6H', 'JC']);
     await advance(landingMs(1));
     expect(result.current.state.board).toEqual([]);

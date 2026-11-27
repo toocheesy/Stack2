@@ -7,7 +7,7 @@ import { FONTS } from '../config/fonts';
 // on the board: the table's cards fly to the taker (TableZone), the scores
 // swap and the bars grow (the seats and your bar), and this banner rises over
 // the Take the Table panel. The file keeps its name; "jackpot" is a code-only
-// word (RULES.md Law 10: Take the Table).
+// word (RULES.md Law 15: Take the Table).
 
 /** The moment's data, under the name App.tsx has passed to GameView since before release 2. */
 export type JackpotDisplay = TakeTheTableMoment;

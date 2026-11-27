@@ -125,7 +125,7 @@ describe('when play moves on around the moments', () => {
     expect(result.current.lastCapture!.placed!.id).toBe('7C');
   });
 
-  it('RULES.md Law 8: after your last place the deal waits for the cards to land and the line to hold', async () => {
+  it('RULES.md Law 6: after your last place the deal waits for the cards to land and the line to hold', async () => {
     save(arrange({ hand: ['4H', '7C'], bot1: [], bot2: [], table: ['3H', '5S'], currentPlayer: 0 }));
     const { result } = mount();
     act(() => { result.current.actions.placeCard('4H'); });
@@ -142,7 +142,7 @@ describe('when play moves on around the moments', () => {
     expect(result.current.lastCapture).toBeNull();
   });
 
-  it("RULES.md Law 8: an opponent's last place waits the same way", async () => {
+  it("RULES.md Law 6: an opponent's last place waits the same way", async () => {
     save(arrange({ hand: [], bot1: ['4H', '7C'], bot2: [], table: ['3H', '5S'], currentPlayer: 1 }));
     const { result } = mount();
     await advanceUntil(() => result.current.state.hands[1].length === 0);
@@ -181,7 +181,7 @@ describe('when play moves on around the moments', () => {
     expect(result.current.jackpotInfo).toBeNull();
   });
 
-  it('no Take the Table moment when nobody captured this round (RULES.md Law 10)', async () => {
+  it('no Take the Table moment when nobody captured this round (RULES.md Law 15)', async () => {
     save(arrange({ hand: ['6H'], bot1: [], bot2: [], table: ['5C', '9D'], deck: 'empty', currentPlayer: 0, lastCapturer: null, handNumber: 4 }));
     const { result } = mount();
     act(() => { result.current.actions.placeCard('6H'); });

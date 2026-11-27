@@ -38,7 +38,7 @@ export interface RoundStats {
   // A per-round extra for the round-end screen only (S-006). Nothing else reads it.
   pointsThisRound: number;
   highestCapture: CaptureRecord | null;
-  // RULES.md Law 10: true for the one player who took the table this round
+  // RULES.md Law 15: true for the one player who took the table this round
   // (D-007 ruling 97). A take is not a capture for highestCapture.
   tookTheTable: boolean;
 }
@@ -94,7 +94,7 @@ export interface GameState {
   gamePhase: GamePhase;
   roundStats: [RoundStats, RoundStats, RoundStats];
   gameStats: [GamePlayerStats, GamePlayerStats, GamePlayerStats];
-  // RULES.md Law 11 — true during gamePhase === 'roundEnd' when the round-end
+  // RULES.md Law 17 — true during gamePhase === 'roundEnd' when the round-end
   // was triggered by tied leaders at/above target (overtime continuation).
   isOvertime: boolean;
 }
@@ -141,7 +141,7 @@ export type TurnResult =
   | { type: 'DEAL_NEW_HAND'; startingPlayer: PlayerIndex }
   | {
       type: 'END_ROUND';
-      isOvertime: boolean; // RULES.md Law 11 — true when round-end was a tie at/above target
+      isOvertime: boolean; // RULES.md Law 17 — true when round-end was a tie at/above target
     }
   | {
       type: 'END_GAME';

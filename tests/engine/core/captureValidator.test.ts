@@ -93,7 +93,7 @@ describe('validateComboSlot', () => {
 
   it('rejects mixed slot: match card + sum cards in same slot (capture-legality)', () => {
     // Slot mixing the base-rank match card with sum cards. Per RULES.md
-    // Law 2 each slot represents ONE relationship to the
+    // Law 8 each slot represents ONE relationship to the
     // base — pair OR sum, never both. Engine rejects via pure math
     // (adding the match card pushes the sum past the base, since no
     // card has value 0). Locks in the math so a future "permissive"
@@ -201,7 +201,7 @@ describe('validateFullCombo', () => {
     expect(v.allCapturedCards).toHaveLength(4);
   });
 
-  it('Law 3: base from the board, slot holding only board cards → "Every slot needs a hand card"', () => {
+  it('Law 9: base from the board, slot holding only board cards → "Every slot needs a hand card"', () => {
     const base = card('5', 'hearts');
     const b5 = card('5', 'clubs');
     const state = minimalState({
@@ -219,7 +219,7 @@ describe('validateFullCombo', () => {
     expect(v.errors[0]).toBe('Every slot needs a hand card');
   });
 
-  it('Law 3: base from the hand, slot holding only hand cards → "Every slot needs a board card"', () => {
+  it('Law 9: base from the hand, slot holding only hand cards → "Every slot needs a board card"', () => {
     const base = card('5', 'hearts');
     const h5 = card('5', 'clubs');
     const state = minimalState({
@@ -236,7 +236,7 @@ describe('validateFullCombo', () => {
     expect(v.errors[0]).toBe('Every slot needs a board card');
   });
 
-  it('Law 3: the live example — base 10 from hand, combo1 from board, combo2 both from hand → refused', () => {
+  it('Law 9: the live example — base 10 from hand, combo1 from board, combo2 both from hand → refused', () => {
     const base = card('10', 'hearts');
     const b6 = card('6', 'hearts');
     const b4 = card('4', 'diamonds');
@@ -257,7 +257,7 @@ describe('validateFullCombo', () => {
     expect(v.errors[0]).toBe('Every slot needs a board card');
   });
 
-  it('Law 3: legal capture with base from the board, every slot has a hand card → accepted', () => {
+  it('Law 9: legal capture with base from the board, every slot has a hand card → accepted', () => {
     const base = card('7', 'hearts');
     const h7 = card('7', 'clubs');
     const h3 = card('3', 'hearts');
@@ -278,7 +278,7 @@ describe('validateFullCombo', () => {
     expect(v.totalPoints).toBe(20);
   });
 
-  it('Law 15: the base repeated in a slot → refused', () => {
+  it('Law 12: the base repeated in a slot → refused', () => {
     const base = card('5', 'hearts');
     const b5 = card('5', 'clubs');
     const state = minimalState({
@@ -295,7 +295,7 @@ describe('validateFullCombo', () => {
     expect(v.isValid).toBe(false);
   });
 
-  it('Law 15: one card in two slots → refused', () => {
+  it('Law 12: one card in two slots → refused', () => {
     const base = card('5', 'hearts');
     const b5 = card('5', 'clubs');
     const state = minimalState({

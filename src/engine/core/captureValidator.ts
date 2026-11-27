@@ -90,7 +90,7 @@ export function validateFullCombo(
 
   const slots = ['combo1', 'combo2', 'combo3'] as const;
   const allCapturedCards: Card[] = [base];
-  // RULES.md Law 15: a card may be used only once in a capture.
+  // RULES.md Law 12: a card may be used only once in a capture.
   const seenIds = new Set<string>([base.id]);
 
   const baseSource = findCardSource(state, base.id);
@@ -106,7 +106,7 @@ export function validateFullCombo(
       errors.push(`${slot}: ${validation.details}`);
       continue;
     }
-    // RULES.md Law 3: every filled slot needs at least one card from the
+    // RULES.md Law 9: every filled slot needs at least one card from the
     // opposite source to the base. Source is the card's real location,
     // not its label.
     let hasOppositeSource = false;

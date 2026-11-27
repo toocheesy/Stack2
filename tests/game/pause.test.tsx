@@ -74,7 +74,7 @@ describe('the pause holds the moments (section D)', () => {
     vi.restoreAllMocks();
   });
 
-  it('RULES.md Law 8: a pause during the last cards\' hold keeps the deal back until it closes', async () => {
+  it('RULES.md Law 6: a pause during the last cards\' hold keeps the deal back until it closes', async () => {
     save(arrange({ hand: ['4H', '7C'], bot1: [], bot2: [], table: ['3H', '5S'], currentPlayer: 0 }));
     const { result, rerender } = mount(false);
     act(() => { result.current.actions.placeCard('4H'); });

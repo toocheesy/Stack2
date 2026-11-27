@@ -217,7 +217,7 @@ export function FlyingCard({ flight, children }: { flight: Flight; children: Rea
 }
 
 /** A card landing where it now lies, from where `from` says (your hand or
- *  an opponent's seat), after `delay` seconds: the last cards (RULES.md Law 8,
+ *  an opponent's seat), after `delay` seconds: the last cards (RULES.md Law 6,
  *  ruling 44). Under reduce-motion it fades in. */
 export function LandingCard({ from, delay, children }: { from: () => Point | null; delay: number; children: ReactNode }) {
   const calm = useReducedMotion();

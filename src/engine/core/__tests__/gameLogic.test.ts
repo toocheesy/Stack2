@@ -254,9 +254,9 @@ describe('game over at round boundary only', () => {
   });
 });
 
-// ─── Overtime tie-breaker (RULES.md Law 11) ────────────
+// ─── Overtime tie-breaker (RULES.md Law 17) ────────────
 
-describe('overtime tie-breaker (RULES.md Law 11)', () => {
+describe('overtime tie-breaker (RULES.md Law 17)', () => {
   function endOfRoundState(scores: [number, number, number], targetScore = 300): GameState {
     let s = createInitialState(
       { ...settings, targetScore },

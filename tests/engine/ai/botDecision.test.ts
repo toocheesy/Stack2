@@ -147,7 +147,7 @@ describe('decideBotAction', () => {
     }
   });
 
-  // ─── RULES.md Law 8 — the last player holding cards may still capture ──
+  // ─── RULES.md Law 6 — the last player holding cards may still capture ──
 
   it('a bot that is the last player with a capture available can choose capture', () => {
     // Bot holds an Ace; board has another Ace; every other hand is empty.

@@ -101,7 +101,7 @@ describe('the message line (D-007 ruling 95)', () => {
       expect(messageLine(state({ hand: [], currentPlayer: 1 }), NOTHING, move({ captures: [ONE_CAPTURE], next: 1 }), null))
         .toBe('Your turn ends: your hand is empty. Nina is next.');
     });
-    it('Law 12: the next player is the next one holding cards', () => {
+    it('Law 5: the next player is the next one holding cards', () => {
       expect(messageLine(state({ hand: [], bot1: [], currentPlayer: 2 }), NOTHING, move({ captures: [ONE_CAPTURE], next: 2 }), null))
         .toBe('Your turn ends: your hand is empty. Rex is next.');
     });
@@ -136,7 +136,7 @@ describe('the message line (D-007 ruling 95)', () => {
     it('in place of "Rex\'s turn."', () => {
       expect(messageLine(state({ deck: [], currentPlayer: 2 }), NOTHING, null, null)).toBe(LAST_HAND);
     });
-    it('Law 8: the last cards, you last', () => {
+    it('Law 6: the last cards, you last', () => {
       const s = state({ hand: [], bot1: [], bot2: [], deck: [], handNumber: 4 });
       expect(messageLine(s, NOTHING, move({ placed: card('6H'), rest: cards('JC'), hand: 4 }), null))
         .toBe('Nina and Rex are out of cards. You placed 6♥, so the rest of your hand (J♣) goes onto the table. Hand 4 is over.');

@@ -12,7 +12,7 @@ import { captureLine } from './board/words';
 // lifted off the dimmed table, with the round end sheet's colours, its gold
 // edge and glow. The result big, the winner's best capture of the game held
 // up at hand size, and a podium with the winner's step in the winner's
-// colour: gold only when you win. Never a tie (RULES.md Law 11).
+// colour: gold only when you win. Never a tie (RULES.md Law 17).
 
 const NAMES: Record<Difficulty, string> = { beginner: 'Calvin', intermediate: 'Nina', advanced: 'Rex', expert: 'Jett' };
 
@@ -35,7 +35,7 @@ export function GameOverOverlay({ winner, state, onPlayAgain, onHome }: Props) {
     colour: sheetColourOf(idx, state),
     score: state.overallScores[SCORE_KEYS[idx]],
   }));
-  // Finishing order: by score, then by seat. The winner is first (Law 11).
+  // Finishing order: by score, then by seat. The winner is first (Law 17).
   const order = [...players].sort((a, b) => b.score - a.score || a.idx - b.idx);
   const [first, second, third] = order;
   const you = winner.winner === 0;
